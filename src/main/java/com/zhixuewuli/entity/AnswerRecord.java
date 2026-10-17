@@ -1,0 +1,168 @@
+package com.zhixuewuli.entity;
+
+import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.persistence.*;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+import java.time.LocalDateTime;
+import java.util.UUID;
+
+/**
+ * 答题记录实体类
+ * 
+ * 对应数据库中的answer_records表，记录用户的每次答题详细信息。
+ * 用于学习行为分析、个性化推荐和学习路径优化。
+ * 
+ * <p>
+ * 核心功能：
+ * </p>
+ * <ul>
+ * <li>记录用户答题的完整过程</li>
+ * <li>统计答题正确率和错误模式</li>
+ * <li>支持错题本功能实现</li>
+ * <li>为AI分析提供数据支撑</li>
+ * </ul>
+ * 
+ * <p>
+ * 设计特色：
+ * </p>
+ * <ul>
+ * <li>使用UUID作为主键确保全局唯一性</li>
+ * <li>包含会话ID支持连续答题场景</li>
+ * <li>记录错误原因便于学习改进</li>
+ * <li>统计错误次数支持遗忘曲线分析</li>
+ * </ul>
+ * 
+ * @author 智学物理开发团队
+ * @version 1.0.0
+ * @since 2026
+ */
+@Entity
+@Table(name = "answer_records", indexes = {
+        @Index(name = "idx_question_answered", columnList = "question_id, answered_at"),
+        @Index(name = "idx_user_answered", columnList = "user_id, answered_at"),
+        @Index(name = "idx_session_answered", columnList = "session_id, answered_at"),
+        @Index(name = "idx_user_session_answered", columnList = "user_id, session_id, answered_at"),
+        @Index(name = "idx_user_question_answered", columnList = "user_id, question_id, answered_at"),
+        @Index(name = "idx_user_correct_answered", columnList = "user_id, correct, answered_at")
+})
+@Schema(description = "答题记录实体")
+@Data
+@EqualsAndHashCode(callSuper = false)
+public class AnswerRecord extends BaseTimeEntity {
+
+    /**
+     * 答题记录唯一标识符
+     * 
+     * 使用UUID字符串确保全局唯一性，避免ID冲突问题。
+     * 在实体持久化时自动生成。
+     */
+    @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
+    @Schema(description = "答题记录ID", example = "550e8400-e29b-41d4-a716-446655440000")
+    private String id;
+
+    /**
+     * 答题会话ID
+     * 
+     * 用于关联同一次学习过程的多个答题记录。
+     * 支持连续答题场景下的数据聚合分析。
+     */
+    @Column(name = "session_id", nullable = false)
+    @Schema(description = "答题会话ID", example = "sess_20260101_123456")
+    private String sessionId;
+
+    /**
+     * 用户ID
+     * 
+     * 指向users表的外键，标识答题的用户。
+     */
+    @Column(name = "user_id", nullable = false)
+    @Schema(description = "用户ID", example = "1001")
+    private Long userId;
+
+    /**
+     * 关联用户对象，多对一关系
+     * 
+     * 用于ORM级别的关联查询优化，避免N+1查询问题。
+     * 注意：insertable和updatable设为false，避免与userId字段冲突。
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", insertable = false, updatable = false)
+    private User user;
+
+    /**
+     * 关联题目ID
+     * 
+     * 指向questions表的外键，标识本次答题对应的题目。
+     */
+    @Column(name = "question_id", nullable = false)
+    @Schema(description = "题目ID", example = "2001")
+    private Long questionId;
+
+    /**
+     * 关联题目对象，多对一关系
+     * 
+     * 用于ORM级别的关联查询优化，可以直接访问题目详情。
+     * 注意：insertable和updatable设为false，避免与questionId字段冲突。
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "question_id", insertable = false, updatable = false)
+    private Question question;
+
+    /**
+     * 用户提交的答案
+     * 
+     * 用户实际选择的答案选项内容。
+     * 用于正确性判断和错误分析。
+     */
+    @Column(name = "selected_option", nullable = false)
+    @Schema(description = "用户答案", example = "A")
+    private String userAnswer;
+
+    /**
+     * 答题正确性标识
+     * 
+     * 标识用户对该题的回答是否正确。
+     * true表示回答正确，false表示回答错误。
+     */
+    @Column(name = "correct")
+    @Schema(description = "答题是否正确", example = "true")
+    private Boolean correct;
+
+    /**
+     * 错误原因分析
+     * 
+     * 用户答题错误时的自述原因说明。
+     * 由用户手动填写。
+     */
+    @Column(name = "error_reason")
+    @Schema(description = "错误原因", example = "对磁场的概念理解不准确")
+    private String errorReason;
+
+    /**
+     * 答题时间戳
+     * 
+     * 用户实际答题的时间点。
+     * 用于学习行为时间和序列分析。
+     */
+    @Column(name = "answered_at", nullable = false)
+    @Schema(description = "答题时间", example = "2026-01-15T14:30:00")
+    private LocalDateTime answeredAt;
+
+    /**
+     * 实体持久化前回调 - 自动设置答题时间
+     */
+    @PrePersist
+    protected void onPersist() {
+        LocalDateTime now = LocalDateTime.now();
+        // 如果没有设置答题时间，则使用当前时间
+        if (this.answeredAt == null) {
+            this.answeredAt = now;
+        }
+        // 自动生成UUID作为主键
+        if (this.id == null) {
+            this.id = UUID.randomUUID().toString();
+        }
+    }
+}

@@ -1,0 +1,27 @@
+{
+  "request": {
+    "method": "POST",
+    "urlPathPattern": "/api/v1/services/aigc/text-generation/generation",
+    "headers": {
+      "Content-Type": {
+        "equalTo": "application/json"
+      },
+      "Authorization": {
+        "matches": "Bearer .*"
+      }
+    },
+    "bodyPatterns": [
+      {
+        "matchesJsonPath": "$.input.prompt"
+      }
+    ]
+  },
+  "response": {
+    "status": 200,
+    "bodyFileName": "aliyun-ai-chat-response.json",
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  },
+  "priority": 1
+}

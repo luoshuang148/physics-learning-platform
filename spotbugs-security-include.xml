@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<FindBugsFilter>
+    <!-- 包含安全相关的检查规则 -->
+    <Match>
+        <Bug category="SECURITY"/>
+    </Match>
+    
+    <!-- 包含高优先级的bug模式 -->
+    <Match>
+        <Priority value="1"/>
+    </Match>
+    
+    <!-- 包含中等优先级的重要bug模式 -->
+    <Match>
+        <Priority value="2"/>
+        <BugPattern name="SQL_INJECTION_JDBC"/>
+    </Match>
+    
+    <Match>
+        <Priority value="2"/>
+        <BugPattern name="COMMAND_INJECTION"/>
+    </Match>
+    
+    <Match>
+        <Priority value="2"/>
+        <BugPattern name="XXE_XMLREADER"/>
+    </Match>
+    
+    <Match>
+        <Priority value="2"/>
+        <BugPattern name="WEAK_MESSAGE_DIGEST"/>
+    </Match>
+</FindBugsFilter>

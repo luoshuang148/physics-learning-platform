@@ -1,0 +1,85 @@
+services:
+  # MySQL 数据库服务
+  mysql:
+    image: mysql:8.4
+    container_name: zhixuewuli-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
+      MYSQL_DATABASE: zhixuewuli
+      MYSQL_USER: ${DB_USER}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+      TZ: Asia/Shanghai
+    ports:
+      - "127.0.0.1:3306:3306"   # 仅允许本机访问，提高安全性
+    volumes:
+      # MySQL 数据持久化到数据盘
+      - /data/mysql:/var/lib/mysql
+      # 仅在数据库目录首次初始化时自动执行建表脚本
+      - ./src/main/resources/sql/schema_init.sql:/docker-entrypoint-initdb.d/01-schema_init.sql:ro
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --default-time-zone=+08:00
+      - --performance-schema=0          # 关闭性能监控以节省内存
+      - --innodb-buffer-pool-size=128M  # 限制缓冲池大小
+      - --max-connections=50
+    mem_limit: 512m
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - zhixuewuli-network
+
+  # Spring Boot 应用服务
+  app:
+    # 单机部署默认本地构建镜像，也支持通过 APP_IMAGE 覆盖标签
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        VITE_APP_BASE: ${VITE_APP_BASE:-/api/v1/}
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-}
+    image: ${APP_IMAGE:-zhixuewuli-app:1.0.0}
+    container_name: zhixuewuli-app
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      TZ: Asia/Shanghai
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
+      SPRING_DATASOURCE_URL: "jdbc:mysql://${DB_HOST:-mysql}:${DB_PORT:-3306}/${DB_NAME:-zhixuewuli}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai&characterEncoding=utf8&connectionCollation=utf8mb4_unicode_ci"
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_NAME: zhixuewuli
+      ALIYUN_AI_API_KEY: ${ALIYUN_AI_API_KEY}
+      ZHIPU_AI_API_KEY: ${ZHIPU_AI_API_KEY}
+      APP_JWT_SECRET: ${APP_JWT_SECRET}
+      APP_CORS_ALLOWED_ORIGIN: ${APP_CORS_ALLOWED_ORIGIN}
+      VIDEO_STORAGE_PATH: /data/videos
+      SERVER_PORT: 8080
+      JAVA_OPTS: ${JAVA_OPTS:--Xms256m -Xmx448m -XX:+UseG1GC -XX:+UseContainerSupport}
+    ports:
+      - "${PUBLIC_PORT:-80}:8080"
+    volumes:
+      # 整体挂载宿主机 /data 到容器 /data，所有子目录自动持久化
+      - /data:/data
+    mem_limit: 700m
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/v1/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - zhixuewuli-network
+
+networks:
+  zhixuewuli-network:
+    driver: bridge

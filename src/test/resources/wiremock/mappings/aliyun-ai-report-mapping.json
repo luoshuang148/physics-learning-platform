@@ -1,0 +1,28 @@
+{
+  "request": {
+    "method": "POST",
+    "urlPathPattern": "/api/v1/services/aigc/text-generation/generation",
+    "headers": {
+      "Content-Type": {
+        "equalTo": "application/json"
+      },
+      "Authorization": {
+        "matches": "Bearer .*"
+      }
+    },
+    "bodyPatterns": [
+      {
+        "matchesJsonPath": "$.input.prompt",
+        "contains": "学习报告"
+      }
+    ]
+  },
+  "response": {
+    "status": 200,
+    "bodyFileName": "aliyun-ai-report-response.json",
+    "headers": {
+      "Content-Type": "application/json"
+    }
+  },
+  "priority": 2
+}

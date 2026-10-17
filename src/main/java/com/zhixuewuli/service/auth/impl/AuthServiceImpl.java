@@ -1,0 +1,156 @@
+package com.zhixuewuli.service.auth.impl;
+
+import com.zhixuewuli.common.exception.BusinessException;
+import com.zhixuewuli.common.exception.auth.*;
+import com.zhixuewuli.common.util.JwtUtil;
+import com.zhixuewuli.common.util.PasswordUtil;
+import com.zhixuewuli.dto.request.RegisterRequest;
+import com.zhixuewuli.entity.User;
+import com.zhixuewuli.repository.UserRepository;
+import com.zhixuewuli.service.auth.AuthService;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDateTime;
+import java.util.Optional;
+
+/**
+ * 认证服务实现类
+ * 
+ * 处理用户认证和注册的核心业务逻辑。
+ * 职责聚焦于用户身份验证、令牌管理和账户创建。
+ * 
+ * <p>
+ * 核心功能：
+ * </p>
+ * <ul>
+ * <li>用户登录认证（密码验证）</li>
+ * <li>JWT访问令牌生成</li>
+ * <li>新用户账户注册</li>
+ * <li>用户数据安全管理</li>
+ * </ul>
+ * 
+ * <p>
+ * 安全特性：
+ * </p>
+ * <ul>
+ * <li>BCrypt密码加密存储</li>
+ * <li>JWT令牌签名验证</li>
+ * <li>输入参数严格验证</li>
+ * <li>操作日志完整记录</li>
+ * </ul>
+ * 
+ * @author 智学物理开发团队
+ * @version 1.0.0
+ * @since 2026
+ * @see AuthService 认证服务接口
+ * @see JwtUtil JWT工具类
+ * @see PasswordUtil 密码工具类
+ */
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class AuthServiceImpl implements AuthService {
+
+    private final UserRepository userRepository;
+    private final PasswordUtil passwordUtil;
+    private final JwtUtil jwtUtil;
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    @Transactional
+    public User authenticate(String username, String password) {
+        // 输入验证
+        if (username == null || username.trim().isEmpty()) {
+            throw new InvalidCredentialsException();
+        }
+
+        if (password == null || password.isEmpty()) {
+            throw new InvalidCredentialsException();
+        }
+
+        String loginId = username.trim();
+
+        // 真实姓名优先，未命中再按用户名匹配
+        Optional<User> userOpt = userRepository.findByRealName(loginId);
+        if (userOpt.isEmpty()) {
+            userOpt = userRepository.findByUsername(loginId);
+        }
+        if (userOpt.isEmpty()) {
+            throw new UserNotFoundException();
+        }
+
+        User user = userOpt.get();
+
+        // 检查账户状态
+        if (!Boolean.TRUE.equals(user.getActive())) {
+            throw new AccountDisabledException();
+        }
+
+        // 验证密码
+        if (!passwordUtil.matches(password, user.getPasswordHash())) {
+            throw new InvalidCredentialsException();
+        }
+
+        // 更新最后登录时间
+        user.setLastLogin(java.time.LocalDateTime.now());
+        userRepository.save(user);
+
+        log.info("用户登录成功，登录标识: {}, 实际用户名: {}", loginId, user.getUsername());
+        return user;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public String generateAccessToken(User user) {
+        if (user == null) {
+            throw new IllegalArgumentException("用户对象不能为空");
+        }
+
+        return jwtUtil.generateToken(user.getId(), user.getUsername());
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    @Transactional
+    public User registerUser(RegisterRequest request) {
+        log.info("开始处理用户注册请求，用户名: {}", request.getUsername());
+
+        // 验证用户名唯一性
+        if (userRepository.existsByUsername(request.getUsername())) {
+            throw new UserNameDuplicateException(request.getUsername());
+        }
+        // 用户名不得与任何真实姓名重复，避免占用真实姓名登录标识
+        if (userRepository.existsByRealName(request.getUsername())) {
+            throw new UserNameDuplicateException(request.getUsername());
+        }
+
+        // 创建新用户对象
+        User newUser = new User();
+        newUser.setUsername(request.getUsername());
+        newUser.setRealName(request.getRealName());
+        newUser.setUserType(request.getUserType());
+        newUser.setClassName(request.getClassName());
+        newUser.setActive(true);
+
+        // 加密密码
+        String encryptedPassword = passwordUtil.encode(request.getPassword());
+        newUser.setPasswordHash(encryptedPassword);
+
+        // 保存用户
+        User savedUser = userRepository.save(newUser);
+
+        log.info("用户注册成功，用户ID: {}, 用户名: {}", savedUser.getId(), savedUser.getUsername());
+
+        return savedUser;
+    }
+}

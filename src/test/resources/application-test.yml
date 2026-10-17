@@ -1,0 +1,138 @@
+# src/test/resources/application-test.yml
+spring:
+  main:
+    allow-bean-definition-overriding: true
+    banner-mode: off
+  
+  # H2内存数据库配置（MySQL兼容模式）
+  datasource:
+    url: jdbc:h2:mem:zhixuewuli_test;MODE=MySQL;DB_CLOSE_DELAY=-1;DATABASE_TO_UPPER=false;CASE_INSENSITIVE_IDENTIFIERS=TRUE
+    username: sa
+    password: 
+    driver-class-name: org.h2.Driver
+    hikari:
+      minimum-idle: 2
+      maximum-pool-size: 10
+      idle-timeout: 10000
+      max-lifetime: 30000
+      connection-timeout: 10000
+      leak-detection-threshold: 5000
+      pool-name: TestHikariCP
+      register-mbeans: false
+  
+  # JPA配置
+  jpa:
+    hibernate:
+      ddl-auto: create-drop  # 测试环境使用create-drop，每次测试后清理
+    show-sql: false          # 测试时不显示SQL，避免日志污染
+    properties:
+      hibernate:
+        format_sql: false
+        dialect: org.hibernate.dialect.H2Dialect
+        jdbc:
+          batch_size: 5      # 测试环境减少批处理大小
+        order_updates: true
+        order_inserts: true
+  
+  # 缓存配置
+  cache:
+    type: simple
+    cache-names:
+      - videoCache
+      - questionCache
+      - userCache
+      - reportCache
+  
+    # 事务管理
+  transaction:
+    default-timeout: 15      # 测试环境使用 15 秒，避免并行测试时的资源竞争
+  
+    # 禁用 Spring Security
+  # security:
+  #   enabled: false
+  
+                # 禁止外部服务
+  # autoconfigure:
+  #   exclude:
+  #     - org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration
+  #     - org.springframework.boot.actuate.autoconfigure.security.servlet.ManagementWebSecurityAutoConfiguration
+
+# 应用配置
+app:
+  video:
+    storage-path: ${java.io.tmpdir}/test-video-uploads
+    access-path: /videos
+    max-file-size: 524288000
+    allowed-formats:
+      - mp4
+      - webm
+    default-cover-url: https://test.example.com/default.jpg
+  
+  security:
+    jwt-expiration: 3600000  # 1小时，便于测试
+    jwt-secret: "test-jwt-secret-key-for-unit-tests-only-do-not-use-in-production"
+    csrf-enabled: false
+    security-enabled: false   # 测试环境关闭安全验证
+    cors-allowed-origins:
+      - "*"
+    cors-allowed-methods:
+      - GET
+      - POST
+      - PUT
+      - DELETE
+      - PATCH
+      - OPTIONS
+    cors-allowed-headers:
+      - "*"
+    cors-allow-credentials: true
+    auth-exclude-paths:
+      - "/auth/login"
+      - "/auth/register"
+      - "/swagger-ui/**"
+      - "/v1/api-docs/**"
+      - "/webjars/**"
+    session-exclude-paths:
+      - "/swagger-ui/**"
+      - "/v1/api-docs/**"
+      - "/webjars/**"
+
+# AI服务配置 - 测试环境禁用真实API调用
+ai:
+  context:
+    # 禁用外部API调用
+    aliyun-api-key: "test-mock-key"
+    zhipu-api-key: "test-mock-key"
+    # 使用测试模式
+    test-mode: true
+    mock-responses: true
+  streaming:
+    enabled: false  # 禁用流式响应
+
+# 日志配置
+logging:
+  level:
+    root: WARN
+    com.zhixuewuli: DEBUG
+    com.zhixuewuli.common.interceptor: DEBUG
+    com.zhixuewuli.service.session: DEBUG
+    org.springframework.web.servlet: DEBUG
+    org.springframework.security: DEBUG
+    org.springframework: WARN
+    org.hibernate: ERROR
+    com.zaxxer.hikari: WARN
+    org.testcontainers: WARN
+  pattern:
+    console: "%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"
+
+# 测试专用配置
+test:
+  database:
+    init-script: /sql/test-schema.sql
+    data-script: /sql/test-data.sql
+    cleanup-script: /sql/clean-database.sql
+  wiremock:
+    port: 8089
+    enabled: true
+  mock:
+    ai-service: true
+    external-api: true

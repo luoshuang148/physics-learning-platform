@@ -1,0 +1,195 @@
+server:
+  port: 8080
+  servlet:
+    context-path: /api/v1
+
+spring:
+  profiles:
+    active: dev
+  application:
+    name: zhixuewuli-backend
+  servlet:
+    multipart:
+      max-file-size: 500MB
+      max-request-size: 520MB
+  cache:
+    type: simple
+    cache-names:
+      - videoCache
+      - questionCache
+      - userCache
+      - reportCache
+    redis:
+      time-to-live: 3600000  # 1小时
+  jpa:
+    hibernate:
+      ddl-auto: validate              # 默认生产环境行为，开发环境会覆盖为update
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: false
+        use_sql_comments: false
+        order_updates: true
+        batch_versioned_data: true
+        order_inserts: true
+        jdbc:
+          batch_size: 25
+          fetch_size: 50
+
+springdoc:
+  api-docs:
+    enabled: true
+    path: /v3/api-docs  # OpenAPI JSON 端点路径（相对于 context-path）
+  swagger-ui:
+    path: /swagger-ui.html
+    enabled: true
+
+# Actuator监控配置
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: always
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+  info:
+    build:
+      enabled: true
+    git:
+      enabled: true
+    env:
+      enabled: true
+
+# 默认日志级别（环境配置文件可覆盖）
+logging:
+  level:
+    com.zhixuewuli: INFO
+    org.springframework.web: WARN
+    org.springframework.security: WARN
+    org.hibernate: WARN
+    com.zaxxer.hikari: INFO
+
+app:
+  # LaTeX服务配置
+  latex:
+    strict-mode: true
+    auto-standardization: true
+    unit-standards:
+      standardize-units: true
+      add-space-between-number-and-unit: true
+      default-unit-font: "\\mathrm"
+    math-symbol-standards:
+      standardize-multiplication: true
+      standardize-division: true
+      standardize-angles: true
+
+  # 安全配置 (对应 SecurityProperties)
+  security:
+    jwt-expiration: 86400000
+    jwt-expiration-ms: 86400000
+    cors-max-age: 3600
+    csrf-enabled: false
+    security-enabled: true
+    cors-allowed-origins:
+      - "*"
+    cors-allowed-methods:
+      - GET
+      - POST
+      - PUT
+      - DELETE
+      - PATCH
+      - OPTIONS
+    cors-allowed-headers:
+      - "*"
+    cors-allow-credentials: true
+    auth-exclude-paths:
+      - /auth/login
+      - /auth/register
+      - /swagger-ui/**
+      - /v1/api-docs/**
+      - /webjars/**
+      - /videos/**
+    session-exclude-paths:
+      - /swagger-ui/**
+      - /v1/api-docs/**
+      - /webjars/**
+      - /videos/**
+    jwt-secret: ${APP_JWT_SECRET:zhixuewuli-default-secret-for-dev-only}
+
+# AI 业务配置 (对应 AIBusinessProperties)
+ai:
+  context:
+    # 上下文管理配置
+    max-history-count: 15
+    max-token-count: 1500000
+    session-expiration: 24h
+    cleanup-interval: 10m
+    context-background: "你是一名经验丰富的高中物理教师，擅长用通俗易懂的方式讲解复杂的物理概念。你的职责是帮助学生理解物理知识，解决学生困惑，并提供针对性的学习建议。请用中文回答，语气要亲切、专业、有耐心。涉及公式的部分，统一使用标准规范的LaTeX格式，例如将所有Unicode箭头替换为LaTeX命令，并且确保公式边界清晰，如应该写成\\cdot t而非\\cdott。"
+    teacher-question-analysis-default-prompt: "请总结归纳学生本题的学习情况，从以下几个角度关注：\r\n1、整体掌握情况（包括正确率、理解程度或学生成绩与掌握情况在班级里的分布等）\r\n2、典型错因和错误思考模式深度分析（可以有依据地结合答题情况与学生自述，适度推理学生错误背后的真相，而不是停留于单纯对学生自述错因的摘要）\r\n3、教学应对建议（包括针对性纠错策略和核心强化知识点与教学方法提示）\r\n4、鼓励在回答中体现具体数据支撑"
+
+    # 模型配置
+    real-time-qa-model: "glm-4.1v-thinking-flash"
+    wrong-question-analysis-model: "glm-4.5v"
+    teacher-report-generation-model: "qwen3-235b-a22b-instruct-2507"
+    student-report-generation-model: "qwen3-30b-a3b-instruct-2507"
+
+    # 通用参数
+    temperature: 0.6
+    max-tokens: 8192
+
+    # 阿里云配置 (优先使用 *_AI_API_KEY，兼容旧变量名)
+    aliyun-api-key: ${ALIYUN_AI_API_KEY:${ALIYUN_API_KEY:}}
+    aliyun-base-url: "https://dashscope.aliyuncs.com/compatible-mode/v1"
+    aliyun-default-model: "qwen3-235b-a22b-instruct-2507"
+    aliyun-temperature: 0.7
+    aliyun-max-tokens: 6144
+
+
+    # 智谱AI配置 (优先使用 *_AI_API_KEY，兼容旧变量名)
+    zhipu-api-key: ${ZHIPU_AI_API_KEY:${ZHIPU_API_KEY:}}
+    zhipu-base-url: "https://open.bigmodel.cn/api/paas/v4"
+    zhipu-default-model: "glm-4.1v-thinking-flash"
+    zhipu-temperature: 0.3
+    zhipu-max-tokens: 8192
+    zhipu-enable-reasoning: true
+
+  # AI流式服务配置 (对应 AIStreamingProperties)
+  streaming:
+    # 超时配置
+    call-timeout: 300000
+    connect-timeout: 10000
+    read-timeout: 60000
+    write-timeout: 40000
+
+    # 连接池配置
+    max-idle-connections: 10
+    keep-alive-duration: 5
+
+    # 可靠性配置
+    auto-reconnect: true
+
+    # 数据处理配置
+    buffer-size: 8192
+
+    # 并发控制配置
+    max-concurrent-requests: 32
+    max-requests-per-host: 16
+
+    # SSE配置
+    sse-emitter-timeout: 300000
+    sse-reconnect-time: 3000
+
+    # 线程池配置
+    ai-core-pool-size: 10
+    ai-max-pool-size: 50
+    ai-queue-capacity: 200
+    ai-thread-name-prefix: "ai-task-"
+    
+    # SSE 连接数限制配置
+    max-sse-connections: 32

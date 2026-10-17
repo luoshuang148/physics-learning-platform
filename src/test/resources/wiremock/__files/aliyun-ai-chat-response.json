@@ -1,0 +1,21 @@
+{
+  "id": "mock-chatcmpl-test123",
+  "object": "chat.completion",
+  "created": 1709564800,
+  "model": "qwen-turbo",
+  "choices": [
+    {
+      "index": 0,
+      "message": {
+        "role": "assistant",
+        "content": "这是一个模拟的 AI 回答。根据您的问题，从物理教学角度来看，我们需要分析题目的考查重点和学生的常见错误。"
+      },
+      "finish_reason": "stop"
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 50,
+    "completion_tokens": 100,
+    "total_tokens": 150
+  }
+}
