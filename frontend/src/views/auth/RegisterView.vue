@@ -1,7 +1,7 @@
 <template>
   <AuthLayout>
     <h2 class="auth-title">创建账号</h2>
-    <p class="auth-sub">接入学生与教师双角色体验</p>
+    <p class="auth-sub">创建学生学习账号</p>
 
     <form class="form" @submit.prevent="onSubmit">
       <label>用户名</label>
@@ -16,22 +16,7 @@
       <label>班级（可选）</label>
       <input v-model="form.className" placeholder="例如：高三 (1) 班" />
 
-      <label>角色</label>
-      <select v-model="form.userType">
-        <option value="STUDENT">学生</option>
-        <option value="TEACHER">教师</option>
-      </select>
-
-      <template v-if="form.userType === 'TEACHER'">
-        <label>教师口令</label>
-        <input
-          v-model="form.teacherCode"
-          inputmode="numeric"
-          maxlength="6"
-          placeholder="请输入 6 位教师口令"
-        />
-        <p class="teacher-code-tip">注册教师账号需输入教师口令</p>
-      </template>
+      <p class="teacher-code-tip">注册后为学生账号。教师身份请联系平台已有教师授权。</p>
 
       <button class="neon-btn primary" type="submit" :disabled="loading">
         {{ loading ? '注册中…' : '注册' }}
@@ -53,7 +38,6 @@ import { registerApi } from '@/api/auth';
 import { useToast } from '@/composables/useToast';
 import { upsertAccount } from '@/db/accountDb';
 
-const TEACHER_REGISTER_CODE = '786526';
 
 const router = useRouter();
 const { visible, type, message, show } = useToast();
@@ -65,7 +49,6 @@ const form = reactive({
   realName: '',
   className: '',
   userType: 'STUDENT' as 'STUDENT' | 'TEACHER',
-  teacherCode: '',
 });
 
 const onSubmit = async () => {
@@ -74,17 +57,6 @@ const onSubmit = async () => {
     return;
   }
 
-  if (form.userType === 'TEACHER') {
-    const teacherCode = form.teacherCode.trim();
-    if (!/^\d{6}$/.test(teacherCode)) {
-      show('教师口令必须为 6 位数字', 'error');
-      return;
-    }
-    if (teacherCode !== TEACHER_REGISTER_CODE) {
-      show('教师口令错误，无法注册教师账号', 'error');
-      return;
-    }
-  }
 
   loading.value = true;
   try {

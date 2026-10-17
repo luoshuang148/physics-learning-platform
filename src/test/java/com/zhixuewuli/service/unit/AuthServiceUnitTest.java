@@ -262,6 +262,20 @@ class AuthServiceUnitTest extends BaseUnitTest {
         verify(jwtUtil, never()).generateToken(anyLong(), anyString());
     }
 
+    @Test
+    void registerUser_shouldRejectPublicTeacherRegistration() {
+        RegisterRequest request = new RegisterRequest();
+        request.setUsername("forged_teacher");
+        request.setPassword("password123");
+        request.setRealName("Unauthorised teacher");
+        request.setUserType(User.UserType.TEACHER);
+        org.mockito.Mockito.lenient().when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        assertThatThrownBy(() -> authService.registerUser(request))
+                .isInstanceOf(com.zhixuewuli.common.exception.InsufficientPermissionException.class);
+        verify(userRepository, never()).save(any(User.class));
+    }
+
     // ==================== registerUser 测试 ====================
 
     @Test
@@ -317,6 +331,7 @@ class AuthServiceUnitTest extends BaseUnitTest {
         request.setUsername("existinguser");
         request.setPassword("password123");
         request.setRealName("_existing_user");
+        request.setUserType(User.UserType.STUDENT);
 
         when(userRepository.existsByUsername("existinguser")).thenReturn(true);
 

@@ -19,7 +19,7 @@ import lombok.Data;
  * <li><strong>username</strong>: 用户登录名，需满足格式要求且唯一</li>
  * <li><strong>password</strong>: 登录密码，需符合安全要求</li>
  * <li><strong>realName</strong>: 用户真实姓名，用于显示和识别</li>
- * <li><strong>userType</strong>: 用户类型（学生/教师），决定功能权限</li>
+ * <li><strong>userType</strong>: 用户类型（公开注册仅允许学生）</li>
  * <li><strong>className</strong>: 所属班级名称（可选）</li>
  * </ul>
  * 

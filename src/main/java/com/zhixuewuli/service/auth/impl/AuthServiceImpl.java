@@ -123,6 +123,10 @@ public class AuthServiceImpl implements AuthService {
     @Override
     @Transactional
     public User registerUser(RegisterRequest request) {
+        if (request.getUserType() != User.UserType.STUDENT) {
+            throw new com.zhixuewuli.common.exception.InsufficientPermissionException(
+                    "公开注册仅允许学生账号，教师身份须由已授权教师在用户管理中授予");
+        }
         log.info("开始处理用户注册请求，用户名: {}", request.getUsername());
 
         // 验证用户名唯一性

@@ -409,7 +409,7 @@ public class AuthControllerIntegrationTest extends BaseControllerIntegrationTest
                 result.andExpect(status().is4xxClientError());
         }
 
-        @DisplayName("注册成功 - 教师用户")
+        @DisplayName("公开注册拒绝伪造教师角色")
         @Test
         void testRegister_TeacherUser() throws Exception {
                 // Given: 教师用户注册信息
@@ -430,11 +430,9 @@ public class AuthControllerIntegrationTest extends BaseControllerIntegrationTest
                                 .content(objectMapper.writeValueAsString(request)))
                                 .andDo(print());
 
-                // Then: 验证注册成功
-                result.andExpect(status().isCreated())
-                                .andExpect(jsonPath("$.code").value(201))
-                                .andExpect(jsonPath("$.data.username").value(username))
-                                .andExpect(jsonPath("$.data.userType").value("TEACHER"));
+                // Direct HTTP requests cannot grant a privileged role.
+                result.andExpect(status().isForbidden());
+                org.assertj.core.api.Assertions.assertThat(userRepository.findByUsername(username)).isEmpty();
         }
 
         // ============================================================

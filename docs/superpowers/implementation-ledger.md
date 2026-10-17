@@ -7,3 +7,5 @@ Ruling: fix test isolation first, before product changes, because existing failu
 Design builder check: nothing important left. User already authorized the preceding review recommendations; implementation proceeds inline.
 
 Task 0: complete — isolated integration contexts after each class, Java 21 compiler release, one configurable test fork, 120-second test transaction budget, Maven Wrapper 3.9.9. Default pre-product suite: 993/993 passed (mvn -B test); wrapper -v verified Java 21/Maven 3.9.9. New task-specific regression sources remain outside this commit until their own RED/GREEN cycles.
+
+Task 1: complete — direct TEACHER registration reproduced as HTTP 201 before the fix, now rejected with 403; public UI provisions students only. Existing protected teacher user-management flow provisions new teachers. Auth controller/service: 31 passed; frontend production build passed. The duplicate-username unit fixture now supplies its required STUDENT role. Session persistence regressions were intentionally run separately in the same command and are still RED; one recovery fixture contained an invalid hyphenated username and is corrected before its RED rerun.
