@@ -274,14 +274,20 @@ public class AnswerRecordController {
         return Result.success(AnswerRecordBatchResponse.builder().records(data).totalCount((long)data.size()).build());
     }
 
+    @org.springframework.beans.factory.annotation.Autowired private com.zhixuewuli.service.answerRecord.TaskLearningSummaryService summaries;
+    @GetMapping("/teacher/summary")
+    public Result<com.zhixuewuli.dto.response.LearningSummary> summary(@RequestParam(required=false) Long eventId,HttpServletRequest request){
+        return Result.success(summaries.summary((Long)request.getAttribute("userId"),eventId));
+    }
+
     @GetMapping("/teacher/page")
     @Operation(summary = "教师分页查询答题记录")
     public Result<com.zhixuewuli.common.result.PageResult<AnswerRecordResponse>> getTeacherPage(
             @RequestParam(defaultValue = "1") int page, @RequestParam(defaultValue = "20") int size,
             @RequestParam(defaultValue = "false") boolean wrongOnly,
-            @RequestParam(defaultValue = "") String studentName, HttpServletRequest request) {
+            @RequestParam(defaultValue = "") String studentName, @RequestParam(required=false) Long eventId,HttpServletRequest request) {
         return Result.success(answerRecordService.getTeacherAnswerPage(
-                (Long) request.getAttribute("userId"), page, size, wrongOnly, studentName));
+                (Long) request.getAttribute("userId"), page, size, wrongOnly, studentName,eventId));
     }
 
     @GetMapping("/teacher/all")

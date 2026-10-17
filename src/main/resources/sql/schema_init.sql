@@ -86,6 +86,7 @@ CREATE TABLE IF NOT EXISTS answer_records (
     request_id VARCHAR(64) NULL,
     practice BOOLEAN NOT NULL DEFAULT FALSE,
     question_snapshot LONGTEXT NULL,
+    content_snapshot LONGTEXT NULL, options_snapshot LONGTEXT NULL, correct_snapshot VARCHAR(1) NULL, analysis_snapshot LONGTEXT NULL,difficulty_snapshot INT NULL,
     attempt_order BIGINT NOT NULL AUTO_INCREMENT UNIQUE,
     UNIQUE KEY uk_user_request(user_id,request_id),
     event_id BIGINT NULL COMMENT '教学任务ID，旧数据和自由练习可为空',

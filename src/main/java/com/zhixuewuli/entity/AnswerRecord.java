@@ -51,6 +51,11 @@ import java.util.UUID;
 @Data
 @EqualsAndHashCode(callSuper = false)
 public class AnswerRecord extends BaseTimeEntity {
+    @Column(name="content_snapshot",columnDefinition="LONGTEXT") private String contentSnapshot;
+    @Column(name="options_snapshot",columnDefinition="LONGTEXT") private String optionsSnapshot;
+    @Column(name="correct_snapshot",length=1) private String correctSnapshot;
+    @Column(name="analysis_snapshot",columnDefinition="LONGTEXT") private String analysisSnapshot;
+    @Column(name="difficulty_snapshot") private Integer difficultySnapshot;
     @Column(name="request_id",length=64) private String requestId;
     @Column(name="practice",nullable=false,columnDefinition="boolean default false") private boolean practice;
     @Column(name="question_snapshot",columnDefinition="LONGTEXT") private String questionSnapshot;

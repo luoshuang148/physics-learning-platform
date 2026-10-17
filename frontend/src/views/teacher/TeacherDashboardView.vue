@@ -1,17 +1,18 @@
 <template>
   <AppShell :subtitle="`教师总览 · ${auth.user?.realName ?? ''}`" :links="links">
     <div class="dashboard-page teacher-font">
+      <p v-if="dashboardError" role="alert">{{ dashboardError }} <button @click="loadDashboard">重试</button></p>
       <section class="dashboard-hero">
         <div class="hero-copy">
           <span class="hero-kicker">Teaching overview</span>
           <h1 class="hero-title">教师总览</h1>
-          <p class="hero-summary">聚焦学生实验参与度与整体答题质量，快速判断班级当前学习状态。</p>
+          <p class="hero-summary">本平台用于单班共享教学。任务成绩按首次作答计算，补练单独统计掌握状态。</p>
         </div>
 
         <div class="hero-visuals">
           <div class="hero-donut-card">
             <div class="hero-donut-head">
-              <span class="hero-donut-label">实验完成情况</span>
+              <span class="hero-donut-label">当前任务完成情况</span>
               <strong>{{ completionRateText }}</strong>
             </div>
             <div class="hero-donut-body">
@@ -24,11 +25,11 @@
               <div class="hero-donut-legend">
                 <div class="legend-row done">
                   <span class="legend-dot"></span>
-                  <span>已作答 {{ answerStats.answeredStudentCount }}</span>
+                  <span>已完成 {{ answerStats.answeredStudentCount }}</span>
                 </div>
                 <div class="legend-row pending">
                   <span class="legend-dot"></span>
-                  <span>未作答 {{ unAnsweredStudentCount }}</span>
+                  <span>未完成 {{ unAnsweredStudentCount }}</span>
                 </div>
                 <div class="legend-note">总学生人数 {{ answerStats.totalStudentCount }}</div>
               </div>
@@ -37,7 +38,7 @@
 
           <div class="hero-donut-card accuracy-card">
             <div class="hero-donut-head">
-              <span class="hero-donut-label">总答题正确率</span>
+              <span class="hero-donut-label">累计作答正确率</span>
               <strong>{{ accuracyRateText }}</strong>
             </div>
             <div class="hero-donut-body">
@@ -146,9 +147,8 @@ import { computed, onMounted, ref } from 'vue';
 import AppShell from '@/layouts/AppShell.vue';
 import { useAuthStore } from '@/stores/auth';
 import { getAllUsersApi } from '@/api/user';
-import { getAllAnswerRecordsApi, getAnswerStatsApi } from '@/api/answer-record';
+import { getLearningSummaryApi } from '@/api/answer-record';
 import { getTeacherEventApi } from '@/api/teacher-event';
-import { getAllQuestionsApi } from '@/api/question';
 import { teacherNavLinks } from '@/constants/navigation';
 import type { UserResponse } from '@/types/user';
 import type { TeacherEventResponse } from '@/types/teacher-event';
@@ -169,6 +169,8 @@ const shortcuts = [
 
 const users = ref<UserResponse[]>([]);
 const totalAnswers = ref(0);
+const dashboardError=ref('');
+const currentSummary=ref<import('@/api/answer-record').LearningSummary|null>(null);
 const totalQuestions = ref(0);
 const correctAnswerCount = ref(0);
 const event = ref<TeacherEventResponse | null>(null);
@@ -213,6 +215,8 @@ const metrics = computed(() => [
   { icon: '👥', label: '学生人数', value: answerStats.value.totalStudentCount.toLocaleString(), loading: loading.value },
   { icon: '🗂️', label: '题库题目数', value: totalQuestions.value.toLocaleString(), loading: loading.value },
   { icon: '⚡', label: '当前任务题数', value: event.value ? `${eventQuestionCount.value}` : '0', loading: loading.value },
+  {icon:'✓',label:'当前任务首次正确率',value:currentSummary.value?.assignmentAnswers ? `${(100*currentSummary.value.assignmentCorrect/currentSummary.value.assignmentAnswers).toFixed(1)}%` : '—',loading:loading.value},
+  {icon:'↻',label:'当前任务补练次数',value:currentSummary.value?.practiceAttempts ?? 0,loading:loading.value},
 ]);
 
 const donutStyle = (percent: number) => ({
@@ -222,26 +226,19 @@ const donutStyle = (percent: number) => ({
 const formatTime = (t: string) => new Date(t).toLocaleString('zh-CN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 const formatDate = (t: string) => new Date(t).toLocaleString('zh-CN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 
-onMounted(async () => {
-  loading.value = true;
+const loadDashboard = async () => {
+  loading.value=true;dashboardError.value='';
   try {
-    const [allUsers, allRecords, stats, currentEvent, questions] = await Promise.all([
-      getAllUsersApi(),
-      getAllAnswerRecordsApi(),
-      getAnswerStatsApi(),
-      getTeacherEventApi(),
-      getAllQuestionsApi(),
-    ]);
-    users.value = allUsers;
-    totalAnswers.value = allRecords.records?.length ?? 0;
-    correctAnswerCount.value = (allRecords.records ?? []).filter((item) => item.correct).length;
-    answerStats.value = stats;
-    event.value = currentEvent;
-    totalQuestions.value = questions.length;
-  } finally {
-    loading.value = false;
-  }
-});
+    const [allUsers,currentEvent,lifetime]=await Promise.all([getAllUsersApi(),getTeacherEventApi(),getLearningSummaryApi()]);
+    users.value=allUsers;event.value=currentEvent;
+    totalAnswers.value=lifetime.totalAttempts;correctAnswerCount.value=lifetime.correctAttempts;totalQuestions.value=lifetime.questionCount;
+    currentSummary.value=currentEvent?await getLearningSummaryApi(currentEvent.id):null;
+    answerStats.value={answeredStudentCount:currentSummary.value?.completedStudents ?? 0,totalStudentCount:lifetime.eligibleStudents,
+      coverageRate:lifetime.eligibleStudents?100*(currentSummary.value?.completedStudents ?? 0)/lifetime.eligibleStudents:0};
+  } catch {dashboardError.value='统计加载失败，请重试。';}
+  finally {loading.value=false;}
+};
+onMounted(loadDashboard);
 </script>
 
 <style scoped>

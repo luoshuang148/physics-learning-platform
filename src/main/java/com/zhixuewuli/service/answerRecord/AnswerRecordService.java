@@ -35,6 +35,7 @@ import com.zhixuewuli.dto.response.AnswerStatsResponse;
  * @since 2026
  */
 public interface AnswerRecordService {
+    com.zhixuewuli.common.result.PageResult<AnswerRecordResponse> getTeacherAnswerPage(Long id,int page,int size,boolean wrongOnly,String studentName,Long eventId);
     com.zhixuewuli.common.result.PageResult<AnswerRecordResponse> getTeacherAnswerPage(
             Long currentUserId, int page, int size, boolean wrongOnly, String studentName);
 

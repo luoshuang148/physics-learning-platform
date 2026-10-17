@@ -5,7 +5,7 @@
         <div>
           <span class="event-kicker">Experiment task workspace</span>
           <h1 class="event-title">实验任务</h1>
-          <p class="event-summary">在一个工作台里完成选题、排题、发布和查看实验学习报告。</p>
+          <p class="event-summary">单班共享任务：替换会归档当前任务并发布新版本，历史作答和题目快照会保留。</p>
         </div>
         <div class="event-status-card" :class="current ? 'live' : 'idle'">
           <span class="event-status-label">当前状态</span>
@@ -15,7 +15,7 @@
             <button
               v-if="current"
               class="status-report-btn"
-              @click="openEventReport"
+              @click="openEventReport()"
             >{{ eventReportButtonText }}</button>
             <button v-if="current" class="status-delete-btn" @click="deleteTask">归档任务</button>
           </div>
@@ -25,7 +25,11 @@
       <details class="event-report-panel">
         <summary>已归档任务（{{ historyTotal }}）</summary>
         <p>归档后保留答题、对话和学习报告。</p>
-        <p v-for="event in archivedEvents" :key="event.id">#{{ event.id }} · {{ event.eventTitle }} · {{ event.eventTimestamp }}</p>
+        <p v-for="event in archivedEvents" :key="event.id">
+          {{ event.eventTitle }} · {{ event.eventTimestamp }}
+          <RouterLink :to="{path:'/teacher/records',query:{eventId:event.id}}">查看作答</RouterLink>
+          <button @click="openEventReport(event)">查看任务分析</button>
+        </p>
         <button class="status-report-btn" :disabled="historyPage <= 1" @click="historyPage--; loadHistory()">上一页</button>
         <button class="status-report-btn" :disabled="historyPage * 10 >= historyTotal" @click="historyPage++; loadHistory()">下一页</button>
       </details>
@@ -427,8 +431,7 @@ const clearEventReport = () => {
   reportStore.clearCachedReport();
 };
 
-const startEventReportStream = async () => {
-  const event = current.value;
+const startEventReportStream = async (event: TeacherEventResponse) => {
   if (!event) return;
   clearEventReport();
   const scope = reportRequestGuard.begin(event.id, event.eventTitle);
@@ -501,20 +504,20 @@ const stopEventReportStream = () => {
   activeAbortController.value?.abort();
 };
 
-const openEventReport = async () => {
-  if (!current.value) {
+const openEventReport = async (event:TeacherEventResponse|null=current.value) => {
+  if (!event) {
     show('当前没有已发布实验任务，无法生成实验学习报告', 'info');
     return;
   }
 
   showEventReport.value = true;
-  const sessionType = `teacher_event_report_${current.value.id}`;
-  const hasCachedCurrentReport = reportStore.cachedReport?.eventId === current.value.id;
+  const sessionType = `teacher_event_report_${event.id}`;
+  const hasCachedCurrentReport = reportStore.cachedReport?.eventId === event.id;
 
   if (eventReportState.value.loading && activeReportSessionType.value === sessionType) return;
   if (hasCachedCurrentReport && (eventReportState.value.content || eventReportState.value.reasoning || eventReportState.value.error)) return;
 
-  await startEventReportStream();
+  await startEventReportStream(event);
 };
 
 const closeEventReport = () => {

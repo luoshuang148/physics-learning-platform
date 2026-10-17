@@ -16,6 +16,25 @@ import java.util.Optional;
 
 @Repository
 public interface AnswerRecordRepository extends JpaRepository<AnswerRecord, String> {
+        interface Totals {
+            Long getTotalAttempts();Long getCorrectAttempts();Long getAssignmentAnswers();
+            Long getAssignmentCorrect();Long getParticipatingStudents();Long getPracticeAttempts();
+        }
+        @Query("select count(a) as totalAttempts,coalesce(sum(case when a.correct=true then 1 else 0 end),0) as correctAttempts,"+
+          "coalesce(sum(case when a.practice=false then 1 else 0 end),0) as assignmentAnswers,"+
+          "coalesce(sum(case when a.practice=false and a.correct=true then 1 else 0 end),0) as assignmentCorrect,"+
+          "count(distinct case when a.practice=false then a.userId else null end) as participatingStudents,"+
+          "coalesce(sum(case when a.practice=true then 1 else 0 end),0) as practiceAttempts "+
+          "from AnswerRecord a where (:eventId is null or a.eventId=:eventId)")
+        Totals summarize(@org.springframework.data.repository.query.Param("eventId") Long eventId);
+        @Query(value="select count(*) from (select user_id from answer_records where event_id=:eventId and practice=false "+
+           "group by user_id having count(distinct question_id)>=:questionCount) completed",nativeQuery=true)
+        long countCompletedStudents(@org.springframework.data.repository.query.Param("eventId") Long eventId,
+           @org.springframework.data.repository.query.Param("questionCount") long questionCount);
+        @Query("select count(a) from AnswerRecord a where (:eventId is null or a.eventId=:eventId) and a.correct=true "+
+          "and not exists(select b.id from AnswerRecord b where b.userId=a.userId and b.questionId=a.questionId "+
+          "and (b.eventId=a.eventId or (b.eventId is null and a.eventId is null)) and b.attemptOrder>a.attemptOrder)")
+        long countMasteredQuestions(@org.springframework.data.repository.query.Param("eventId") Long eventId);
         Optional<AnswerRecord> findByUserIdAndRequestId(Long userId,String requestId);
         boolean existsByQuestionId(Long questionId);
         boolean existsByUserIdAndEventIdAndQuestionIdAndPracticeFalse(Long userId,Long eventId,Long questionId);
@@ -36,17 +55,17 @@ public interface AnswerRecordRepository extends JpaRepository<AnswerRecord, Stri
 
         @Query(value = "SELECT new com.zhixuewuli.dto.response.AnswerRecordListRow(" +
                 "a.id,a.userId,a.questionId,a.sessionId,a.userAnswer,a.correct,a.answeredAt,a.errorReason," +
-                "u.realName,q.content,q.options,q.correctOption,q.explanation,q.difficulty) " +
+                "u.realName,coalesce(a.contentSnapshot,q.content),coalesce(a.optionsSnapshot,q.options),coalesce(a.correctSnapshot,q.correctOption),coalesce(a.analysisSnapshot,q.explanation),coalesce(a.difficultySnapshot,q.difficulty)) " +
                 "FROM AnswerRecord a JOIN a.question q JOIN a.user u " +
-                "WHERE (:wrongOnly = false OR a.correct = false) " +
+                "WHERE (:wrongOnly = false OR a.correct = false) AND (:eventId is null OR a.eventId=:eventId) " +
                 "AND LOWER(u.realName) LIKE LOWER(:name) ESCAPE '!' " +
                 "ORDER BY a.answeredAt DESC, a.id DESC",
                 countQuery = "SELECT COUNT(a) FROM AnswerRecord a JOIN a.user u " +
-                "WHERE (:wrongOnly = false OR a.correct = false) " +
+                "WHERE (:wrongOnly = false OR a.correct = false) AND (:eventId is null OR a.eventId=:eventId) " +
                 "AND LOWER(u.realName) LIKE LOWER(:name) ESCAPE '!'")
         org.springframework.data.domain.Page<com.zhixuewuli.dto.response.AnswerRecordListRow> findTeacherPage(
                 @org.springframework.data.repository.query.Param("wrongOnly") boolean wrongOnly,
-                @org.springframework.data.repository.query.Param("name") String name, Pageable pageable);
+                @org.springframework.data.repository.query.Param("name") String name, @org.springframework.data.repository.query.Param("eventId") Long eventId, Pageable pageable);
 
 
         /**

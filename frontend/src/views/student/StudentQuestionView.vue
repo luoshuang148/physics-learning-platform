@@ -20,6 +20,7 @@
       </transition>
 
       <!-- 顶部：任务标题 + 圆点导航 -->
+      <p v-if="currentQuestion?.snapshotOrigin && currentQuestion.snapshotOrigin !== 'PUBLISHED'" role="note">历史内容在升级时重建；原题缺失的条目无法补练。</p>
       <div class="q-header">
         <span class="q-task-label" v-if="activeTaskTitle">{{ activeTaskTitle }}</span>
         <div class="q-dots">

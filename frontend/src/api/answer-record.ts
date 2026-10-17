@@ -66,7 +66,7 @@ export const getAnswerStatsApi = async (): Promise<AnswerStatsResponse> => {
 };
 
 
-export const getAnswerRecordPageApi = async (params: { page: number; size: number; wrongOnly: boolean; studentName: string }) => {
+export const getAnswerRecordPageApi = async (params: { page: number; size: number; wrongOnly: boolean; studentName: string; eventId?: number }) => {
   const { data } = await request.get<ApiResponse<import('@/types/common').PageResult<AnswerRecordResponse>>>(
     '/answer-records/teacher/page', { params });
   return data.data;
@@ -77,4 +77,12 @@ export const getTaskAnswersApi = async (eventId: number): Promise<AnswerRecordBa
 };
 export const getPracticeReviewApi = async (): Promise<AnswerRecordBatchResponse> => {
  const {data}=await request.get<ApiResponse<AnswerRecordBatchResponse>>('/answer-records/student/practice-review');return data.data;
+};
+
+export interface LearningSummary {
+ eventId:number|null; totalAttempts:number;correctAttempts:number;assignmentAnswers:number;assignmentCorrect:number;
+ participatingStudents:number;completedStudents:number;eligibleStudents:number;questionCount:number;practiceAttempts:number;masteredQuestions:number;generatedAt:string;
+}
+export const getLearningSummaryApi = async (eventId?: number):Promise<LearningSummary> => {
+ const {data}=await request.get<ApiResponse<LearningSummary>>('/answer-records/teacher/summary',{params:{eventId}});return data.data;
 };

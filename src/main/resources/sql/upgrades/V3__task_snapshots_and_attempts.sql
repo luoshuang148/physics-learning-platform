@@ -35,3 +35,6 @@ UPDATE answer_records a JOIN (SELECT id,ROW_NUMBER() OVER(ORDER BY answered_at,i
 ALTER TABLE answer_records MODIFY attempt_order BIGINT NOT NULL AUTO_INCREMENT, ADD UNIQUE KEY uk_attempt_order(attempt_order);
 -- Null event IDs are explicitly legacy/free practice, not current-task participation.
 UPDATE answer_records SET practice=TRUE WHERE event_id IS NULL;
+
+ALTER TABLE answer_records ADD COLUMN content_snapshot LONGTEXT NULL, ADD COLUMN options_snapshot LONGTEXT NULL,
+ ADD COLUMN correct_snapshot VARCHAR(1) NULL, ADD COLUMN analysis_snapshot LONGTEXT NULL, ADD COLUMN difficulty_snapshot INT NULL;

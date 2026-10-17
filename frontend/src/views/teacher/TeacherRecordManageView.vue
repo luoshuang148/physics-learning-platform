@@ -23,6 +23,7 @@
         </div>
       </section>
 
+      <p v-if="taskFilter">正在查看所选教学任务的记录 <button @click="taskRouter.replace({query:{}})">查看全部任务</button></p>
       <section class="toolbar">
         <div class="toolbar-left">
           <button class="mode-btn" :class="{ active: mode === 'all' }" @click="switchMode('all')">全部记录</button>
@@ -161,7 +162,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
+import { computed, watch, onMounted, ref } from 'vue';
 import AppShell from '@/layouts/AppShell.vue';
 import AppToast from '@/components/AppToast.vue';
 import LatexText from '@/components/LatexText.vue';
@@ -175,6 +177,8 @@ import {
 import { teacherNavLinks } from '@/constants/navigation';
 import type { AnswerRecordResponse } from '@/types/answer-record';
 
+const taskRoute=useRoute();const taskRouter=useRouter();
+const taskFilter=computed(()=>taskRoute.query.eventId?Number(taskRoute.query.eventId):undefined);
 const auth = useAuthStore();
 const { visible, type, message, show } = useToast();
 
@@ -234,7 +238,7 @@ const loadPage = async () => {
   loading.value = true;
   try {
     const data = await getAnswerRecordPageApi({ page: page.value, size: pageSize.value,
-      wrongOnly: mode.value === 'wrong', studentName: studentFilter.value });
+      wrongOnly: mode.value === 'wrong', studentName: studentFilter.value,eventId:taskFilter.value });
     if (sequence !== loadSequence) return;
     total.value = data.total;
     totalPages.value = data.pages;
@@ -285,6 +289,7 @@ const batchDelete = async () => {
   }
 };
 
+watch(taskFilter,resetPage);
 onMounted(loadPage);
 
 </script>

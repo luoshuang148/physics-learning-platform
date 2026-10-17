@@ -75,6 +75,11 @@ public class AnswerRecordServiceImpl implements AnswerRecordService {
     @Transactional(readOnly = true)
     public com.zhixuewuli.common.result.PageResult<AnswerRecordResponse> getTeacherAnswerPage(
             Long currentUserId, int page, int size, boolean wrongOnly, String studentName) {
+        return getTeacherAnswerPage(currentUserId,page,size,wrongOnly,studentName,null);
+    }
+    @Override @Transactional(readOnly=true)
+    public com.zhixuewuli.common.result.PageResult<AnswerRecordResponse> getTeacherAnswerPage(
+            Long currentUserId,int page,int size,boolean wrongOnly,String studentName,Long eventId) {
         userPermissionUtil.checkTeacherPermission(currentUserId);
         if (page < 1 || size < 1 || size > 100 || (long) (page - 1) * size > Integer.MAX_VALUE) {
             throw new IllegalArgumentException("页码须大于零，每页条数须在1到100之间");
@@ -82,7 +87,7 @@ public class AnswerRecordServiceImpl implements AnswerRecordService {
         String name = studentName == null ? "" : studentName.trim();
         if (name.length() > 100) throw new IllegalArgumentException("姓名筛选不得超过100个字符");
         name = "%" + name.replace("!", "!!").replace("%", "!%").replace("_", "!_") + "%";
-        var result = answerRecordRepository.findTeacherPage(wrongOnly, name,
+        var result = answerRecordRepository.findTeacherPage(wrongOnly, name,eventId,
                 org.springframework.data.domain.PageRequest.of(page - 1, size));
         var rows = result.getContent().stream().map(row -> AnswerRecordResponse.builder()
                 .recordId(row.recordId()).userId(row.userId()).questionId(row.questionId())
@@ -150,6 +155,8 @@ public class AnswerRecordServiceImpl implements AnswerRecordService {
             record.setEventId(eventId);
             record.setRequestId(request.getRequestId());record.setPractice(practice || eventId==null);
             record.setQuestionSnapshot(snapshotJson.writeValueAsString(question));
+            record.setContentSnapshot(question.getContent());record.setOptionsSnapshot(question.getOptions());
+            record.setCorrectSnapshot(question.getCorrectOption());record.setAnalysisSnapshot(question.getExplanation());record.setDifficultySnapshot(question.getDifficulty());
             record.setUserId(currentUserId);
             record.setQuestionId(request.getQuestionId());
             record.setUserAnswer(request.getUserAnswer());
