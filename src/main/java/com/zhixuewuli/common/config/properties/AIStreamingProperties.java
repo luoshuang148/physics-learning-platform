@@ -77,6 +77,7 @@ import org.springframework.stereotype.Component;
 @ConfigurationProperties(prefix = "ai.streaming")
 @Component
 public class AIStreamingProperties {
+    private Integer maxSseConnectionsPerUser = 2;
 
     // ========== 超时配置 ==========
     /**

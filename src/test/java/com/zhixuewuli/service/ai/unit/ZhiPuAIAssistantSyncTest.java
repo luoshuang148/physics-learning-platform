@@ -36,10 +36,10 @@ import static org.mockito.Mockito.when;
 
 /**
  * 智谱AI助手服务同步逻辑测试
- * 
+ *
  * 专注于测试ZhiPuAIAssistantService的同步业务逻辑，
  * 确保AI客户端在这些测试中绝不被调用。
- * 
+ *
  * <p>
  * 测试范围：
  * </p>
@@ -50,7 +50,7 @@ import static org.mockito.Mockito.when;
  * <li>私有方法的复杂逻辑</li>
  * <li>异常处理场景</li>
  * </ul>
- * 
+ *
  * @author 智学物理开发团队
  * @version 1.0.0
  * @since 2026
@@ -180,7 +180,7 @@ class ZhiPuAIAssistantSyncTest extends AIServiceSyncTestBase {
         when(sessionManager.canAccessSession(TEST_SESSION_ID, TEST_USER_ID))
                 .thenReturn(true);
 
-        when(conversationHistoryRepository.findByUserIdAndSessionIdAndIsActiveOrderByCreatedAtAsc(TEST_USER_ID, 
+        when(conversationHistoryRepository.findByUserIdAndSessionIdAndIsActiveOrderByCreatedAtAsc(TEST_USER_ID,
                 TEST_SESSION_ID, true))
                 .thenReturn(mockHistories);
 
@@ -266,7 +266,7 @@ class ZhiPuAIAssistantSyncTest extends AIServiceSyncTestBase {
         when(sessionManager.canAccessSession(TEST_SESSION_ID, TEST_USER_ID))
                 .thenReturn(true);
 
-        when(conversationHistoryRepository.findByUserIdAndSessionIdAndIsActiveOrderByCreatedAtAsc(TEST_USER_ID, 
+        when(conversationHistoryRepository.findByUserIdAndSessionIdAndIsActiveOrderByCreatedAtAsc(TEST_USER_ID,
                 TEST_SESSION_ID, true))
                 .thenReturn(List.of()); // 返回空列表
 

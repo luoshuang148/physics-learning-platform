@@ -121,7 +121,7 @@ public class ZhiPuAIAssistantServiceImpl implements ZhiPuAIAssistantService {
 
     @Override
     public void streamQAResponse(AIAskRequest request, SseEmitter emitter, Long userId, String sessionId) {
-        aiTaskExecutor.execute(() -> {
+        AIStreamExecutor.submit(aiTaskExecutor, userId, emitter, streamUtils, () -> {
             executeStreamOperation(
                     "实时问答处理",
                     sessionId,
@@ -154,7 +154,7 @@ public class ZhiPuAIAssistantServiceImpl implements ZhiPuAIAssistantService {
     @Override
     public void streamWrongQuestionAnalysis(AIAskRequest request, SseEmitter emitter,
             Long userId, String sessionId) {
-        aiTaskExecutor.execute(() -> {
+        AIStreamExecutor.submit(aiTaskExecutor, userId, emitter, streamUtils, () -> {
             executeStreamOperation(
                     "错题分析处理",
                     sessionId,
@@ -521,8 +521,11 @@ public class ZhiPuAIAssistantServiceImpl implements ZhiPuAIAssistantService {
 
             zhipuAIClient.streamChatWithMessages(messages, model, new AIStreamCallback() {
                 @Override
+                public void onCancel(Runnable action) { streamUtils.onCancel(emitter, action); }
+
+                @Override
                 public boolean isCancelled() {
-                    return sessionContext != null && sessionContext.isCancelled();
+                    return streamUtils.isCancelled(emitter) || (sessionContext != null && sessionContext.isCancelled());
                 }
 
                 @Override

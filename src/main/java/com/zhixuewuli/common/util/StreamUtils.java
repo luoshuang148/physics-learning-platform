@@ -41,6 +41,67 @@ public class StreamUtils {
     /** 关联上下文映射表：emitter -> 关联的 SessionContext */
     private final Map<SseEmitter, SessionContextInternalDTO> emitterContexts = new ConcurrentHashMap<>();
 
+    private final Map<String, SseEmitter> conversationOwners = new ConcurrentHashMap<>();
+    private final Map<SseEmitter, Long> emitterUsers = new ConcurrentHashMap<>();
+    private final Map<Long, Integer> userConnections = new HashMap<>();
+
+    /** Request state lives on the emitter, so late callbacks cannot cancel a later request. */
+    private static final class RequestEmitter extends SseEmitter {
+        private boolean cancelled;
+        private final java.util.List<Runnable> actions = new java.util.ArrayList<>();
+        RequestEmitter(long timeout) { super(timeout); }
+        synchronized boolean isCancelled() { return cancelled; }
+        void onCancel(Runnable action) {
+            synchronized (this) {
+                if (!cancelled) { actions.add(action); return; }
+            }
+            action.run();
+        }
+        void cancelRequest() {
+            java.util.List<Runnable> pending;
+            synchronized (this) {
+                if (cancelled) return;
+                cancelled = true;
+                pending = java.util.List.copyOf(actions);
+                actions.clear();
+            }
+            for (Runnable action : pending) {
+                try { action.run(); } catch (RuntimeException ex) { log.debug("取消上游调用失败", ex); }
+            }
+        }
+    }
+
+    public boolean isCancelled(SseEmitter emitter) {
+        return emitter instanceof RequestEmitter request && request.isCancelled();
+    }
+
+    public void onCancel(SseEmitter emitter, Runnable action) {
+        if (emitter instanceof RequestEmitter request) request.onCancel(action);
+        else {
+            emitter.onCompletion(action);
+            emitter.onTimeout(action);
+            emitter.onError(error -> action.run());
+        }
+    }
+
+    public void claimUser(SseEmitter emitter, Long userId) {
+        synchronized (userConnections) {
+            if (userId == null) throw new BusinessException("未认证请求");
+            if (isCancelled(emitter)) throw new BusinessException("请求已取消");
+            if (emitterUsers.containsKey(emitter)) return;
+            int count = userConnections.getOrDefault(userId, 0);
+            Integer configured = aiStreamingProperties.getMaxSseConnectionsPerUser();
+            int limit = configured == null || configured < 1 ? 2 : configured;
+            if (count >= limit) throw new BusinessException("同时生成的请求过多，请等待当前请求完成");
+            userConnections.put(userId, count + 1);
+            emitterUsers.put(emitter, userId);
+        }
+    }
+
+    private String conversationKey(SessionContextInternalDTO context) {
+        return context.getUserId() + ":" + context.getSessionId() + ":" + context.getConversationType() + ":" + context.getQuestionId();
+    }
+
     /** 最大连接数限制（从配置类读取） */
     private volatile Integer maxConnections = null;
 
@@ -147,9 +208,13 @@ public class StreamUtils {
      */
     public void bindContext(SseEmitter emitter, SessionContextInternalDTO context) {
         if (emitter != null && context != null) {
-            // 新一轮流式任务开始时，清空上一次断连遗留的取消状态
-            context.setCancelled(false);
-            emitterContexts.put(emitter, context);
+            synchronized (conversationOwners) {
+                if (isCancelled(emitter)) throw new BusinessException("请求已取消");
+                SseEmitter owner = conversationOwners.putIfAbsent(conversationKey(context), emitter);
+                if (owner != null && owner != emitter) throw new BusinessException("该会话正在生成，请等待或停止当前请求");
+                context.setCancelled(false);
+                emitterContexts.put(emitter, context);
+            }
             log.debug("SSE 绑定上下文成功");
         }
     }
@@ -163,11 +228,26 @@ public class StreamUtils {
         if (emitter == null)
             return;
 
+        if (emitter instanceof RequestEmitter request) request.cancelRequest();
         Long creationTime = activeEmitters.remove(emitter);
-        SessionContextInternalDTO context = emitterContexts.remove(emitter);
+        SessionContextInternalDTO context;
+        synchronized (conversationOwners) {
+            context = emitterContexts.remove(emitter);
+            if (context != null) {
+                context.setCancelled(true);
+                conversationOwners.remove(conversationKey(context), emitter);
+            }
+        }
+        synchronized (userConnections) {
+            Long userId = emitterUsers.remove(emitter);
+            if (userId != null) {
+                int remaining = userConnections.getOrDefault(userId, 1) - 1;
+                if (remaining <= 0) userConnections.remove(userId);
+                else userConnections.put(userId, remaining);
+            }
+        }
 
         if (context != null) {
-            context.setCancelled(true);
             log.info("SSE 连接已移除，关联上下文已标记为取消");
         }
 
@@ -272,7 +352,7 @@ public class StreamUtils {
         // 原子预占连接名额，确保并发下不突破上限
         int currentConnections = reserveConnectionSlotOrThrow();
 
-        SseEmitter emitter = new SseEmitter(timeout);
+        SseEmitter emitter = new RequestEmitter(timeout);
 
         log.debug("创建 SseEmitter，超时时间：{}ms, 重连时间：{}ms, 当前连接数：{}",
                 timeout, reconnectTime, currentConnections);
@@ -287,7 +367,7 @@ public class StreamUtils {
             // ★★★ 关键：连接成功后加入映射表 ★★★
             activeEmitters.put(emitter, System.currentTimeMillis());
 
-        } catch (IOException e) {
+        } catch (IOException | RuntimeException e) {
             log.error("SSE 连接初始化失败：客户端可能已断开或网络异常", e);
             // 立即关闭 emitter 并减少计数
             activeConnections.decrementAndGet();

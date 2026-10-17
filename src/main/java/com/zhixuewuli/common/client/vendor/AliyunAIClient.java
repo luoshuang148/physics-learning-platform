@@ -233,7 +233,10 @@ public class AliyunAIClient extends AbstractStreamingClient {
                 .addHeader("Content-Type", "application/json")
                 .build();
 
-        try (Response response = httpClient.newCall(request).execute()) {
+        okhttp3.Call call = httpClient.newCall(request);
+        callback.onCancel(call::cancel);
+        if (callback.isCancelled()) { call.cancel(); return; }
+        try (Response response = call.execute()) {
             if (!response.isSuccessful()) {
                 String errorMsg = "AI服务返回错误状态: " + response.code();
                 if (response.code() == 401) {
@@ -261,6 +264,9 @@ public class AliyunAIClient extends AbstractStreamingClient {
 
             long duration = System.currentTimeMillis() - startTime;
             logStreamComplete(model, duration);
+        } catch (IOException error) {
+            if (callback.isCancelled()) callback.onComplete(0, 0, 0);
+            else throw error;
         }
     }
 

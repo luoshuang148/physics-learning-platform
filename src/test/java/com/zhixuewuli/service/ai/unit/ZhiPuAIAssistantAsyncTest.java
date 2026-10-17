@@ -319,6 +319,6 @@ class ZhiPuAIAssistantAsyncTest extends AIAsyncTestBase {
         // Then
         verify(sessionManager, times(1)).addInteraction(eq(mockSessionContext), anyString(), eq("部分内容"), anyInt());
         verify(sessionManager, times(1)).updateTokenUsage(eq(mockSessionContext), anyInt());
-        verify(streamUtils, never()).safeCompleteEmitter(any());
+        verify(streamUtils, org.mockito.Mockito.atLeastOnce()).safeCompleteEmitter(mockEmitter);
     }
 }

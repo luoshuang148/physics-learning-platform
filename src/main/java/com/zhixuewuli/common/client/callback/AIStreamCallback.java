@@ -167,6 +167,9 @@ public interface AIStreamCallback {
      * 
      * @return true 表示已取消，此时应停止生成流
      */
+    /** Registers cancellation of a blocking upstream call. Late registration must cancel immediately. */
+    default void onCancel(Runnable action) { }
+
     default boolean isCancelled() {
         return false;
     }

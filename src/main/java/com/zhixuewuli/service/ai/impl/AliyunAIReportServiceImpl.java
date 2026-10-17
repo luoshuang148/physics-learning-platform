@@ -101,7 +101,7 @@ public class AliyunAIReportServiceImpl implements AliyunAIReportService {
     @Override
     public void streamStudentReport(String sessionId, SseEmitter emitter, Long userId) {
         // 立即提交异步任务，不阻塞当前线程
-        aiTaskExecutor.execute(() -> {
+        AIStreamExecutor.submit(aiTaskExecutor, userId, emitter, streamUtils, () -> {
             executeStreamOperation(
                     "学生个人报告生成",
                     userId,
@@ -140,8 +140,11 @@ public class AliyunAIReportServiceImpl implements AliyunAIReportService {
 
                         aliyunAIClient.streamGenerate(prompt, model, new AIStreamCallback() {
                             @Override
-                            public boolean isCancelled() {
-                                return cancelled.get();
+                            public void onCancel(Runnable action) { streamUtils.onCancel(emitter, action); }
+
+                @Override
+                public boolean isCancelled() {
+                                return streamUtils.isCancelled(emitter) || cancelled.get();
                             }
 
                             @Override
@@ -241,7 +244,7 @@ public class AliyunAIReportServiceImpl implements AliyunAIReportService {
         }
 
         // 立即提交异步任务，不阻塞当前线程
-        aiTaskExecutor.execute(() -> {
+        AIStreamExecutor.submit(aiTaskExecutor, userId, emitter, streamUtils, () -> {
             executeStreamOperation(
                     "教师综合分析报告生成",
                     userId,
@@ -293,8 +296,11 @@ public class AliyunAIReportServiceImpl implements AliyunAIReportService {
 
                         aliyunAIClient.streamGenerate(prompt, model, new AIStreamCallback() {
                             @Override
-                            public boolean isCancelled() {
-                                return cancelled.get();
+                            public void onCancel(Runnable action) { streamUtils.onCancel(emitter, action); }
+
+                @Override
+                public boolean isCancelled() {
+                                return streamUtils.isCancelled(emitter) || cancelled.get();
                             }
 
                             @Override

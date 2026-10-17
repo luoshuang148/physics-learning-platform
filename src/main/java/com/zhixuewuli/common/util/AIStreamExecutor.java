@@ -14,6 +14,25 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
  */
 @Slf4j
 public class AIStreamExecutor {
+    public static void submit(java.util.concurrent.Executor executor, Long userId, SseEmitter emitter,
+            StreamUtils streams, Runnable task) {
+        try {
+            streams.claimUser(emitter, userId);
+            executor.execute(() -> {
+                if (streams.isCancelled(emitter)) { streams.safeCompleteEmitter(emitter); return; }
+                try { task.run(); }
+                catch (Exception error) {
+                    log.error("AI 工作任务失败", error);
+                    streams.sendError(emitter, ResultCode.TECHNICAL_ERROR, "AI处理失败，请稍后重试");
+                } finally { streams.safeCompleteEmitter(emitter); }
+            });
+        } catch (java.util.concurrent.RejectedExecutionException error) {
+            streams.sendError(emitter, ResultCode.AI_SERVICE_UNAVAILABLE, "AI任务队列已满，请稍后重试");
+        } catch (BusinessException error) {
+            streams.sendError(emitter, error.getCode(), error.getMessage());
+        }
+    }
+
 
     @FunctionalInterface
     public interface StreamOperation {
@@ -33,45 +52,28 @@ public class AIStreamExecutor {
             SseEmitter emitter, StreamUtils streamUtils, StreamOperation operation) {
         try {
             log.info("{}开始 - 用户ID: {}", operationName, userId);
-            System.out.println("DEBUG AIStreamExecutor: Starting operation " + operationName + " for user " + userId);
             operation.execute();
-            System.out.println("DEBUG AIStreamExecutor: Operation completed successfully");
         } catch (QuestionNotFoundException | AnswerRecordNotFoundException e) {
             log.warn("AI业务异常 - 用户ID: {}, 原因: {}", userId, e.getMessage());
-            System.out.println(
-                    "DEBUG AIStreamExecutor: Caught QuestionNotFoundException/AnswerRecordNotFoundException: " + e);
-            e.printStackTrace();
             streamUtils.sendError(emitter, e.getCode(), e.getMessage());
         } catch (AIServiceUnavailableException e) {
             log.error("AI服务不可用 - 用户ID: {}, 错误码: {}", userId, e.getCode(), e);
-            System.out.println("DEBUG AIStreamExecutor: Caught AIServiceUnavailableException: " + e);
-            e.printStackTrace();
             streamUtils.sendError(emitter, e.getCode(), e.getMessage());
         } catch (AITimeoutException e) {
             log.error("AI响应超时 - 用户ID: {}, 错误码: {}", userId, e.getCode(), e);
-            System.out.println("DEBUG AIStreamExecutor: Caught AITimeoutException: " + e);
-            e.printStackTrace();
             streamUtils.sendError(emitter, e.getCode(), e.getMessage());
         } catch (AIResponseParseException e) {
             log.error("AI响应解析失败 - 用户ID: {}, 错误码: {}", userId, e.getCode(), e);
-            System.out.println("DEBUG AIStreamExecutor: Caught AIResponseParseException: " + e);
-            e.printStackTrace();
             streamUtils.sendError(emitter, e.getCode(), e.getMessage());
         } catch (AITechnicalException e) {
             log.error("AI技术异常兜底 - 用户ID: {}, 错误码: {}, 异常类型: {}",
                     userId, e.getCode(), e.getClass().getSimpleName(), e);
-            System.out.println("DEBUG AIStreamExecutor: Caught AITechnicalException: " + e);
-            e.printStackTrace();
             streamUtils.sendError(emitter, e.getCode(), "AI技术服务异常，请稍后重试");
         } catch (BusinessException e) {
             log.warn("AI业务异常 - 用户ID: {}, 错误码: {}, 原因: {}", userId, e.getCode(), e.getMessage());
-            System.out.println("DEBUG AIStreamExecutor: Caught BusinessException: " + e);
-            e.printStackTrace();
             streamUtils.sendError(emitter, e.getCode(), e.getMessage());
         } catch (Exception e) {
             log.error("AI未知异常 - 用户ID: {}", userId, e);
-            System.out.println("DEBUG AIStreamExecutor: Caught generic Exception: " + e);
-            e.printStackTrace();
             streamUtils.sendError(emitter, ResultCode.TECHNICAL_ERROR, "AI服务出现未知问题，请稍后重试");
         }
     }

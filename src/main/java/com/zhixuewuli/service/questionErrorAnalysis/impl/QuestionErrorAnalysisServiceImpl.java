@@ -79,7 +79,7 @@ public class QuestionErrorAnalysisServiceImpl implements QuestionErrorAnalysisSe
     @Override
     public void streamTeacherQuestionAnalysis(AIAskRequest request, SseEmitter emitter, Long teacherId,
             String sessionId) {
-        aiTaskExecutor.execute(() -> {
+        AIStreamExecutor.submit(aiTaskExecutor, teacherId, emitter, streamUtils, () -> {
             executeTeacherQuestionAnalysisStream(request, emitter, teacherId, sessionId);
         });
     }
@@ -208,8 +208,11 @@ public class QuestionErrorAnalysisServiceImpl implements QuestionErrorAnalysisSe
             StringBuilder fullResponse = new StringBuilder();
             aliyunAIClient.streamGenerate(prompt, model, new AIStreamCallback() {
                 @Override
+                public void onCancel(Runnable action) { streamUtils.onCancel(emitter, action); }
+
+                @Override
                 public boolean isCancelled() {
-                    return sessioncontext != null && sessioncontext.isCancelled();
+                    return streamUtils.isCancelled(emitter) || (sessioncontext != null && sessioncontext.isCancelled());
                 }
 
                 @Override

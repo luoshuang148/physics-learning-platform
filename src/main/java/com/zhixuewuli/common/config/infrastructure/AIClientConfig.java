@@ -62,15 +62,8 @@ public class AIClientConfig {
         executor.setQueueCapacity(aiStreamingProperties.getAiQueueCapacity());
         executor.setThreadNamePrefix(aiStreamingProperties.getAiThreadNamePrefix());
 
-        // 添加拒绝策略，记录日志并使用调用者线程执行，避免任务丢失
-        executor.setRejectedExecutionHandler((r, e) -> {
-            log.warn("AI 任务线程池队列已满，任务被拒绝。活跃线程：{}, 队列大小：{}, 最大线程：{}",
-                    e.getActiveCount(), e.getQueue().size(), e.getMaximumPoolSize());
-            // 使用调用者线程执行，避免任务丢失
-            if (!e.isShutdown()) {
-                r.run();
-            }
-        });
+        // Saturation must not run blocking model I/O on the servlet caller.
+        executor.setRejectedExecutionHandler(new java.util.concurrent.ThreadPoolExecutor.AbortPolicy());
 
         executor.initialize();
 
