@@ -199,7 +199,7 @@ public class ZhiPuAIAssistantServiceImpl implements ZhiPuAIAssistantService {
         if (!sessionManager.canAccessSession(sessionId, userId) && sessionManager.hasAnySessionRecord(sessionId)) {
             throw new InsufficientPermissionException("无权访问该会话");
         }
-        return conversationHistoryRepository.findBySessionIdAndIsActiveOrderByCreatedAtAsc(sessionId, true);
+        return conversationHistoryRepository.findByUserIdAndSessionIdAndIsActiveOrderByCreatedAtAsc(userId, sessionId, true);
     }
 
     @Override

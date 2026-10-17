@@ -9,6 +9,13 @@ import java.util.List;
 
 @Repository
 public interface ConversationHistoryRepository extends JpaRepository<ConversationHistory, Long> {
+        List<ConversationHistory> findByUserIdAndSessionIdAndIsActiveOrderByCreatedAtAsc(
+                        Long userId, String sessionId, Boolean active);
+        List<ConversationHistory> findByUserIdAndSessionIdAndConversationTypeAndQuestionIdAndIsActiveOrderBySequenceNumberAsc(
+                        Long userId, String sessionId, ConversationType type, Long questionId, Boolean active);
+        @org.springframework.transaction.annotation.Transactional
+        void deleteBySessionIdAndUserId(String sessionId, Long userId);
+
 
         /**
          * 根据会话 ID 查找活跃的对话历史（按创建时间升序）

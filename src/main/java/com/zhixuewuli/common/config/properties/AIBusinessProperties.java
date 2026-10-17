@@ -81,6 +81,9 @@ public class AIBusinessProperties {
          */
         private int maxHistoryCount = 15;
 
+        /** Maximum cached conversations in this application instance. */
+        private int maxCachedSessions = 1000;
+
         /**
          * 最大token总数限制
          * 防止上下文过长导致的性能问题和成本增加

@@ -180,7 +180,7 @@ class ZhiPuAIAssistantSyncTest extends AIServiceSyncTestBase {
         when(sessionManager.canAccessSession(TEST_SESSION_ID, TEST_USER_ID))
                 .thenReturn(true);
 
-        when(conversationHistoryRepository.findBySessionIdAndIsActiveOrderByCreatedAtAsc(
+        when(conversationHistoryRepository.findByUserIdAndSessionIdAndIsActiveOrderByCreatedAtAsc(TEST_USER_ID, 
                 TEST_SESSION_ID, true))
                 .thenReturn(mockHistories);
 
@@ -197,7 +197,7 @@ class ZhiPuAIAssistantSyncTest extends AIServiceSyncTestBase {
         // 验证权限检查被调用
         verify(sessionManager).canAccessSession(TEST_SESSION_ID, TEST_USER_ID);
         verify(conversationHistoryRepository)
-                .findBySessionIdAndIsActiveOrderByCreatedAtAsc(TEST_SESSION_ID, true);
+                .findByUserIdAndSessionIdAndIsActiveOrderByCreatedAtAsc(TEST_USER_ID, TEST_SESSION_ID, true);
 
         // 确保AI客户端未被调用
         ensureAIClientNeverCalled();
@@ -266,7 +266,7 @@ class ZhiPuAIAssistantSyncTest extends AIServiceSyncTestBase {
         when(sessionManager.canAccessSession(TEST_SESSION_ID, TEST_USER_ID))
                 .thenReturn(true);
 
-        when(conversationHistoryRepository.findBySessionIdAndIsActiveOrderByCreatedAtAsc(
+        when(conversationHistoryRepository.findByUserIdAndSessionIdAndIsActiveOrderByCreatedAtAsc(TEST_USER_ID, 
                 TEST_SESSION_ID, true))
                 .thenReturn(List.of()); // 返回空列表
 
@@ -279,7 +279,7 @@ class ZhiPuAIAssistantSyncTest extends AIServiceSyncTestBase {
 
         verify(sessionManager).canAccessSession(TEST_SESSION_ID, TEST_USER_ID);
         verify(conversationHistoryRepository)
-                .findBySessionIdAndIsActiveOrderByCreatedAtAsc(TEST_SESSION_ID, true);
+                .findByUserIdAndSessionIdAndIsActiveOrderByCreatedAtAsc(TEST_USER_ID, TEST_SESSION_ID, true);
 
         // 确保AI客户端未被调用
         ensureAIClientNeverCalled();
@@ -303,7 +303,7 @@ class ZhiPuAIAssistantSyncTest extends AIServiceSyncTestBase {
         verify(sessionManager).canAccessSession(TEST_SESSION_ID, TEST_USER_ID);
         verify(sessionManager).hasAnySessionRecord(TEST_SESSION_ID);
         verify(conversationHistoryRepository, never())
-                .findBySessionIdAndIsActiveOrderByCreatedAtAsc(anyString(), any(Boolean.class));
+                .findByUserIdAndSessionIdAndIsActiveOrderByCreatedAtAsc(org.mockito.ArgumentMatchers.eq(TEST_USER_ID), anyString(), any(Boolean.class));
 
         // 确保AI客户端未被调用
         ensureAIClientNeverCalled();
@@ -317,7 +317,7 @@ class ZhiPuAIAssistantSyncTest extends AIServiceSyncTestBase {
                 .thenReturn(false);
         when(sessionManager.hasAnySessionRecord(TEST_SESSION_ID))
                 .thenReturn(false); // 会话不存在
-        when(conversationHistoryRepository.findBySessionIdAndIsActiveOrderByCreatedAtAsc(TEST_SESSION_ID, true))
+        when(conversationHistoryRepository.findByUserIdAndSessionIdAndIsActiveOrderByCreatedAtAsc(TEST_USER_ID, TEST_SESSION_ID, true))
                 .thenReturn(List.of());
 
         // When
@@ -329,7 +329,7 @@ class ZhiPuAIAssistantSyncTest extends AIServiceSyncTestBase {
         verify(sessionManager).canAccessSession(TEST_SESSION_ID, TEST_USER_ID);
         verify(sessionManager).hasAnySessionRecord(TEST_SESSION_ID);
         verify(conversationHistoryRepository)
-                .findBySessionIdAndIsActiveOrderByCreatedAtAsc(TEST_SESSION_ID, true);
+                .findByUserIdAndSessionIdAndIsActiveOrderByCreatedAtAsc(TEST_USER_ID, TEST_SESSION_ID, true);
 
         // 确保AI客户端未被调用
         ensureAIClientNeverCalled();

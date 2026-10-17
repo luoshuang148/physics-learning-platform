@@ -476,7 +476,7 @@ public class SessionManagerUnitTest extends BaseUnitTest {
         verify(answerRecordRepository).countBySessionIdAndUserId(TEST_SESSION_ID, TEST_USER_ID);
 
         // 验证数据库删除调用
-        verify(conversationHistoryRepository).deleteBySessionId(TEST_SESSION_ID);
+        verify(conversationHistoryRepository).deleteBySessionIdAndUserId(TEST_SESSION_ID, TEST_USER_ID);
 
         // 验证内存清理 - 通过反射检查sessionStore状态
         assertEquals(0, ((java.util.Map<?, ?>) getFieldFromSessionManager("sessionStore")).size(),
@@ -504,7 +504,7 @@ public class SessionManagerUnitTest extends BaseUnitTest {
         assertEquals("无权清除该会话", exception.getMessage(), "异常消息应该匹配");
 
         // 验证数据库操作未被执行
-        verify(conversationHistoryRepository, never()).deleteBySessionId(anyString());
+        verify(conversationHistoryRepository, never()).deleteBySessionIdAndUserId(anyString(), anyLong());
     }
 
     /**
@@ -834,12 +834,8 @@ public class SessionManagerUnitTest extends BaseUnitTest {
             // 已经不活跃的会话应该被移除
             java.util.Map<?, ?> sessionStore = (java.util.Map<?, ?>) getFieldFromSessionManager("sessionStore");
 
-            // 注意：由于清理逻辑在测试执行时，可能时间已经过去了若干毫秒
-            // inactiveSession 的 lastActiveTime(20 分钟前) < expiryThreshold(10 分钟前)
-            // 所以它会被标记为不活跃，而不是被移除
-            // 只有那些 lastActiveTime >= expiryThreshold 且 !isActive 的才会被移除
-            // 因此我们预期剩下 5 个会话 (active + boundary + justExpired + expired + inactive 被标记但不移除)
-            assertEquals(5, sessionStore.size(), "应该剩下 5 个会话");
+            // 原有不活跃会话已移除，其余过期会话在第二次扫描移除。
+            assertEquals(4, sessionStore.size(), "首次清理移除原有不活跃会话，标记其他过期会话");
 
             // Record 第一次清理后的状态
             int sizeAfterFirstCleanup = sessionStore.size();
@@ -853,7 +849,7 @@ public class SessionManagerUnitTest extends BaseUnitTest {
 
             // Then - 验证幂等性：结果应该与第一次一致
             java.util.Map<?, ?> sessionStoreAfterSecond = (java.util.Map<?, ?>) getFieldFromSessionManager("sessionStore");
-            assertEquals(sizeAfterFirstCleanup, sessionStoreAfterSecond.size(),
+            assertEquals(2, sessionStoreAfterSecond.size(),
                     "第二次清理后会话数量应该与第一次相同 (幂等性)");
             assertEquals(activeStillActive, activeSession.getIsActive(), "活跃会话状态应该保持一致");
             assertEquals(boundaryStillActive, boundarySession.getIsActive(), "边界会话状态应该保持一致");
@@ -1109,7 +1105,7 @@ public class SessionManagerUnitTest extends BaseUnitTest {
             assertNull(keyAfterClear, "会话键应该从 store 中移除");
             
             // 验证数据库删除被调用
-            verify(conversationHistoryRepository).deleteBySessionId(sessionId);
+            verify(conversationHistoryRepository).deleteBySessionIdAndUserId(sessionId, TEST_USER_ID);
             
             // When - 如果再次尝试访问该会话，应该创建新的会话
             SessionContextInternalDTO newSession = sessionManager.getOrCreateSession(
@@ -1181,11 +1177,6 @@ public class SessionManagerUnitTest extends BaseUnitTest {
                 assertFalse(session.getIsActive(), "第一轮清理后过期会话应被标记为不活跃");
             }
 
-            // 第二轮前将 lastActiveTime 拉回非过期窗口，触发 remove 分支完成回收。
-            for (SessionContextInternalDTO session : storeAfterFirstSweep.values()) {
-                session.setLastActiveTime(LocalDateTime.now());
-            }
-
             sessionManager.cleanupExpiredSessions(Duration.ofMinutes(10));
 
             assertEquals(0, getSessionStore().size(),
@@ -1213,7 +1204,7 @@ public class SessionManagerUnitTest extends BaseUnitTest {
     // 辅助方法：在 sessionStore 中查找指定 sessionId 的复合键
     private String findSessionKeyInStore(java.util.Map<?, ?> sessionStore, String sessionId) {
         for (Object key : sessionStore.keySet()) {
-            if (key instanceof String && ((String) key).startsWith(sessionId + ":")) {
+            if (key instanceof String && ((String) key).contains(":" + sessionId + ":")) {
                 return (String) key;
             }
         }

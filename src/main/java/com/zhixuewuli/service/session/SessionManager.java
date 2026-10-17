@@ -66,7 +66,7 @@ public class SessionManager {
     public SessionContextInternalDTO getOrCreateSession(String sessionId, Long userId,
             ConversationType conversationType, Long questionId,
             Supplier<String> initialContextSupplier) {
-        String sessionKey = generateSessionKey(sessionId, conversationType, questionId);
+        String sessionKey = userId + ":" + generateSessionKey(sessionId, conversationType, questionId);
         SessionContextInternalDTO existing = sessionStore.get(sessionKey);
         if (existing != null) {
             if (!Boolean.TRUE.equals(existing.getIsActive())) {
@@ -74,12 +74,20 @@ public class SessionManager {
             }
             return existing;
         }
-        // 原子创建新会话
+        // Admission is serialized only for cache misses; existing-session reads stay concurrent.
+        synchronized (sessionStore) {
+        int capacity = aiProperties.getMaxCachedSessions() > 0 ? aiProperties.getMaxCachedSessions() : 1000;
+        if (!sessionStore.containsKey(sessionKey) && sessionStore.size() >= capacity) {
+            cleanupExpiredSessions(aiProperties.getSessionExpiration());
+            if (sessionStore.size() >= capacity) {
+                throw new com.zhixuewuli.common.exception.BusinessException("会话缓存已满，请稍后重试");
+            }
+        }
         return sessionStore.computeIfAbsent(sessionKey, key -> {
             log.info("创建新会话上下文 - 会话ID: {}, 用户ID: {}, 类型: {}, 题目ID: {}",
                     sessionId, userId, conversationType, questionId);
             String initialContext = initialContextSupplier.get();
-            return SessionContextInternalDTO.builder()
+            SessionContextInternalDTO context = SessionContextInternalDTO.builder()
                     .sessionId(sessionId)
                     .userId(userId)
                     .conversationType(conversationType)
@@ -94,7 +102,24 @@ public class SessionManager {
                     .interactionRecords(new ConcurrentSkipListMap<>())
                     .totalInteractionCount(0)
                     .build();
+            var persisted = conversationHistoryRepository
+                    .findByUserIdAndSessionIdAndConversationTypeAndQuestionIdAndIsActiveOrderBySequenceNumberAsc(
+                            userId, sessionId, conversationType, questionId, true);
+            long tokens = 0;
+            int sequence = 0;
+            for (ConversationHistory history : persisted) {
+                context.addInteractionRecord(history);
+                sequence = Math.max(sequence, history.getSequenceNumber() == null ? 0 : history.getSequenceNumber());
+                tokens += history.getTokenCount() == null ? 0 : Math.max(0, history.getTokenCount());
+            }
+            context.setTotalInteractionCount(sequence);
+            context.setUsedTokens((int) Math.min(Integer.MAX_VALUE, tokens));
+            if (context.getMaxTokens() > 0 && tokens > context.getMaxTokens()) {
+                throw new SessionExpiredException(sessionId);
+            }
+            return context;
         });
+        }
     }
 
     /**
@@ -203,12 +228,12 @@ public class SessionManager {
 
                 session.getLock().writeLock().lock();
                 try {
-                    if (session.getLastActiveTime().isBefore(expiryThreshold)) {
-                        session.setIsActive(false);
-                        marked++;
-                    } else if (!Boolean.TRUE.equals(session.getIsActive())) {
+                    if (!Boolean.TRUE.equals(session.getIsActive())) {
                         iterator.remove();
                         removed++;
+                    } else if (session.getLastActiveTime().isBefore(expiryThreshold)) {
+                        session.setIsActive(false);
+                        marked++;
                     }
                 } finally {
                     session.getLock().writeLock().unlock();
@@ -225,14 +250,15 @@ public class SessionManager {
      * 清除指定会话（从内存和数据库）
      * 需先验证用户权限
      */
+    @org.springframework.transaction.annotation.Transactional
     public void clearSession(String sessionId, Long userId) {
         if (!canAccessSession(sessionId, userId)) {
             throw new InsufficientPermissionException("无权清除该会话");
         }
         // 从内存中移除所有以该sessionId开头的复合键
-        sessionStore.entrySet().removeIf(entry -> entry.getKey().startsWith(sessionId + ":"));
+        sessionStore.entrySet().removeIf(entry -> userId.equals(entry.getValue().getUserId()) && sessionId.equals(entry.getValue().getSessionId()));
         // 从数据库中删除
-        conversationHistoryRepository.deleteBySessionId(sessionId);
+        conversationHistoryRepository.deleteBySessionIdAndUserId(sessionId, userId);
         log.info("会话清除成功 - 会话ID: {}, 用户ID: {}", sessionId, userId);
     }
 }
