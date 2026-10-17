@@ -196,8 +196,8 @@ export const streamWrongQuestionAnalysis = (body: AIAskPayload, options: Omit<St
 export const streamStudentReport = (options: Omit<StreamOptions, 'body'>) =>
   streamAI('/ai/student/report', { ...options, method: 'GET' });
 
-export const streamTeacherReport = (options: Omit<StreamOptions, 'body'>) =>
-  streamAI('/ai/teacher/report', { ...options, method: 'GET' });
+export const streamTeacherReport = (options: Omit<StreamOptions, 'body'> & { eventId?: number }) =>
+  streamAI(`/ai/teacher/report${options.eventId == null ? '' : `?eventId=${options.eventId}`}`, { ...options, method: 'GET' });
 
 export const streamTeacherQuestionAnalysis = (
   body: AIAskPayload,

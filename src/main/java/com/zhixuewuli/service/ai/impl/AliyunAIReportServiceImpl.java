@@ -230,22 +230,11 @@ public class AliyunAIReportServiceImpl implements AliyunAIReportService {
     // ========== 教师报告 ==========
     @Override
     public void streamTeacherAnalysis(SseEmitter emitter, Long userId) {
-        // 在主线程中提前查询所有学生姓名，避免异步任务中的懒加载问题
-        List<Long> userIds = answerRecordRepository.findDistinctUserIds();
-        if (userIds.isEmpty()) {
-            throw new AnswerRecordNotFoundException("暂无任何学生答题数据，无法生成教师报告");
-        }
+        streamTeacherAnalysis(emitter, userId, null);
+    }
 
-        // 批量查询学生姓名，避免懒加载问题
-        Map<Long, String> studentNames = new java.util.HashMap<>();
-        List<Object[]> namesResult = userRepository.findIdsAndRealNamesByUserIds(userIds);
-        for (Object[] row : namesResult) {
-            Long uid = (Long) row[0];
-            String realName = (String) row[1];
-            studentNames.put(uid, realName != null ? realName : "学生" + uid);
-        }
-
-        // 立即提交异步任务，不阻塞当前线程
+    @Override
+    public void streamTeacherAnalysis(SseEmitter emitter, Long userId, Long eventId) {
         AIStreamExecutor.submit(aiTaskExecutor, userId, emitter, streamUtils, () -> {
             executeStreamOperation(
                     "教师综合分析报告生成",
@@ -257,32 +246,27 @@ public class AliyunAIReportServiceImpl implements AliyunAIReportService {
                         emitter.onTimeout(() -> cancelled.set(true));
                         emitter.onError(t -> cancelled.set(true));
 
-                        // 获取所有有答题记录的用户 ID
-                        if (userIds.isEmpty()) {
+                        List<AnswerRecord> allRecords = new ArrayList<>();
+                        if (eventId != null) {
+                            // Task reports must never fall back to another task's sessions.
+                            allRecords.addAll(answerRecordRepository.findByEventIdOrderByAnsweredAtDesc(eventId));
+                        } else {
+                            // The dashboard's general report keeps its latest-session-per-student semantics.
+                            for (Long uid : answerRecordRepository.findDistinctUserIds()) {
+                                String latestSessionId = answerRecordRepository.findDistinctSessionIdsByUserId(uid)
+                                        .stream().max(Comparator.comparing(SessionUtil::extractTimestamp)).orElse(null);
+                                if (latestSessionId != null) allRecords.addAll(answerRecordRepository
+                                        .findByUserIdAndSessionIdOrderByAnsweredAtDesc(uid, latestSessionId));
+                            }
+                        }
+                        if (allRecords.isEmpty()) {
                             throw new AnswerRecordNotFoundException("暂无任何学生答题数据，无法生成教师报告");
                         }
-
-                        List<AnswerRecord> allRecords = new ArrayList<>();
-                        // 遍历每个学生，获取其最新会话的答题记录
-                        for (Long uid : userIds) {
-                            List<String> sessionIds = answerRecordRepository.findDistinctSessionIdsByUserId(uid);
-                            if (sessionIds.isEmpty()) {
-                                continue;
-                            }
-                            // 找出最新会话ID（按时间戳降序）
-                            String latestSessionId = sessionIds.stream()
-                                    .max(Comparator.comparing(SessionUtil::extractTimestamp))
-                                    .orElse(null);
-                            if (latestSessionId == null) {
-                                continue;
-                            }
-                            List<AnswerRecord> sessionRecords = answerRecordRepository
-                                    .findByUserIdAndSessionIdOrderByAnsweredAtDesc(uid, latestSessionId);
-                            allRecords.addAll(sessionRecords);
-                        }
-
-                        if (allRecords.isEmpty()) {
-                            throw new AnswerRecordNotFoundException("无有效的学生最新会话答题数据，无法生成教师报告");
+                        List<Long> userIds = allRecords.stream().map(AnswerRecord::getUserId).distinct().toList();
+                        Map<Long, String> studentNames = new HashMap<>();
+                        for (Object[] row : userRepository.findIdsAndRealNamesByUserIds(userIds)) {
+                            Long uid = (Long) row[0];
+                            studentNames.put(uid, row[1] == null ? "学生" + uid : (String) row[1]);
                         }
 
                         // 批量加载题目

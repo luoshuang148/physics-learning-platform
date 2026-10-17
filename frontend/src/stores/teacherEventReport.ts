@@ -8,6 +8,7 @@ export interface CachedTeacherEventReport {
   error: string;
   tokenUsage: string;
   currentEventTitle: string;
+  eventId?: number;
   updatedAt: string;
 }
 

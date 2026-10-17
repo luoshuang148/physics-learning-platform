@@ -7,7 +7,6 @@
 SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci;
 SET FOREIGN_KEY_CHECKS = 0;
 
--- 删除数据库（如果存在）
 -- Fresh installation only. Existing installations use the versioned upgrade scripts.
 
 -- 创建数据库并指定字符集
@@ -198,11 +197,12 @@ CREATE TABLE IF NOT EXISTS experiments (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='实验配置表';
 
 -- ====================================================================
--- 插入初始必需数据
--- ====================================================================
+-- 与增量升级一致：学习数据引用的任务不能被物理删除。
+ALTER TABLE answer_records ADD CONSTRAINT fk_answer_event FOREIGN KEY (event_id) REFERENCES teacher_events(id);
+ALTER TABLE conversation_history ADD CONSTRAINT fk_history_event FOREIGN KEY (event_id) REFERENCES teacher_events(id);
+ALTER TABLE student_reports ADD CONSTRAINT fk_report_event FOREIGN KEY (event_id) REFERENCES teacher_events(id);
 
-INSERT INTO users (username, password_hash, user_type, real_name, class_name) VALUES
-('admin', '$2a$10$5nxV.VGD3yCGNdr3mgzyR.QIGne12zdXlFL158jiTII9H30nLyCKC', 'TEACHER', '系统管理员', '管理员');
+-- 首次教师由显式启用的 BootstrapTeacherInitializer 创建，不内置账户或密码。
 
 -- 显示创建完成信息
 SELECT '数据库初始化完成' as message;

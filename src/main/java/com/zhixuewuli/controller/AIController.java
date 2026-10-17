@@ -177,7 +177,7 @@ public class AIController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "权限不足（非教师身份）")
         }
     )
-    public SseEmitter streamTeacherAnalysis(HttpServletRequest httpRequest) {
+    public SseEmitter streamTeacherAnalysis(HttpServletRequest httpRequest, @RequestParam(required = false) Long eventId) {
         Long userId = (Long) httpRequest.getAttribute("userId");
 
         // 前置校验
@@ -187,7 +187,7 @@ public class AIController {
         SseEmitter emitter = aliyunAIReportService.createConfiguredEmitter();
 
         // 调用服务方法
-        aliyunAIReportService.streamTeacherAnalysis(emitter, userId);
+        aliyunAIReportService.streamTeacherAnalysis(emitter, userId, eventId);
 
         return emitter;
     }

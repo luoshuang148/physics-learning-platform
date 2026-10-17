@@ -55,6 +55,9 @@ class UserServiceUnitTest extends BaseUnitTest {
     @Mock
     private UserPermissionUtil userPermissionUtil;
 
+    @Mock
+    private com.zhixuewuli.repository.TeacherEventRepository teacherEventRepository;
+
     @InjectMocks
     private UserServiceImpl userService;
 
@@ -74,6 +77,15 @@ class UserServiceUnitTest extends BaseUnitTest {
         mockTeacher.setUserType(User.UserType.TEACHER);
         mockTeacher.setUsername("teacher001");
         mockTeacher.setRealName("教师一号");
+    }
+
+    @Test
+    void cannotDeletePublisherWithRetainedTeachingTasks() {
+        when(userRepository.findById(110L)).thenReturn(Optional.of(mockTeacher));
+        when(teacherEventRepository.existsByTeacherId(110L)).thenReturn(true);
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> userService.deleteUser(110L, 110L))
+                .isInstanceOf(com.zhixuewuli.common.exception.BusinessException.class);
+        verify(userRepository, never()).delete(any(User.class));
     }
 
     // ==================== getCurrentUser 测试 ====================

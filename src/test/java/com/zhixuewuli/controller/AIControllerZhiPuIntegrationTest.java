@@ -102,10 +102,23 @@ public class AIControllerZhiPuIntegrationTest extends BaseControllerIntegrationT
         static class TestConfig {
                 @Bean
                 @Primary
-                public Executor aiTaskExecutor() {
-                        return new SyncTaskExecutor();
+                public TestExecutor aiTaskExecutor() {
+                        return new TestExecutor();
                 }
         }
+
+        static class TestExecutor implements Executor {
+                volatile boolean asynchronous;
+                @Override public void execute(Runnable task) {
+                        if (asynchronous) new Thread(task, "test-ai-worker").start();
+                        else task.run();
+                }
+        }
+
+        @Autowired private TestExecutor testExecutor;
+
+        @org.junit.jupiter.api.AfterEach
+        void resetExecutor() { testExecutor.asynchronous = false; }
 
         @Autowired
         private ObjectMapper objectMapper;
@@ -198,7 +211,7 @@ public class AIControllerZhiPuIntegrationTest extends BaseControllerIntegrationT
                 SseTestUtils.assertValidSseFormat(finalResult);
 
                 // 验证 Mock 被调用
-                verify(zhipuAIClient, times(1)).streamChatWithMessages(any(), anyString(),
+                verify(zhipuAIClient, org.mockito.Mockito.times(1)).streamChatWithMessages(any(), anyString(),
                                 any(AIStreamCallback.class));
         }
 
@@ -233,7 +246,7 @@ public class AIControllerZhiPuIntegrationTest extends BaseControllerIntegrationT
                                 .andExpect(content().contentTypeCompatibleWith(MediaType.TEXT_EVENT_STREAM));
 
                 // 验证 Mock 被调用
-                verify(zhipuAIClient, times(1)).streamChatWithMessages(any(), anyString(),
+                verify(zhipuAIClient, org.mockito.Mockito.times(1)).streamChatWithMessages(any(), anyString(),
                                 any(AIStreamCallback.class));
         }
 
@@ -317,7 +330,7 @@ public class AIControllerZhiPuIntegrationTest extends BaseControllerIntegrationT
                 SseTestUtils.assertValidSseFormat(finalResult);
 
                 // 验证 Mock 被调用
-                verify(zhipuAIClient, times(1)).streamChatWithMessages(any(), anyString(),
+                verify(zhipuAIClient, org.mockito.Mockito.times(1)).streamChatWithMessages(any(), anyString(),
                                 any(AIStreamCallback.class));
         }
 
@@ -659,7 +672,7 @@ public class AIControllerZhiPuIntegrationTest extends BaseControllerIntegrationT
                 SseTestUtils.assertValidSseFormat(finalResult);
         
                 // 验证 Mock 被调用
-                verify(zhipuAIClient, times(1)).streamChatWithMessages(any(), anyString(),
+                verify(zhipuAIClient, org.mockito.Mockito.times(1)).streamChatWithMessages(any(), anyString(),
                                 any(AIStreamCallback.class));
         }
 
@@ -752,6 +765,7 @@ public class AIControllerZhiPuIntegrationTest extends BaseControllerIntegrationT
         @Transactional(propagation = Propagation.NOT_SUPPORTED)
         @Sql(scripts = { "/sql/cleanup-all.sql" }, executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD)
         void testStreamRealtimeQA_HttpClientDisconnect_ShouldBeCancelledServerSide() throws Exception {
+                testExecutor.asynchronous = true;
                 // Given
                 CountDownLatch firstChunkSent = new CountDownLatch(1);
                 CountDownLatch cancelObserved = new CountDownLatch(1);
@@ -798,7 +812,7 @@ public class AIControllerZhiPuIntegrationTest extends BaseControllerIntegrationT
                                 }
                         }, "http-disconnect-stream-mock");
 
-                        streamThread.start();
+                        streamThread.run();
                         return null;
                 }).when(zhipuAIClient).streamChatWithMessages(any(), anyString(), any(AIStreamCallback.class));
 
@@ -823,6 +837,7 @@ public class AIControllerZhiPuIntegrationTest extends BaseControllerIntegrationT
                 int readBytes;
                 try (var inputStream = connection.getInputStream()) {
                         readBytes = inputStream.read(buffer);
+                        assertThat(firstChunkSent.await(3, TimeUnit.SECONDS)).isTrue();
                 }
 
                 assertThat(readBytes).isGreaterThan(0);
@@ -866,7 +881,7 @@ public class AIControllerZhiPuIntegrationTest extends BaseControllerIntegrationT
                                 errorTriggered.countDown();
                         }, "http-server-error-stream-mock");
 
-                        streamThread.start();
+                        streamThread.run();
                         return null;
                 }).when(zhipuAIClient).streamChatWithMessages(any(), anyString(), any(AIStreamCallback.class));
 
@@ -914,6 +929,7 @@ public class AIControllerZhiPuIntegrationTest extends BaseControllerIntegrationT
         @Transactional(propagation = Propagation.NOT_SUPPORTED)
         @Sql(scripts = { "/sql/cleanup-all.sql" }, executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD)
         void testStreamRealtimeQA_ServerTimeoutClose_ShouldEndWithoutNamedTerminalEvent() throws Exception {
+                testExecutor.asynchronous = true;
                 // Given
                 CountDownLatch timeoutObserved = new CountDownLatch(1);
                 AtomicBoolean completionCalled = new AtomicBoolean(false);
@@ -955,7 +971,7 @@ public class AIControllerZhiPuIntegrationTest extends BaseControllerIntegrationT
                                         }
                                 }, "http-server-timeout-stream-mock");
 
-                                streamThread.start();
+                                streamThread.run();
                                 return null;
                         }).when(zhipuAIClient).streamChatWithMessages(any(), anyString(), any(AIStreamCallback.class));
 
@@ -1088,7 +1104,7 @@ public class AIControllerZhiPuIntegrationTest extends BaseControllerIntegrationT
                                 } finally {
                                         latch.countDown();
                                 }
-                        }).start();
+                        }).run();
                         return null;
                 }).when(zhipuAIClient).streamChatWithMessages(any(), anyString(), any(AIStreamCallback.class));
         
@@ -1197,129 +1213,52 @@ public class AIControllerZhiPuIntegrationTest extends BaseControllerIntegrationT
                                 .streamChatWithMessages(any(), anyString(), any(AIStreamCallback.class));
         }
 
-        @DisplayName("实时问答流式生成 - 同一会话并发追问应保持序列一致")
+        @DisplayName("同一会话已有请求时拒绝重复生成且保留首个请求")
         @Test
         @Transactional(propagation = Propagation.NOT_SUPPORTED)
         @Sql(scripts = { "/sql/cleanup-all.sql" }, executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD)
         void testStreamRealtimeQA_SameSessionConcurrentFollowUp_ShouldKeepConsistentHistory() throws Exception {
-                // Given
-                java.util.concurrent.atomic.AtomicInteger callIndex = new java.util.concurrent.atomic.AtomicInteger(0);
-
+                testExecutor.asynchronous = true;
+                long uid = 998001L;
+                String username = "single_flight_student";
+                jdbcTemplate.update("INSERT INTO users(id,username,password_hash,real_name,user_type,active) VALUES(?,?,? ,?,'STUDENT',TRUE)",
+                        uid, username, "test-hash", username);
+                CountDownLatch started = new CountDownLatch(1);
+                CountDownLatch release = new CountDownLatch(1);
                 doAnswer(invocation -> {
                         AIStreamCallback callback = invocation.getArgument(2);
-                        int index = callIndex.incrementAndGet();
-                        callback.onContent("并发追问响应-" + index, false);
-                        callback.onContent("并发追问完成-" + index, true);
-                        callback.onComplete(20 + index, 40 + index, 60 + index);
+                        started.countDown();
+                        if (!release.await(10, TimeUnit.SECONDS)) throw new AssertionError("first request not released");
+                        callback.onContent("single response", true);
+                        callback.onComplete(20, 40, 60);
                         return null;
                 }).when(zhipuAIClient).streamChatWithMessages(any(), anyString(), any(AIStreamCallback.class));
-
-                String sharedSessionId = "20260418093000_" + String.format("%016x", System.nanoTime());
-                int concurrentRequests = 2;
-                CountDownLatch startLatch = new CountDownLatch(1);
-                CountDownLatch doneLatch = new CountDownLatch(concurrentRequests);
-                java.util.List<Integer> statusCodes = java.util.Collections
-                                .synchronizedList(new java.util.ArrayList<>());
-                java.util.concurrent.atomic.AtomicReference<Throwable> failure = new java.util.concurrent.atomic.AtomicReference<>();
-                String endpoint = "http://127.0.0.1:" + localServerPort + "/api/v1/ai/student/realtimeQA";
-
-                long tempUserId = 993000L + (System.nanoTime() % 100000L);
-                String tempUsername = "http_concurrent_student_" + tempUserId;
-                jdbcTemplate.update(
-                                "INSERT INTO users (id, username, password_hash, real_name, user_type, class_name, active, last_login, created_at, updated_at) "
-                                                + "VALUES (?, ?, ?, ?, 'STUDENT', ?, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
-                                tempUserId,
-                                tempUsername,
-                                "$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy",
-                                "并发追问测试学生",
-                                "test-class");
-
-                String authorization = createAuthHeader(tempUserId, tempUsername);
-
+                String session = "20260418093000_aabbccddeeff0011";
                 try {
-                        // When
-                        for (int i = 0; i < concurrentRequests; i++) {
-                                final int requestIndex = i;
-                                Thread thread = new Thread(() -> {
-                                        HttpURLConnection connection = null;
-                                        try {
-                                                startLatch.await();
-
-                                                AIAskRequest request = new AIAskRequest();
-                                                request.setQuestion("同会话并发追问-" + requestIndex);
-                                                String requestBody = objectMapper.writeValueAsString(request);
-
-                                                connection = (HttpURLConnection) new URL(endpoint).openConnection();
-                                                connection.setRequestMethod("POST");
-                                                connection.setDoOutput(true);
-                                                connection.setConnectTimeout(5000);
-                                                connection.setReadTimeout(15000);
-                                                connection.setRequestProperty("Authorization", authorization);
-                                                connection.setRequestProperty("X-Session-Id", sharedSessionId);
-                                                connection.setRequestProperty("Content-Type", MediaType.APPLICATION_JSON_VALUE);
-                                                connection.setRequestProperty("Accept", MediaType.TEXT_EVENT_STREAM_VALUE);
-
-                                                connection.getOutputStream()
-                                                                .write(requestBody.getBytes(StandardCharsets.UTF_8));
-                                                int statusCode = connection.getResponseCode();
-                                                statusCodes.add(statusCode);
-
-                                                // 消费响应流，确保连接完成释放
-                                                java.io.InputStream inputStream = statusCode >= 400
-                                                                ? connection.getErrorStream()
-                                                                : connection.getInputStream();
-                                                if (inputStream != null) {
-                                                        try (BufferedReader reader = new BufferedReader(
-                                                                        new InputStreamReader(inputStream,
-                                                                                        StandardCharsets.UTF_8))) {
-                                                                while (reader.readLine() != null) {
-                                                                        // 消费完响应即可
-                                                                }
-                                                        }
-                                                }
-                                        } catch (Throwable t) {
-                                                failure.compareAndSet(null, t);
-                                        } finally {
-                                                if (connection != null) {
-                                                        connection.disconnect();
-                                                }
-                                                doneLatch.countDown();
-                                        }
-                                });
-                                thread.start();
-                        }
-
-                        startLatch.countDown();
-                        doneLatch.await();
-
-                        // Then
-                        assertThat(failure.get()).as("并发请求不应抛出异常").isNull();
-                        assertThat(statusCodes).hasSize(concurrentRequests);
-                        assertThat(statusCodes).allMatch(code -> code == 200);
-
-                        Thread.sleep(600);
-
-                        verify(zhipuAIClient, atLeast(concurrentRequests))
-                                        .streamChatWithMessages(any(), anyString(), any(AIStreamCallback.class));
-
-                        java.util.List<ConversationHistory> records = conversationHistoryRepository
-                                        .findBySessionIdAndConversationTypeAndIsActiveOrderBySequenceNumberAsc(
-                                                        sharedSessionId,
-                                                        ConversationType.REAL_TIME_QA,
-                                                        true);
-
-                        assertThat(records).hasSize(concurrentRequests);
-
-                        java.util.Set<Integer> sequenceSet = new java.util.HashSet<>();
-                        for (ConversationHistory history : records) {
-                                assertThat(history.getSequenceNumber()).isNotNull();
-                                sequenceSet.add(history.getSequenceNumber());
-                        }
-
-                        assertThat(sequenceSet).hasSize(concurrentRequests);
-                        assertThat(sequenceSet).containsExactlyInAnyOrder(1, 2);
+                        MvcResult first = mockMvc.perform(post("/ai/student/realtimeQA")
+                                .header("Authorization", createAuthHeader(uid, username)).header("X-Session-Id", session)
+                                .contentType(MediaType.APPLICATION_JSON).content("{\"question\":\"first\"}"))
+                                .andExpect(request().asyncStarted()).andReturn();
+                        assertThat(started.await(5, TimeUnit.SECONDS)).isTrue();
+                        MvcResult duplicate = mockMvc.perform(post("/ai/student/realtimeQA")
+                                .header("Authorization", createAuthHeader(uid, username)).header("X-Session-Id", session)
+                                .contentType(MediaType.APPLICATION_JSON).content("{\"question\":\"duplicate\"}"))
+                                .andExpect(request().asyncStarted()).andReturn();
+                        duplicate.getAsyncResult(5000);
+                        String error = mockMvc.perform(asyncDispatch(duplicate)).andReturn().getResponse().getContentAsString();
+                        assertContainsEventName(error, "error");
+                        release.countDown();
+                        first.getAsyncResult(5000);
+                        String response = mockMvc.perform(asyncDispatch(first)).andReturn().getResponse().getContentAsString();
+                        assertContainsEventName(response, "complete");
+                        verify(zhipuAIClient, org.mockito.Mockito.times(1)).streamChatWithMessages(any(), anyString(), any(AIStreamCallback.class));
+                        var history = conversationHistoryRepository.findBySessionIdAndConversationTypeAndIsActiveOrderBySequenceNumberAsc(
+                                session, ConversationType.REAL_TIME_QA, true);
+                        assertThat(history).hasSize(1);
                 } finally {
-                        jdbcTemplate.update("DELETE FROM users WHERE id = ?", tempUserId);
+                        release.countDown();
+                        jdbcTemplate.update("DELETE FROM conversation_history WHERE user_id=?", uid);
+                        jdbcTemplate.update("DELETE FROM users WHERE id=?", uid);
                 }
         }
 

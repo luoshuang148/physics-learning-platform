@@ -16,6 +16,9 @@ import java.util.Optional;
 
 @Repository
 public interface AnswerRecordRepository extends JpaRepository<AnswerRecord, String> {
+        @EntityGraph(attributePaths = "question")
+        List<AnswerRecord> findByEventIdOrderByAnsweredAtDesc(Long eventId);
+
         @Override
         @EntityGraph(attributePaths = "question")
         List<AnswerRecord> findAll();

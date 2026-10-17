@@ -46,6 +46,23 @@ class TeacherEventArchiveRegressionTest extends BaseControllerIntegrationTest {
                 .andExpect(status().isOk()).andExpect(jsonPath("$.data.records[0].id").value(1));
     }
 
+    @Test
+    void archivedAnswersNeverBecomeTheNewTasksReportInput() {
+        Question question = new Question(); question.setContent("Scoped report fixture"); question.setDifficulty(1);
+        question.setOptions("{\"A\":\"a\",\"B\":\"b\",\"C\":\"c\",\"D\":\"d\"}"); question.setCorrectOption("A");
+        jpaEntityManager.persist(question); jpaEntityManager.flush();
+        AnswerRecord answer = new AnswerRecord(); answer.setUserId(1001L); answer.setQuestionId(question.getId());
+        answer.setSessionId("task-a"); answer.setUserAnswer("A"); answer.setCorrect(true); answer.setEventId(1L);
+        answers.saveAndFlush(answer);
+        events.deleteCurrentEvent(2001L);
+        var next = new com.zhixuewuli.dto.request.TeacherEventCreateRequest();
+        next.setEventTitle("Task B"); next.setEventTimestamp(LocalDateTime.now());
+        Long newId = events.publishEvent(next, 2001L).getId();
+        assertThat(answers.findByEventIdOrderByAnsweredAtDesc(1L)).hasSize(1);
+        assertThat(answers.findByEventIdOrderByAnsweredAtDesc(newId)).isEmpty();
+        assertThat(answers.count()).isEqualTo(1);
+    }
+
     @Autowired com.zhixuewuli.service.answerRecord.AnswerRecordService answerService;
     @Autowired com.zhixuewuli.service.session.SessionManager sessions;
 

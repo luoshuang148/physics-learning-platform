@@ -34,6 +34,7 @@ import java.util.List;
 public class UserServiceImpl implements UserService {
 
     private final UserRepository userRepository;
+    private final com.zhixuewuli.repository.TeacherEventRepository teacherEventRepository;
     private final PasswordEncoder passwordEncoder;
     private final UserPermissionUtil userPermissionUtil;
 
@@ -153,6 +154,9 @@ public class UserServiceImpl implements UserService {
         User targetUser = userRepository.findById(userId)
                 .orElseThrow(() -> new UserNotFoundException("用户不存在"));
 
+        if (teacherEventRepository.existsByTeacherId(userId)) {
+            throw new com.zhixuewuli.common.exception.BusinessException("该用户有关联教学任务，请保留账号并停用以保留历史数据");
+        }
         userRepository.delete(targetUser);
     }
 }

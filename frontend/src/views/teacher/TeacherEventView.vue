@@ -207,6 +207,7 @@
 </template>
 
 <script setup lang="ts">
+import { createReportRequestGuard } from '@/utils/reportRequestGuard';
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import AppShell from '@/layouts/AppShell.vue';
 import LatexText from '@/components/LatexText.vue';
@@ -270,6 +271,8 @@ const expandedId = ref<number | null>(null);
 const searchText = ref('');
 const showEventReport = ref(false);
 const activeReportSessionType = ref('');
+const reportRequestGuard = createReportRequestGuard();
+const activeReportEvent = ref<{ eventId: number; title: string } | null>(null);
 const activeAbortController = ref<AbortController | null>(null);
 
 const toggleExpand = (id: number) => {
@@ -309,7 +312,7 @@ const shouldShowEventReportPanel = computed(() =>
 );
 
 const reportEventTitle = computed(() =>
-  reportStore.cachedReport?.currentEventTitle || current.value?.eventTitle || '未发布'
+  activeReportEvent.value?.title || current.value?.eventTitle || '未发布'
 );
 
 const eventReportButtonText = computed(() => {
@@ -388,17 +391,19 @@ const restoreCachedEventReport = () => {
     return;
   }
 
+  if (cached.eventId == null) { reportStore.clearCachedReport(); return; }
+  activeReportEvent.value = { eventId: cached.eventId, title: cached.currentEventTitle };
   eventReportState.value.loading = cached.loading;
   eventReportState.value.progress = cached.progress;
   eventReportState.value.content = cached.content;
   eventReportState.value.reasoning = cached.reasoning;
   eventReportState.value.error = normalizedCachedError;
   eventReportState.value.tokenUsage = cached.tokenUsage;
-  activeReportSessionType.value = cached.currentEventTitle ? `teacher_event_report_${cached.currentEventTitle}` : '';
+  activeReportSessionType.value = cached.eventId ? `teacher_event_report_${cached.eventId}` : '';
 };
 
 const persistEventReport = () => {
-  if (!reportEventTitle.value || reportEventTitle.value === '未发布') return;
+  if (!activeReportEvent.value) return;
   if (!eventReportState.value.loading && !eventReportState.value.content && !eventReportState.value.reasoning && !eventReportState.value.error) return;
   reportStore.setCachedReport({
     loading: eventReportState.value.loading,
@@ -408,18 +413,27 @@ const persistEventReport = () => {
     error: eventReportState.value.error,
     tokenUsage: eventReportState.value.tokenUsage,
     currentEventTitle: reportEventTitle.value,
+    eventId: activeReportEvent.value.eventId,
   });
 };
 
 const clearEventReport = () => {
+  reportRequestGuard.invalidate();
+  activeAbortController.value?.abort();
+  activeAbortController.value = null;
+  activeReportEvent.value = null;
   resetEventReport();
   activeReportSessionType.value = '';
   reportStore.clearCachedReport();
 };
 
-const startEventReportStream = async (eventTitle: string) => {
-  activeReportSessionType.value = `teacher_event_report_${eventTitle}`;
-  resetEventReport();
+const startEventReportStream = async () => {
+  const event = current.value;
+  if (!event) return;
+  clearEventReport();
+  const scope = reportRequestGuard.begin(event.id, event.eventTitle);
+  activeReportEvent.value = { eventId: scope.eventId, title: scope.title };
+  activeReportSessionType.value = `teacher_event_report_${scope.eventId}`;
   eventReportState.value.loading = true;
   eventReportState.value.error = '';
   persistEventReport();
@@ -427,32 +441,39 @@ const startEventReportStream = async (eventTitle: string) => {
   activeAbortController.value = abortController;
   try {
     await streamTeacherReport({
+      eventId: scope.eventId,
       signal: abortController.signal,
       sessionType: activeReportSessionType.value,
       onMessage: (payload) => {
+        if (!scope.isCurrent()) return;
         eventReportState.value.content += payload.content;
         persistEventReport();
       },
       onProgress: (payload) => {
+        if (!scope.isCurrent()) return;
         eventReportState.value.progress = payload.progress ?? eventReportState.value.progress;
         persistEventReport();
       },
       onReasoning: (payload) => {
+        if (!scope.isCurrent()) return;
         eventReportState.value.reasoning += payload.reasoning;
         persistEventReport();
       },
       onComplete: (payload) => {
+        if (!scope.isCurrent()) return;
         eventReportState.value.loading = false;
         eventReportState.value.tokenUsage = `Token: ${payload.totalTokens ?? 0}`;
         persistEventReport();
       },
       onError: (payload) => {
+        if (!scope.isCurrent()) return;
         eventReportState.value.loading = false;
         eventReportState.value.error = normalizeEventReportError(payload.message);
         persistEventReport();
       },
     });
   } catch (error: any) {
+    if (!scope.isCurrent()) return;
     if (isAbortError(error)) {
       eventReportState.value.loading = false;
       persistEventReport();
@@ -468,6 +489,13 @@ const startEventReportStream = async (eventTitle: string) => {
   }
 };
 
+watch(() => current.value?.id, (id) => {
+  if (activeReportEvent.value && activeReportEvent.value.eventId !== id) {
+    clearEventReport();
+    showEventReport.value = false;
+  }
+});
+
 const stopEventReportStream = () => {
   if (!eventReportState.value.loading) return;
   activeAbortController.value?.abort();
@@ -480,13 +508,13 @@ const openEventReport = async () => {
   }
 
   showEventReport.value = true;
-  const sessionType = `teacher_event_report_${current.value.eventTitle}`;
-  const hasCachedCurrentReport = reportStore.cachedReport?.currentEventTitle === current.value.eventTitle;
+  const sessionType = `teacher_event_report_${current.value.id}`;
+  const hasCachedCurrentReport = reportStore.cachedReport?.eventId === current.value.id;
 
   if (eventReportState.value.loading && activeReportSessionType.value === sessionType) return;
   if (hasCachedCurrentReport && (eventReportState.value.content || eventReportState.value.reasoning || eventReportState.value.error)) return;
 
-  await startEventReportStream(current.value.eventTitle);
+  await startEventReportStream();
 };
 
 const closeEventReport = () => {

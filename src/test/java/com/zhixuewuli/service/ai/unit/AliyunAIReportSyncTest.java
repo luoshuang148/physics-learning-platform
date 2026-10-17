@@ -437,7 +437,7 @@ class AliyunAIReportSyncTest extends AIServiceSyncTestBase {
         String reportContent = "测试报告内容";
 
         when(userRepository.findById(userId)).thenReturn(Optional.of(mockStudent));
-        when(studentReportRepository.findByUserIdAndSessionId(userId, sessionId))
+        when(studentReportRepository.findByUserIdAndSessionIdAndEventId(userId, sessionId, null))
                 .thenReturn(Optional.empty());
         when(studentReportRepository.save(any(StudentReport.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
@@ -446,15 +446,16 @@ class AliyunAIReportSyncTest extends AIServiceSyncTestBase {
         com.zhixuewuli.common.util.test.ReflectionTestUtil.invokePrivateMethod(
                 service,
                 "saveStudentReport",
-                new Class<?>[] { Long.class, String.class, String.class },
+                new Class<?>[] { Long.class, String.class, Long.class, String.class },
                 userId,
                 sessionId,
+                null,
                 reportContent);
 
         // Then
         // 验证依赖调用
         verify(userRepository).findById(userId);
-        verify(studentReportRepository).findByUserIdAndSessionId(userId, sessionId);
+        verify(studentReportRepository).findByUserIdAndSessionIdAndEventId(userId, sessionId, null);
         verify(studentReportRepository).save(any(StudentReport.class));
 
         // 确保AI客户端未被调用
@@ -499,15 +500,16 @@ class AliyunAIReportSyncTest extends AIServiceSyncTestBase {
         com.zhixuewuli.common.util.test.ReflectionTestUtil.invokePrivateMethod(
                 service,
                 "saveStudentReport",
-                new Class<?>[] { Long.class, String.class, String.class },
+                new Class<?>[] { Long.class, String.class, Long.class, String.class },
                 userId,
                 sessionId,
+                null,
                 reportContent);
 
         // Then
         verify(userRepository).findById(userId);
         // 不应该查询或保存报告
-        verify(studentReportRepository, never()).findByUserIdAndSessionId(anyLong(), anyString());
+        verify(studentReportRepository, never()).findByUserIdAndSessionIdAndEventId(anyLong(), anyString(), org.mockito.ArgumentMatchers.nullable(Long.class));
         verify(studentReportRepository, never()).save(any(StudentReport.class));
 
         // 确保AI客户端未被调用

@@ -694,7 +694,7 @@ public class AIControllerAliyunIntegrationTest extends BaseControllerIntegration
                                 } finally {
                                         latch.countDown();
                                 }
-                        }).start();
+                        }).run();
                         return null;
                 }).when(aliyunAIClient).streamGenerate(any(), anyString(), any(AIStreamCallback.class));
 

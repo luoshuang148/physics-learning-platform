@@ -83,6 +83,9 @@ class QuestionErrorAnalysisServiceSyncTest extends BaseUnitTest {
     @Mock
     private java.util.concurrent.Executor aiTaskExecutor;
 
+    @Mock
+    private com.zhixuewuli.common.util.StreamUtils streamUtils;
+
     @InjectMocks
     private QuestionErrorAnalysisServiceImpl questionErrorAnalysisService;
 
@@ -223,6 +226,6 @@ class QuestionErrorAnalysisServiceSyncTest extends BaseUnitTest {
         questionErrorAnalysisService.streamTeacherQuestionAnalysis(request, emitter, teacherId, sessionId);
 
         // 验证没有抛出异常即可
-        assertThat(true).isTrue();
+        org.mockito.Mockito.verify(aiTaskExecutor).execute(org.mockito.ArgumentMatchers.any(Runnable.class));
     }
 }

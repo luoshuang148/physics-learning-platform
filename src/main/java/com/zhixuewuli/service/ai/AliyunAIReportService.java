@@ -51,6 +51,8 @@ public interface AliyunAIReportService {
      */
     void streamTeacherAnalysis(SseEmitter emitter, Long userId);
 
+    void streamTeacherAnalysis(SseEmitter emitter, Long userId, Long eventId);
+
     /**
      * 创建配置好的SseEmitter实例
      */

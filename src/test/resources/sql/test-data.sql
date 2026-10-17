@@ -190,12 +190,12 @@ INSERT INTO conversation_history (user_id, session_id, question, answer, sequenc
 (107, 'chat_session_003', '能推荐一些参考资料吗？', '优秀的科普作品同样能够启发思考，拓展视野增长见识。', 2, TRUE, 44, 'REAL_TIME_QA', NULL, DATEADD('DAY', -6, CURRENT_TIMESTAMP()), CURRENT_TIMESTAMP());
 
 -- 6. 教师事件测试数据 (5条)
-INSERT INTO teacher_events (teacher_id, teacher_name, event_title, event_description, event_timestamp, created_at, updated_at) VALUES
-(110, '李老师', '期中考试', '高三物理期中考试安排', DATEADD('DAY', -30, CURRENT_TIMESTAMP()), CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()),
-(111, '陈老师', '实验课程', '力学实验课程通知', DATEADD('DAY', -25, CURRENT_TIMESTAMP()), CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()),
-(112, '刘老师', '知识点复习', '电磁学重点知识梳理', DATEADD('DAY', -20, CURRENT_TIMESTAMP()), CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()),
-(113, '杨老师', '期末准备', '期末复习计划制定', DATEADD('DAY', -15, CURRENT_TIMESTAMP()), CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()),
-(114, '科研人员', '研究成果分享', '最新物理研究成果交流', DATEADD('DAY', -10, CURRENT_TIMESTAMP()), CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP());
+INSERT INTO teacher_events (teacher_id, teacher_name, event_title, event_description, event_timestamp, is_global, created_at, updated_at) VALUES
+(110, '李老师', '期中考试', '高三物理期中考试安排', DATEADD('DAY', -30, CURRENT_TIMESTAMP()), false, CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()),
+(111, '陈老师', '实验课程', '力学实验课程通知', DATEADD('DAY', -25, CURRENT_TIMESTAMP()), false, CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()),
+(112, '刘老师', '知识点复习', '电磁学重点知识梳理', DATEADD('DAY', -20, CURRENT_TIMESTAMP()), false, CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()),
+(113, '杨老师', '期末准备', '期末复习计划制定', DATEADD('DAY', -15, CURRENT_TIMESTAMP()), false, CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()),
+(114, '科研人员', '研究成果分享', '最新物理研究成果交流', DATEADD('DAY', -10, CURRENT_TIMESTAMP()), false, CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP());
 
 -- 显示测试数据统计信息
 SELECT 'H2测试数据初始化完成' as message;
