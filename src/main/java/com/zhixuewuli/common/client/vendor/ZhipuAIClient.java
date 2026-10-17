@@ -51,6 +51,9 @@ public class ZhipuAIClient extends AbstractStreamingClient {
     private AIBusinessProperties aiBusinessProperties;
 
     @Override
+    protected boolean isEnabled() { return aiBusinessProperties.isEnabled(); }
+
+    @Override
     protected String getApiKey() {
         return aiBusinessProperties.getZhipuApiKey();
     }

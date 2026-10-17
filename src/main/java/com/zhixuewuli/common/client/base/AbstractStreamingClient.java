@@ -100,7 +100,7 @@ public abstract class AbstractStreamingClient {
     @PostConstruct
     protected void initHttpClient() {
 
-        validateConfiguration();
+        if (isEnabled()) validateConfiguration();
 
         // 获取各维度超时配置值，使用独立配置项
         long connectTimeout = aiStreamingProperties.getConnectTimeout() != null
@@ -202,7 +202,11 @@ public abstract class AbstractStreamingClient {
      * @throws IllegalStateException 当配置不完整时抛出
      * @implNote 建议在具体客户端的初始化方法中调用此方法
      */
+    protected boolean isEnabled() { return true; }
+
     protected void validateConfiguration() {
+        if (!isEnabled()) throw new com.zhixuewuli.common.exception.ai.AIServiceUnavailableException(
+                "AI功能未启用，请配置模型密钥并设置 AI_ENABLED=true");
         if (getApiKey() == null || getApiKey().isEmpty()) {
             throw new IllegalStateException("API密钥未配置");
         }

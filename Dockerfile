@@ -1,7 +1,7 @@
 # =====================================================
 # 第一阶段：前端构建
 # =====================================================
-FROM node:20-alpine AS frontend-builder
+FROM node:22-alpine AS frontend-builder
 
 WORKDIR /build/frontend/frontend
 
@@ -23,7 +23,7 @@ RUN npm run build
 # =====================================================
 # 第二阶段：后端构建
 # =====================================================
-FROM maven:3.9.6-eclipse-temurin-21 AS backend-builder
+FROM maven:3.9.9-eclipse-temurin-21 AS backend-builder
 
 WORKDIR /build/backend
 

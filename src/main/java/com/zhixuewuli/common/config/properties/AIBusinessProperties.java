@@ -72,6 +72,7 @@ import java.time.Duration;
 @Component("aiBusinessProperties")
 @ConfigurationProperties(prefix = "ai.context")
 public class AIBusinessProperties {
+        private boolean enabled = true;
 
         // ========== 上下文管理配置 ==========
         /**

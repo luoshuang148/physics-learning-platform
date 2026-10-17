@@ -201,3 +201,6 @@ data/videos/
 
 # .continue (AI coding assistant config)
 .continue/
+
+!.dockerignore
+!src/main/resources/application-dev.yml

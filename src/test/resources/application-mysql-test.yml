@@ -1,0 +1,22 @@
+spring:
+  datasource:
+    url: ${MYSQL_TEST_URL:jdbc:mysql://127.0.0.1:3306/zhixuewuli?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai}
+    username: ${MYSQL_TEST_USER:root}
+    password: ${MYSQL_TEST_PASSWORD:test-root-password}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+app:
+  security:
+    jwt-secret: mysql-integration-test-secret-never-use-in-production
+  video:
+    storage-path: ${java.io.tmpdir}/physics-mysql-test
+    access-path: /videos
+    max-file-size: 524288000
+ai:
+  context:
+    aliyun-api-key: test-not-real
+    zhipu-api-key: test-not-real
+logging:
+  level:
+    root: WARN

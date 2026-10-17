@@ -36,6 +36,7 @@ management:
 # 生产环境API密钥从环境变量注入（不留默认值）
 ai:
   context:
+    enabled: ${AI_ENABLED:true}
     aliyun-api-key: ${ALIYUN_AI_API_KEY}
     zhipu-api-key: ${ZHIPU_AI_API_KEY}
 
