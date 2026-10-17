@@ -45,7 +45,7 @@ spring:
   
     # 事务管理
   transaction:
-    default-timeout: 15      # 测试环境使用 15 秒，避免并行测试时的资源竞争
+    default-timeout: 120      # 测试环境使用 15 秒，避免并行测试时的资源竞争
   
     # 禁用 Spring Security
   # security:

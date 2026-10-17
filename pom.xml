@@ -17,6 +17,8 @@
     </parent>
 
     <properties>
+        <java.version>21</java.version>
+        <test.fork-count>1</test.fork-count>
         <maven.compiler.source>21</maven.compiler.source>
         <maven.compiler.target>21</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -246,7 +248,7 @@
                          内存占用：12 × 750MB ≈ 9GB（安全范围）
                          JVM 复用：true，减少启动开销（测试隔离良好，可安全复用）
                     -->
-                    <forkCount>0.5C</forkCount>
+                    <forkCount>${test.fork-count}</forkCount>
                     <reuseForks>true</reuseForks>  <!-- JVM 复用，减少启动开销 -->
                     <threadCount>2</threadCount>
                     <perCoreThreadCount>true</perCoreThreadCount>
