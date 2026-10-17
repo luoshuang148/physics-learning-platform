@@ -10,15 +10,15 @@
         <div class="hero-stats">
           <div class="stat-card cyan">
             <span class="stat-num">{{ totalCountText }}</span>
-            <span class="stat-label">当前列表记录数</span>
+            <span class="stat-label">匹配记录总数</span>
           </div>
           <div class="stat-card amber">
             <span class="stat-num">{{ wrongCount }}</span>
-            <span class="stat-label">当前错题记录</span>
+            <span class="stat-label">本页错题记录</span>
           </div>
           <div class="stat-card rose">
             <span class="stat-num">{{ uniqueStudents }}</span>
-            <span class="stat-label">涉及学生数</span>
+            <span class="stat-label">本页涉及学生数</span>
           </div>
         </div>
       </section>
@@ -27,7 +27,7 @@
         <div class="toolbar-left">
           <button class="mode-btn" :class="{ active: mode === 'all' }" @click="switchMode('all')">全部记录</button>
           <button class="mode-btn" :class="{ active: mode === 'wrong' }" @click="switchMode('wrong')">错题记录</button>
-          <input v-model="searchText" class="toolbar-search" placeholder="搜索学生姓名 / 题目内容 / 作答…" />
+          <input v-model="searchText" class="toolbar-search" placeholder="搜索本页姓名 / 题目 / 作答…" />
         </div>
         <div class="toolbar-right">
           <button class="ghost-btn" :disabled="loading" @click="reloadCurrent">刷新当前结果</button>
@@ -39,7 +39,7 @@
           <div class="query-title">按学生姓名筛选</div>
           <div class="query-row">
             <input v-model="studentNameInput" class="mini-input student-name" placeholder="输入学生姓名" />
-            <button class="ghost-btn" :disabled="loading || !studentNameInput.trim()" @click="loadStudentLatestSessionByName">查最近记录</button>
+            <button class="ghost-btn" :disabled="loading || !studentNameInput.trim()" @click="loadStudentLatestSessionByName">筛选记录</button>
           </div>
         </div>
         <div class="query-card danger-zone query-card-wide">
@@ -52,6 +52,15 @@
             </button>
           </div>
         </div>
+      </section>
+
+      <section class="toolbar">
+        <button class="ghost-btn" :disabled="loading || page <= 1" @click="changePage(-1)">上一页</button>
+        <span>第 {{ page }} / {{ Math.max(totalPages, 1) }} 页</span>
+        <select v-model.number="pageSize" :disabled="loading" aria-label="每页记录数" @change="resetPage">
+          <option :value="20">每页20条</option><option :value="50">每页50条</option><option :value="100">每页100条</option>
+        </select>
+        <button class="ghost-btn" :disabled="loading || page >= totalPages" @click="changePage(1)">下一页</button>
       </section>
 
       <section class="record-layout">
@@ -161,12 +170,9 @@ import { useAuthStore } from '@/stores/auth';
 import {
   batchDeleteAnswerRecordsApi,
   deleteAnswerRecordApi,
-  getAllAnswerRecordsApi,
-  getAllWrongAnswerRecordsApi,
+  getAnswerRecordPageApi,
 } from '@/api/answer-record';
-import { getAllUsersApi } from '@/api/user';
 import { teacherNavLinks } from '@/constants/navigation';
-import type { UserResponse } from '@/types/user';
 import type { AnswerRecordResponse } from '@/types/answer-record';
 
 const auth = useAuthStore();
@@ -182,12 +188,16 @@ const searchText = ref('');
 const studentNameInput = ref('');
 const batchStart = ref('');
 const batchEnd = ref('');
-const users = ref<UserResponse[]>([]);
+const page = ref(1);
+const pageSize = ref(20);
+const totalPages = ref(0);
+const total = ref(0);
+const studentFilter = ref('');
+let loadSequence = 0;
 const records = ref<AnswerRecordResponse[]>([]);
 const selectedRecord = ref<AnswerRecordResponse | null>(null);
-const currentLoader = ref<'all' | 'wrong' | 'student-latest'>('all');
 
-const totalCountText = computed(() => records.value.length.toLocaleString());
+const totalCountText = computed(() => total.value.toLocaleString());
 const wrongCount = computed(() => records.value.filter(item => !item.correct).length);
 const uniqueStudents = computed(() => new Set(records.value.map(item => resolveStudentName(item))).size);
 
@@ -203,12 +213,7 @@ const filteredRecords = computed(() => {
   });
 });
 
-const studentNameMap = computed(() => new Map(users.value.map(user => [String(user.id), user.realName])));
-
-const resolveStudentName = (record: AnswerRecordResponse) => {
-  const userId = String(record.userId);
-  return studentNameMap.value.get(userId) ?? '未知学生';
-};
+const resolveStudentName = (record: AnswerRecordResponse) => record.studentName ?? `学生 #${record.userId}`;
 
 const crop = (text: string, len: number) => text.length > len ? `${text.slice(0, len)}…` : text;
 const formatDate = (date: string) => new Date(date).toLocaleString('zh-CN', {
@@ -224,77 +229,37 @@ const applyRecords = (next: AnswerRecordResponse[]) => {
   selectedRecord.value = next[0] ?? null;
 };
 
-const loadAll = async () => {
-  currentLoader.value = 'all';
+const loadPage = async () => {
+  const sequence = ++loadSequence;
   loading.value = true;
   try {
-    const data = await getAllAnswerRecordsApi();
+    const data = await getAnswerRecordPageApi({ page: page.value, size: pageSize.value,
+      wrongOnly: mode.value === 'wrong', studentName: studentFilter.value });
+    if (sequence !== loadSequence) return;
+    total.value = data.total;
+    totalPages.value = data.pages;
+    if (data.pages > 0 && page.value > data.pages) { page.value = data.pages; await loadPage(); return; }
     applyRecords(data.records ?? []);
   } catch (error: any) {
-    show(error?.response?.data?.message ?? '加载全部记录失败', 'error');
+    if (sequence === loadSequence) show(error?.response?.data?.message ?? '加载记录失败', 'error');
   } finally {
-    loading.value = false;
+    if (sequence === loadSequence) loading.value = false;
   }
 };
-
-const loadWrong = async () => {
-  currentLoader.value = 'wrong';
-  loading.value = true;
-  try {
-    const data = await getAllWrongAnswerRecordsApi();
-    applyRecords(data.records ?? []);
-  } catch (error: any) {
-    show(error?.response?.data?.message ?? '加载错题记录失败', 'error');
-  } finally {
-    loading.value = false;
-  }
-};
-
-const switchMode = async (next: 'all' | 'wrong') => {
-  mode.value = next;
-  if (next === 'all') await loadAll();
-  else await loadWrong();
-};
-
-const reloadCurrent = async () => {
-  if (currentLoader.value === 'wrong') await loadWrong();
-  else if (currentLoader.value === 'student-latest' && studentNameInput.value.trim()) await loadStudentLatestSessionByName();
-  else await loadAll();
-};
-
+const resetPage = async () => { page.value = 1; await loadPage(); };
+const changePage = async (delta: number) => { page.value += delta; await loadPage(); };
+const switchMode = async (next: 'all' | 'wrong') => { mode.value = next; await resetPage(); };
+const reloadCurrent = loadPage;
 const loadStudentLatestSessionByName = async () => {
-  const keyword = studentNameInput.value.trim().toLowerCase();
-  if (!keyword) return;
-  currentLoader.value = 'student-latest';
-  loading.value = true;
-  try {
-    const latestRecords = mode.value === 'wrong'
-      ? await getAllWrongAnswerRecordsApi()
-      : await getAllAnswerRecordsApi();
-    const matchedUsers = users.value.filter(user => user.realName.toLowerCase().includes(keyword));
-    if (!matchedUsers.length) {
-      applyRecords([]);
-      show('未找到匹配的学生姓名', 'error');
-      return;
-    }
-    const matchedUserIds = new Set(matchedUsers.map(user => String(user.id)));
-    applyRecords((latestRecords.records ?? []).filter(record => matchedUserIds.has(String(record.userId))));
-    show(`已按学生姓名筛选 ${studentNameInput.value.trim()} 的记录`, 'success');
-  } catch (error: any) {
-    show(error?.response?.data?.message ?? '按学生姓名筛选记录失败', 'error');
-  } finally {
-    loading.value = false;
-  }
+  studentFilter.value = studentNameInput.value.trim();
+  await resetPage();
 };
 
 const removeRecord = async (recordId: string) => {
   deletingSingle.value = true;
   try {
     await deleteAnswerRecordApi(recordId);
-    records.value = records.value.filter(item => item.recordId !== recordId);
-    if (selectedRecord.value?.recordId === recordId) {
-      selectedRecord.value = records.value[0] ?? null;
-    }
+    await loadPage();
     show('记录已删除', 'success');
   } catch (error: any) {
     show(error?.response?.data?.message ?? '删除记录失败', 'error');
@@ -320,14 +285,8 @@ const batchDelete = async () => {
   }
 };
 
-onMounted(async () => {
-  try {
-    users.value = await getAllUsersApi();
-  } catch {
-    users.value = [];
-  }
-  await loadAll();
-});
+onMounted(loadPage);
+
 </script>
 
 <style scoped>

@@ -68,6 +68,31 @@ public class AnswerRecordServiceImpl implements AnswerRecordService {
     private final UserPermissionUtil userPermissionUtil;
     private final QuestionResponseConverter questionResponseConverter;
 
+    @Override
+    @Transactional(readOnly = true)
+    public com.zhixuewuli.common.result.PageResult<AnswerRecordResponse> getTeacherAnswerPage(
+            Long currentUserId, int page, int size, boolean wrongOnly, String studentName) {
+        userPermissionUtil.checkTeacherPermission(currentUserId);
+        if (page < 1 || size < 1 || size > 100 || (long) (page - 1) * size > Integer.MAX_VALUE) {
+            throw new IllegalArgumentException("页码须大于零，每页条数须在1到100之间");
+        }
+        String name = studentName == null ? "" : studentName.trim();
+        if (name.length() > 100) throw new IllegalArgumentException("姓名筛选不得超过100个字符");
+        name = "%" + name.replace("!", "!!").replace("%", "!%").replace("_", "!_") + "%";
+        var result = answerRecordRepository.findTeacherPage(wrongOnly, name,
+                org.springframework.data.domain.PageRequest.of(page - 1, size));
+        var rows = result.getContent().stream().map(row -> AnswerRecordResponse.builder()
+                .recordId(row.recordId()).userId(row.userId()).questionId(row.questionId())
+                .sessionId(row.sessionId()).userAnswer(row.userAnswer()).correct(row.correct())
+                .answeredAt(row.answeredAt()).errorReason(row.errorReason()).studentName(row.studentName())
+                .questionContent(row.questionContent()).correctAnswer(row.correctAnswer())
+                .questionOptions(questionResponseConverter.parseOptionsFromJson(row.options()))
+                .questionAnalysis(row.analysis()).difficulty(questionResponseConverter.getDifficultyString(row.difficulty()))
+                .build()).toList();
+        return com.zhixuewuli.common.result.PageResult.<AnswerRecordResponse>builder().records(rows)
+                .total(result.getTotalElements()).pages(result.getTotalPages()).currentPage(page).pageSize(size).build();
+    }
+
     // === 学生基础功能 ===
 
     @Override
@@ -411,9 +436,11 @@ public class AnswerRecordServiceImpl implements AnswerRecordService {
      */
     private AnswerRecordResponse convertToFullResponseDTO(AnswerRecord record) {
         // 获取关联的题目信息
-        Question question = questionRepository.findById(record.getQuestionId())
-                .orElseThrow(() -> new QuestionNotFoundException(record.getQuestionId()));
-
+        Question question = record.getQuestion();
+        if (question == null) {
+            question = questionRepository.findById(record.getQuestionId())
+                    .orElseThrow(() -> new QuestionNotFoundException(record.getQuestionId()));
+        }
         return questionResponseConverter.convertToFullResponseDTO(record, question);
     }
 

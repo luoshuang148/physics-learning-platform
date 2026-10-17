@@ -16,6 +16,24 @@ import java.util.Optional;
 
 @Repository
 public interface AnswerRecordRepository extends JpaRepository<AnswerRecord, String> {
+        @Override
+        @EntityGraph(attributePaths = "question")
+        List<AnswerRecord> findAll();
+
+        @Query(value = "SELECT new com.zhixuewuli.dto.response.AnswerRecordListRow(" +
+                "a.id,a.userId,a.questionId,a.sessionId,a.userAnswer,a.correct,a.answeredAt,a.errorReason," +
+                "u.realName,q.content,q.options,q.correctOption,q.explanation,q.difficulty) " +
+                "FROM AnswerRecord a JOIN a.question q JOIN a.user u " +
+                "WHERE (:wrongOnly = false OR a.correct = false) " +
+                "AND LOWER(u.realName) LIKE LOWER(:name) ESCAPE '!' " +
+                "ORDER BY a.answeredAt DESC, a.id DESC",
+                countQuery = "SELECT COUNT(a) FROM AnswerRecord a JOIN a.user u " +
+                "WHERE (:wrongOnly = false OR a.correct = false) " +
+                "AND LOWER(u.realName) LIKE LOWER(:name) ESCAPE '!'")
+        org.springframework.data.domain.Page<com.zhixuewuli.dto.response.AnswerRecordListRow> findTeacherPage(
+                @org.springframework.data.repository.query.Param("wrongOnly") boolean wrongOnly,
+                @org.springframework.data.repository.query.Param("name") String name, Pageable pageable);
+
 
         /**
          * 根据会话ID和题目ID查找记录（用于幂等性检查）
@@ -37,6 +55,7 @@ public interface AnswerRecordRepository extends JpaRepository<AnswerRecord, Stri
          * @return 错题记录列表
          */
         @Query("SELECT ar FROM AnswerRecord ar WHERE ar.userId = ?1 AND ar.correct = false ORDER BY ar.answeredAt DESC")
+        @EntityGraph(attributePaths = "question")
         List<AnswerRecord> findWrongAnswersByUserId(Long userId);
 
         /**
@@ -148,6 +167,7 @@ public interface AnswerRecordRepository extends JpaRepository<AnswerRecord, Stri
          * @return 答题记录列表
          */
         @Query("SELECT ar FROM AnswerRecord ar WHERE ar.userId = ?1 AND ar.answeredAt BETWEEN ?2 AND ?3 ORDER BY ar.answeredAt DESC")
+        @EntityGraph(attributePaths = "question")
         List<AnswerRecord> findByUserIdAndDateRange(Long userId, LocalDateTime start, LocalDateTime end);
 
         /**
@@ -284,6 +304,7 @@ public interface AnswerRecordRepository extends JpaRepository<AnswerRecord, Stri
          * @return 答题记录列表
          */
         @Query("SELECT ar FROM AnswerRecord ar WHERE ar.sessionId = ?1 AND ar.userId = ?2 ORDER BY ar.answeredAt DESC")
+        @EntityGraph(attributePaths = "question")
         List<AnswerRecord> findBySessionIdAndUserId(String sessionId, Long userId);
 
         /**
@@ -301,6 +322,7 @@ public interface AnswerRecordRepository extends JpaRepository<AnswerRecord, Stri
          * @return 答题记录列表
          */
         @Query("SELECT ar FROM AnswerRecord ar WHERE ar.answeredAt BETWEEN ?1 AND ?2 ORDER BY ar.answeredAt DESC")
+        @EntityGraph(attributePaths = "question")
         List<AnswerRecord> findByDateRange(LocalDateTime start, LocalDateTime end);
 
         /**
@@ -459,6 +481,7 @@ public interface AnswerRecordRepository extends JpaRepository<AnswerRecord, Stri
          * @return 错误答题记录列表
          */
         @Query("SELECT ar FROM AnswerRecord ar WHERE ar.correct = false ORDER BY ar.answeredAt DESC")
+        @EntityGraph(attributePaths = "question")
         List<AnswerRecord> findByCorrectFalseOrderByAnsweredAtDesc();
 
         /**
@@ -472,6 +495,7 @@ public interface AnswerRecordRepository extends JpaRepository<AnswerRecord, Stri
          * @return 会话中的答题记录列表
          */
         @Query("SELECT ar FROM AnswerRecord ar WHERE ar.userId = :userId AND ar.sessionId = :sessionId ORDER BY ar.answeredAt DESC")
+        @EntityGraph(attributePaths = "question")
         List<AnswerRecord> findByUserIdAndSessionIdOrderByAnsweredAtDesc(
                         @org.springframework.data.repository.query.Param("userId") Long userId,
                         @org.springframework.data.repository.query.Param("sessionId") String sessionId);
@@ -485,6 +509,7 @@ public interface AnswerRecordRepository extends JpaRepository<AnswerRecord, Stri
          * @param sessionId 会话ID
          * @return 会话中的答题记录列表
          */
+        @EntityGraph(attributePaths = "question")
         List<AnswerRecord> findBySessionIdOrderByAnsweredAtAsc(String sessionId);
 
         /**
@@ -720,6 +745,6 @@ public interface AnswerRecordRepository extends JpaRepository<AnswerRecord, Stri
          * 
          * @see EntityGraph 预加载注解说明
          */
-        @EntityGraph(attributePaths = { "user" })
+        @EntityGraph(attributePaths = { "user", "question" })
         List<AnswerRecord> findByQuestionIdOrderByAnsweredAtDesc(Long questionId);
 }

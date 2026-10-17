@@ -37,3 +37,5 @@ export interface SSEErrorEventPayload {
   reason?: string;
 }
 
+
+export interface PageResult<T> { total: number; pages: number; currentPage: number; pageSize: number; records: T[]; }

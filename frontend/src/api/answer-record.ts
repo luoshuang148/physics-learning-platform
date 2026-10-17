@@ -65,3 +65,9 @@ export const getAnswerStatsApi = async (): Promise<AnswerStatsResponse> => {
   return data.data;
 };
 
+
+export const getAnswerRecordPageApi = async (params: { page: number; size: number; wrongOnly: boolean; studentName: string }) => {
+  const { data } = await request.get<ApiResponse<import('@/types/common').PageResult<AnswerRecordResponse>>>(
+    '/answer-records/teacher/page', { params });
+  return data.data;
+};

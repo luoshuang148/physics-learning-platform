@@ -45,6 +45,7 @@ import java.util.Map;
 @NoArgsConstructor
 @Schema(description = "答题记录响应")
 public class AnswerRecordResponse {
+    private String studentName;
 
     // ==================== 基础答题信息 ====================
 

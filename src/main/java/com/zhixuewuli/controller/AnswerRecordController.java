@@ -259,6 +259,16 @@ public class AnswerRecordController {
      * 教师查询系统内所有用户的答题记录。
      * 需要教师权限验证。
      */
+    @GetMapping("/teacher/page")
+    @Operation(summary = "教师分页查询答题记录")
+    public Result<com.zhixuewuli.common.result.PageResult<AnswerRecordResponse>> getTeacherPage(
+            @RequestParam(defaultValue = "1") int page, @RequestParam(defaultValue = "20") int size,
+            @RequestParam(defaultValue = "false") boolean wrongOnly,
+            @RequestParam(defaultValue = "") String studentName, HttpServletRequest request) {
+        return Result.success(answerRecordService.getTeacherAnswerPage(
+                (Long) request.getAttribute("userId"), page, size, wrongOnly, studentName));
+    }
+
     @GetMapping("/teacher/all")
     @Operation(
         summary = "获取所有用户答题记录",
