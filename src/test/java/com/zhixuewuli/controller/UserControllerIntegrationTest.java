@@ -164,6 +164,19 @@ public class UserControllerIntegrationTest extends BaseControllerIntegrationTest
         assertThat(updatedUser.getClassName()).isEqualTo("高三一班");
     }
 
+    @Test
+    void studentCannotPromoteSelfThroughProfileUpdate() throws Exception {
+        mockMvc.perform(put("/user/me")
+                .header("Authorization", createAuthHeader(STUDENT_SELF_ID, STUDENT_SELF_USERNAME))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"userType\":\"TEACHER\",\"realName\":\"forged_teacher\"}"))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(get("/user/me")
+                .header("Authorization", createAuthHeader(STUDENT_SELF_ID, STUDENT_SELF_USERNAME)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.userType").value("STUDENT"));
+    }
+
     @DisplayName("更新当前用户信息 - 完整字段更新")
     @Test
     void testUpdateCurrentUser_FullUpdate() throws Exception {

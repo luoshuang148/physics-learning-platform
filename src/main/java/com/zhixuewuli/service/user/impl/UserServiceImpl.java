@@ -51,6 +51,10 @@ public class UserServiceImpl implements UserService {
         User user = userRepository.findById(currentUserId)
                 .orElseThrow(() -> new UserNotFoundException("用户不存在"));
 
+        if (request.getUserType() != null && request.getUserType() != user.getUserType()) {
+            throw new InsufficientPermissionException(currentUserId, "个人资料接口不能修改用户角色");
+        }
+
         if (request.getUsername() != null && !request.getUsername().isEmpty()) {
             String newUsername = request.getUsername();
             if (!newUsername.equals(user.getUsername())) {
@@ -76,9 +80,7 @@ public class UserServiceImpl implements UserService {
         if (request.getClassName() != null) {
             user.setClassName(request.getClassName());
         }
-        if (request.getUserType() != null) {
-            user.setUserType(request.getUserType());
-        }
+
 
         return userRepository.save(user);
     }

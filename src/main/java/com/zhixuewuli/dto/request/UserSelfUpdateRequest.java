@@ -9,7 +9,7 @@ import lombok.Data;
  * 用户自我更新请求 DTO
  * 
  * 用于用户更新自己基本信息的请求数据传输对象。
- * 仅包含用户可以自我修改的字段：用户名、密码、真实姓名、班级、用户类型。
+ * 仅包含用户可以自我修改的字段：用户名、密码、真实姓名、班级。角色仅兼容回传原值，不能通过此接口修改。
  * 不包含账户状态 (active) 字段。
  * 
  * <p>
@@ -20,7 +20,7 @@ import lombok.Data;
  * <li><strong>password</strong>: 登录密码（可选）</li>
  * <li><strong>realName</strong>: 用户真实姓名（可选）</li>
  * <li><strong>className</strong>: 所属班级名称（可选）</li>
- * <li><strong>userType</strong>: 用户类型（可选）</li>
+ * <li><strong>userType</strong>: 用户类型（兼容字段，不可修改）</li>
  * </ul>
  * 
  * @author 智学物理开发团队
@@ -71,6 +71,6 @@ public class UserSelfUpdateRequest {
      * 标识用户的角色类型，决定可访问的功能范围。
      * 可选值：STUDENT（学生）、TEACHER（教师）
      */
-    @Schema(description = "用户类型", example = "STUDENT")
+    @Schema(description = "兼容字段，仅可回传当前角色；修改角色必须使用教师管理接口", example = "STUDENT", deprecated = true)
     private User.UserType userType;
 }
