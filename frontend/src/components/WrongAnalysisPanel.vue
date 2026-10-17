@@ -100,8 +100,8 @@
 
 <script setup lang="ts">
 import { ref, watch, onMounted, onBeforeUnmount, computed } from 'vue';
-import { marked } from 'marked';
-import katex from 'katex';
+import { renderMarkdown as renderMixedContent } from '@/utils/markdown';
+
 import 'katex/dist/katex.min.css';
 import { streamWrongQuestionAnalysis } from '@/api/ai';
 
@@ -139,40 +139,6 @@ const isAbortError = (err: unknown) => {
 };
 
 // Render Markdown + LaTeX. Supports: \[...\], \(...\), $$...$$, $...$
-const renderMixedContent = (text: string): string => {
-  if (!text) return '';
-
-  const tokenMap = new Map<string, string>();
-  let counter = 0;
-
-  const protect = (expr: string, display: boolean): string => {
-    const key = 'XKATEX' + (counter++) + 'XEND';
-    try {
-      tokenMap.set(key, katex.renderToString(expr.trim(), { throwOnError: false, displayMode: display }));
-    } catch {
-      tokenMap.set(key, display ? '$$' + expr + '$$' : '$' + expr + '$');
-    }
-    return key;
-  };
-
-  let fixed = text
-    .replace(/(#{1,6})([0-9])/g, '$1 $2')
-    .replace(/(#{1,6})([a-zA-Z\u4e00-\u9fa5])/g, '$1 $2')
-    .replace(/(\d+\.)([^\s\.])/g, '$1 $2')
-    .replace(/(?<![\S])([-+])(\S)/g, '$1 $2');
-
-  let safe = fixed.replace(/\\\[([\s\S]+?)\\\]/g, (_, e) => protect(e, true));
-  safe = safe.replace(/\\\(([\s\S]+?)\\\)/g, (_, e) => protect(e, false));
-  safe = safe.replace(/\$\$([\s\S]+?)\$\$/g, (_, e) => protect(e, true));
-  safe = safe.replace(/\$([^$\n]+?)\$/g, (_, e) => protect(e, false));
-
-  let html: string;
-  try { html = marked.parse(safe) as string; } catch { html = safe; }
-
-  tokenMap.forEach((rendered, key) => { html = html.split(key).join(rendered); });
-  return html;
-};
-
 watch(content, (val) => {
   renderedContent.value = renderMixedContent(val);
 });

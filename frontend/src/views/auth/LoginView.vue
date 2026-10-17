@@ -28,7 +28,7 @@ import AuthLayout from '@/layouts/AuthLayout.vue';
 import AppToast from '@/components/AppToast.vue';
 import { useAuthStore } from '@/stores/auth';
 import { useToast } from '@/composables/useToast';
-import { updateLoginInfo } from '@/db/accountDb';
+
 
 const auth = useAuthStore();
 const router = useRouter();
@@ -48,16 +48,7 @@ const onSubmit = async () => {
 
   loading.value = true;
   try {
-    const loginData = await auth.login(form);
-    // 登录成功后同步账户信息到前端本地数据库
-    updateLoginInfo(
-      loginData.username,
-      loginData.token,
-      loginData.userId,
-      loginData.userType,
-      loginData.realName,
-      auth.user?.className ?? null,
-    );
+    await auth.login(form);
     show('登录成功', 'success');
     await router.push(auth.isTeacher ? '/teacher/dashboard' : '/student/home');
   } catch (error: any) {

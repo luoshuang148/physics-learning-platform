@@ -27,7 +27,7 @@ export interface LocalAccount {
   /** 最后登录时间（ISO 字符串） */
   lastLogin: string | null;
   /** JWT token（登录成功后缓存，方便离线展示） */
-  cachedToken: string | null;
+
 }
 
 const DB_KEY = 'zhixue_account_db';
@@ -40,7 +40,10 @@ function readAll(): Record<string, LocalAccount> {
   try {
     const raw = localStorage.getItem(DB_KEY);
     if (!raw) return {};
-    return JSON.parse(raw) as Record<string, LocalAccount>;
+    const records = JSON.parse(raw) as Record<string, LocalAccount>;
+    for (const account of Object.values(records)) delete (account as unknown as Record<string, unknown>).cachedToken;
+    localStorage.setItem(DB_KEY, JSON.stringify(records));
+    return records;
   } catch {
     return {};
   }
@@ -68,7 +71,7 @@ export function upsertAccount(account: LocalAccount): void {
  */
 export function updateLoginInfo(
   username: string,
-  token: string,
+  _token: string,
   userId?: number,
   userType?: UserType,
   realName?: string,
@@ -80,7 +83,7 @@ export function updateLoginInfo(
   if (db[username]) {
     // 已有记录，仅更新动态字段
     db[username].lastLogin = now;
-    db[username].cachedToken = token;
+
     if (userId !== undefined) db[username].userId = userId;
     if (userType !== undefined) db[username].userType = userType;
     if (realName !== undefined) db[username].realName = realName;
@@ -96,7 +99,7 @@ export function updateLoginInfo(
       active: true,
       createdAt: now,
       lastLogin: now,
-      cachedToken: token,
+
     };
   }
 
@@ -109,7 +112,7 @@ export function updateLoginInfo(
 export function clearTokenByUsername(username: string): void {
   const db = readAll();
   if (db[username]) {
-    db[username].cachedToken = null;
+    delete (db[username] as unknown as Record<string, unknown>).cachedToken;
     writeAll(db);
   }
 }

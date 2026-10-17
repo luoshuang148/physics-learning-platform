@@ -4,7 +4,6 @@ import { getTeacherEventApi } from '@/api/teacher-event';
 
 const LoginView = () => import('@/views/auth/LoginView.vue');
 const RegisterView = () => import('@/views/auth/RegisterView.vue');
-const AccountDbView = () => import('@/views/auth/AccountDbView.vue');
 const StudentHomeView = () => import('@/views/student/StudentHomeView.vue');
 const StudentTaskView = () => import('@/views/student/StudentTaskView.vue');
 const StudentQuestionView = () => import('@/views/student/StudentQuestionView.vue');
@@ -37,7 +36,6 @@ const router = createRouter({
     { path: '/', redirect: '/auth/login' },
     { path: '/auth/login', component: LoginView, meta: { guestOnly: true } },
     { path: '/auth/register', component: RegisterView, meta: { guestOnly: true } },
-    { path: '/auth/account-db', component: AccountDbView },
 
     { path: '/student/home', component: StudentHomeView, meta: { requiresAuth: true, role: 'STUDENT', sidebarDefault: 'expanded' } },
     { path: '/student/task', component: StudentTaskView, meta: { requiresAuth: true, role: 'STUDENT', sidebarDefault: 'collapsed' } },
@@ -48,14 +46,6 @@ const router = createRouter({
     { path: '/student/ai', component: StudentAIView, meta: { requiresAuth: true, role: 'STUDENT', sidebarDefault: 'collapsed' } },
     { path: '/student/report', component: StudentReportView, meta: { requiresAuth: true, role: 'STUDENT', sidebarDefault: 'collapsed' } },
 
-    { path: '/preview/student/home', component: StudentHomeView, meta: { sidebarDefault: 'expanded' } },
-    { path: '/preview/student/task', component: StudentTaskView, meta: { sidebarDefault: 'collapsed' } },
-    { path: '/preview/student/experiment', component: StudentExperimentView, meta: { sidebarDefault: 'collapsed' } },
-    { path: '/preview/student/question', component: StudentQuestionView, meta: { sidebarDefault: 'collapsed' } },
-    { path: '/preview/student/question/video', component: StudentQuestionVideoView, meta: { sidebarDefault: 'collapsed' } },
-    { path: '/preview/student/wrong-book', component: StudentWrongBookView, meta: { sidebarDefault: 'collapsed' } },
-    { path: '/preview/student/ai', component: StudentAIView, meta: { sidebarDefault: 'collapsed' } },
-    { path: '/preview/student/report', component: StudentReportView, meta: { sidebarDefault: 'collapsed' } },
 
     { path: '/teacher/dashboard', component: TeacherDashboardView, meta: { requiresAuth: true, role: 'TEACHER', sidebarDefault: 'expanded' } },
     { path: '/teacher/users', component: TeacherUserManageView, meta: { requiresAuth: true, role: 'TEACHER', sidebarDefault: 'expanded' } },
@@ -67,15 +57,7 @@ const router = createRouter({
     { path: '/teacher/student-analysis', component: TeacherStudentAnalysisView, meta: { requiresAuth: true, role: 'TEACHER', sidebarDefault: 'expanded' } },
     { path: '/teacher/event-manage', component: TeacherEventView, meta: { requiresAuth: true, role: 'TEACHER', sidebarDefault: 'expanded' } },
 
-    { path: '/preview/teacher/dashboard', component: TeacherDashboardView, meta: { sidebarDefault: 'expanded' } },
-    { path: '/preview/teacher/users', component: TeacherUserManageView, meta: { sidebarDefault: 'expanded' } },
-    { path: '/preview/teacher/records', component: TeacherRecordManageView, meta: { sidebarDefault: 'expanded' } },
-    { path: '/preview/teacher/experiments', component: TeacherExperimentManageView, meta: { sidebarDefault: 'expanded' } },
-    { path: '/preview/teacher/questions', component: TeacherQuestionManageView, meta: { sidebarDefault: 'expanded' } },
-    { path: '/preview/teacher/videos', component: TeacherVideoManageView, meta: { sidebarDefault: 'expanded' } },
-    { path: '/preview/teacher/errors', component: TeacherErrorAnalysisView, meta: { sidebarDefault: 'expanded' } },
-    { path: '/preview/teacher/student-analysis', component: TeacherStudentAnalysisView, meta: { sidebarDefault: 'expanded' } },
-    { path: '/preview/teacher/event-manage', component: TeacherEventView, meta: { sidebarDefault: 'expanded' } },
+    { path: '/:pathMatch(.*)*', redirect: '/auth/login' },
   ],
 });
 

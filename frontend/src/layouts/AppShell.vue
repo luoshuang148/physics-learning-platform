@@ -135,7 +135,7 @@
         <div class="profile-modal-head">
           <div>
             <h3>修改个人信息</h3>
-            <p>支持修改用户名、密码、姓名、班级和身份。</p>
+            <p>支持修改用户名、密码、姓名和班级；角色由教师管理。</p>
           </div>
           <button class="profile-close" @click="closeProfileEditor">×</button>
         </div>
@@ -152,23 +152,6 @@
 
           <label>班级</label>
           <input v-model="profileForm.className" placeholder="留空表示不设班级" />
-
-          <label>身份</label>
-          <select v-model="profileForm.userType">
-            <option value="STUDENT">学生</option>
-            <option value="TEACHER">教师</option>
-          </select>
-
-          <template v-if="profileForm.userType === 'TEACHER' && originalUserType !== 'TEACHER'">
-            <label>教师口令</label>
-            <input
-              v-model="profileForm.teacherCode"
-              inputmode="numeric"
-              maxlength="6"
-              placeholder="请输入 6 位教师口令"
-            />
-            <p class="profile-tip">修改为教师身份需输入教师口令</p>
-          </template>
 
           <div class="profile-actions">
             <button type="button" class="secondary-btn" @click="closeProfileEditor">取消</button>
@@ -227,7 +210,6 @@ interface Link {
   to: string;
 }
 
-const TEACHER_REGISTER_CODE = '786526';
 const FONT_SIZE_STORAGE_KEY = 'zxwl-font-scale';
 const GUIDE_PROMPT_STORAGE_KEY = 'zxwl-guide-prompt-seen';
 const SIDEBAR_STATE_STORAGE_KEY = 'zxwl-sidebar-collapsed';
@@ -253,7 +235,6 @@ const profileModalOpen = ref(false);
 const profileSaving = ref(false);
 const guideModalOpen = ref(false);
 const guidePromptOpen = ref(false);
-const originalUserType = ref<'STUDENT' | 'TEACHER'>('STUDENT');
 const sidebarCollapsed = ref(false);
 const autoSidebarTransition = ref(false);
 const profileForm = reactive({
@@ -261,8 +242,6 @@ const profileForm = reactive({
   password: '',
   realName: '',
   className: '',
-  userType: 'STUDENT' as 'STUDENT' | 'TEACHER',
-  teacherCode: '',
 });
 
 const avatarLetter = computed(() => {
@@ -357,13 +336,10 @@ const handleSidebarTransitionEnd = (event: TransitionEvent) => {
 };
 
 const syncProfileForm = () => {
-  originalUserType.value = auth.user?.userType ?? 'STUDENT';
   profileForm.username = auth.user?.username ?? '';
   profileForm.password = '';
   profileForm.realName = auth.user?.realName ?? '';
   profileForm.className = auth.user?.className ?? '';
-  profileForm.userType = auth.user?.userType ?? 'STUDENT';
-  profileForm.teacherCode = '';
 };
 
 const openProfileEditor = () => {
@@ -474,19 +450,6 @@ const submitProfileEditor = async () => {
     return;
   }
 
-  const changingToTeacher = originalUserType.value !== 'TEACHER' && profileForm.userType === 'TEACHER';
-  if (changingToTeacher) {
-    const teacherCode = profileForm.teacherCode.trim();
-    if (!/^\d{6}$/.test(teacherCode)) {
-      window.alert('教师口令必须为 6 位数字');
-      return;
-    }
-    if (teacherCode !== TEACHER_REGISTER_CODE) {
-      window.alert('教师口令错误，无法修改为教师身份');
-      return;
-    }
-  }
-
   profileSaving.value = true;
   try {
     const updatedUser = await updateCurrentUserApi({
@@ -494,7 +457,6 @@ const submitProfileEditor = async () => {
       password: profileForm.password.trim() || undefined,
       realName: profileForm.realName.trim(),
       className: profileForm.className.trim() || null,
-      userType: profileForm.userType,
     });
     auth.user = updatedUser;
     profileModalOpen.value = false;

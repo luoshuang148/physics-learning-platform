@@ -1,0 +1,11 @@
+# Product hardening ledger — plan: docs/superpowers/plans/2026-10-18-product-hardening.md
+
+Base e32fefa. User authorized the preceding complete review and stage commits/GitHub synchronization. Existing checkout is clean and dedicated to this task; use codex/product-hardening in place without copying bundled media or asking for an extra worktree. No business databases touched.
+
+Pre-flight: Task2 produces event snapshots and locked lifecycle consumed by Task3 submissions and Task6 report inputs; Task3 produces scoped attempts consumed by Task4 aggregates/E2E. Task5 token version requires V3 schema alongside Task2/3. Fresh and upgrade DDL must stay equivalent. Shared renderer feeds all AI output components.
+
+Ruling: retain the existing single shared classroom and state its scope in the product. Multi-tenant ownership was conditional on an unconfirmed product expansion; inventing it would change the user model and migration scope.
+Ruling: archived remediation is a separate practice intent tied to its original task snapshot; it never changes original assignment completion counts. Task retries with identical requestId return the original result even after archive; conflicting payloads reject. Use a database-assigned monotonic attempt order for deterministic mastery, never client timestamps or UUID ordering.
+Ruling: legacy QIDS snapshots rebuilt at upgrade are marked MIGRATED/MISSING, not claimed to be original content. Reports and wrong-question AI must consume the same authorized snapshot as the student page.
+
+Task 1: complete — observed HTML event/script/javascript-link failures and secondary account token retention before fixes. Shared DOMPurify+KaTeX renderer replaces three AI renderer copies. Removed public preview/account routes, role/teacher-code profile controls and account-history writes; auth initialization scrubs legacy secondary cache. Node 7/7 passed, vue-tsc/Vite production build passed. No token values were logged.

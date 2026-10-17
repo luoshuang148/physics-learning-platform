@@ -36,7 +36,7 @@ import AuthLayout from '@/layouts/AuthLayout.vue';
 import AppToast from '@/components/AppToast.vue';
 import { registerApi } from '@/api/auth';
 import { useToast } from '@/composables/useToast';
-import { upsertAccount } from '@/db/accountDb';
+
 
 
 const router = useRouter();
@@ -66,17 +66,6 @@ const onSubmit = async () => {
       realName: form.realName,
       className: form.className || undefined,
       userType: form.userType,
-    });
-    upsertAccount({
-      userId: 0,
-      username: form.username,
-      userType: form.userType,
-      realName: form.realName,
-      className: form.className || null,
-      active: true,
-      createdAt: new Date().toISOString(),
-      lastLogin: null,
-      cachedToken: null,
     });
     show('注册成功，请登录', 'success');
     await router.push('/auth/login');

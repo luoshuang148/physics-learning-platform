@@ -24,12 +24,12 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { marked } from 'marked';
-import katex from 'katex';
+import { renderMarkdown } from '@/utils/markdown';
+
 import 'katex/dist/katex.min.css';
 
 // 配置 marked 开启 GFM 支持
-marked.setOptions({ gfm: true, breaks: true });
+
 
 const props = withDefaults(defineProps<{
   loading: boolean;
@@ -66,47 +66,6 @@ const shouldShowFriendlyEmpty = computed(() => {
 const showVisibleError = computed(() => Boolean(props.error) && !shouldShowFriendlyEmpty.value);
 const compactMode = computed(() => shouldShowFriendlyEmpty.value && !props.reasoning);
 
-const renderMarkdown = (content: string): string => {
-  if (!content) return '';
-
-  const tokenMap = new Map<string, string>();
-  let counter = 0;
-
-  const protect = (expr: string, display: boolean): string => {
-    const key = `XKATEX${counter++}XEND`;
-    try {
-      tokenMap.set(key, katex.renderToString(expr.trim(), { throwOnError: false, displayMode: display }));
-    } catch {
-      tokenMap.set(key, display ? `$$${expr}$$` : `$${expr}$`);
-    }
-    return key;
-  };
-
-  // 0. 【关键修复】处理 Markdown 格式粘连问题
-  let fixed = content
-    .replace(/(#{1,6})([0-9])/g, '$1 $2')
-    .replace(/(#{1,6})([a-zA-Z\u4e00-\u9fa5])/g, '$1 $2')
-    .replace(/(\d+\.)([^\s\.])/g, '$1 $2')
-    .replace(/(?<![\S])([-+])(\S)/g, '$1 $2');
-
-  let safe = fixed.replace(/\\\[([\s\S]+?)\\\]/g, (_, e) => protect(e, true));
-  safe = safe.replace(/\\\(([\s\S]+?)\\\)/g, (_, e) => protect(e, false));
-  safe = safe.replace(/\$\$([\s\S]+?)\$\$/g, (_, e) => protect(e, true));
-  safe = safe.replace(/\$([^$\n]+?)\$/g, (_, e) => protect(e, false));
-
-  let html = '';
-  try {
-    html = marked.parse(safe) as string;
-  } catch {
-    html = safe;
-  }
-
-  tokenMap.forEach((rendered, key) => {
-    html = html.split(key).join(rendered);
-  });
-
-  return html;
-};
 </script>
 
 <style scoped>

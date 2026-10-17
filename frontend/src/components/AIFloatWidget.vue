@@ -156,12 +156,12 @@ import { streamRealtimeQA, clearSessionApi, getSessionHistoryApi } from '@/api/a
 import { useAIStreamState } from '@/composables/useAIStreamState';
 import { useToast } from '@/composables/useToast';
 import type { ConversationHistory } from '@/types/ai';
-import { marked } from 'marked';
-import katex from 'katex';
+import { renderMarkdown } from '@/utils/markdown';
+
 import 'katex/dist/katex.min.css';
 
 // 配置 marked 开启 GFM 支持
-marked.setOptions({ gfm: true, breaks: true });
+
 
 interface ChatMessage {
   id: string;
@@ -509,50 +509,6 @@ const renderUserText = (content: string) => content
   .replace(/</g, '&lt;')
   .replace(/>/g, '&gt;')
   .replace(/\n/g, '<br />');
-
-const renderMarkdown = (content: string): string => {
-  if (!content) return '';
-
-  const tokenMap = new Map<string, string>();
-  let counter = 0;
-
-  const protect = (expr: unknown, display: boolean): string => {
-    const key = 'XKATEX' + (counter++) + 'XEND';
-    const source = String(expr ?? '');
-    try {
-      tokenMap.set(key, katex.renderToString(source.trim(), { throwOnError: false, displayMode: display }));
-    } catch {
-      tokenMap.set(key, display ? '$$' + source + '$$' : '$' + source + '$');
-    }
-    return key;
-  };
-
-  // 【关键修复】处理 Markdown 格式粘连问题
-  // 解决流式传输分块导致的后端修复失效问题（如 "###" + "1." 拼接成 "###1."）
-  let fixed = content
-    // 标题后紧跟数字（###1. -> ### 1.）
-    .replace(/(#{1,6})([0-9])/g, '$1 $2')
-    // 标题后紧跟字母/汉字（###标题 -> ### 标题）
-    .replace(/(#{1,6})([a-zA-Z\u4e00-\u9fa5])/g, '$1 $2')
-    // 有序列表粘连（1.标题 -> 1. 标题）
-    .replace(/(\d+\.)([^\s\.])/g, '$1 $2')
-    // 无序列表粘连（-标题 -> - 标题）
-    .replace(/(?<![\S])([-+])(\S)/g, '$1 $2');
-
-  let safe = fixed.replace(/\\\[([\s\S]+?)\\\]/g, (_, e) => protect(e, true));
-  safe = safe.replace(/\\\(([\s\S]+?)\\\)/g, (_, e) => protect(e, false));
-  safe = safe.replace(/\$\$([\s\S]+?)\$\$/g, (_, e) => protect(e, true));
-  safe = safe.replace(/\$([^$\n]+?)\$/g, (_, e) => protect(e, false));
-
-  let html: string;
-  try { html = marked.parse(safe) as string; } catch { html = safe; }
-
-  tokenMap.forEach((rendered, key) => {
-    html = html.split(key).join(rendered);
-  });
-
-  return html;
-};
 
 const normalizeError = (msg: string | undefined) => {
   if (!msg) return 'AI 服务暂不可用，请稍后重试。';

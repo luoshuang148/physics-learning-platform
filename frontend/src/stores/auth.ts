@@ -7,6 +7,9 @@ import { getCurrentUserApi } from '@/api/user';
 import type { LoginRequest } from '@/types/user';
 
 const TOKEN_KEY = 'zhixue_token';
+// Delete credentials left by older debug/account-history implementations.
+localStorage.removeItem('zhixue_account_db');
+localStorage.removeItem('zhixue_account_db_version');
 const STUDENT_SESSION_STATE_KEY_PREFIXES = [
   'student_task_entry_event_id',
   'student_experiment_view_state',
