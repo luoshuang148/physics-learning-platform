@@ -38,6 +38,7 @@
             :title="needsAnswerCommit && currentQuestion?.id !== q.id ? '请先提交当前题目记录' : `第 ${idx + 1} 题`"
           >{{ idx + 1 }}</button>
         </div>
+        <button v-if="isPractice && currentCommittedResult" class="neon-btn primary" @click="restartPractice">再次补练</button>
         <span class="q-progress">{{ doneCount }}/{{ questions.length }}</span>
       </div>
 
@@ -144,7 +145,8 @@
               />
               <div class="q-reason-actions">
                 <button class="neon-btn ghost" :disabled="isPersistingAnswer" @click="skipErrorReasonAndSubmit">放弃填写</button>
-                <button class="neon-btn primary" :disabled="isPersistingAnswer" @click="submitPendingAnswer">{{ isPersistingAnswer ? '提交中…' : '提交并保存' }}</button>
+
+              <button class="neon-btn primary" :disabled="isPersistingAnswer" @click="submitPendingAnswer">{{ isPersistingAnswer ? '提交中…' : '提交并保存' }}</button>
               </div>
             </div>
             <div v-else class="q-submit-row q-submit-row-pending">
@@ -195,8 +197,9 @@ import AppShell from '@/layouts/AppShell.vue';
 import LatexText from '@/components/LatexText.vue';
 import { useAuthStore } from '@/stores/auth';
 import { getAllVideosApi } from '@/api/video';
-import { submitAnswerApi, getMyAnswersApi } from '@/api/answer-record';
-import { getTaskQuestionsApi, getTeacherEventApi } from '@/api/teacher-event';
+import { submitAnswerApi, getTaskAnswersApi } from '@/api/answer-record';
+import { getQuestionByIdApi } from '@/api/question';
+import { getTaskApi, getTaskQuestionsApi, getTeacherEventApi } from '@/api/teacher-event';
 import { useToast } from '@/composables/useToast';
 import WrongAnalysisPanel from '@/components/WrongAnalysisPanel.vue';
 import AppToast from '@/components/AppToast.vue';
@@ -212,6 +215,7 @@ const QUESTION_TASK_EVENT_ID_KEY_PREFIX = 'student_question_task_event_id';
 const QUESTION_VIEW_STATE_LEGACY_KEY = 'student_question_view_state';
 
 interface PendingAnswerResult {
+  requestId: string;
   questionId: number;
   userAnswer: string;
   correct: boolean;
@@ -222,6 +226,7 @@ interface PendingAnswerResult {
 const auth = useAuthStore();
 const route = useRoute();
 const router = useRouter();
+const isPractice = computed(() => route.path === '/student/practice');
 
 const getQuestionViewStateKey = () => `${QUESTION_VIEW_STATE_KEY_PREFIX}_${auth.user?.id ?? 'anonymous'}`;
 const getQuestionTaskEventIdKey = () => `${QUESTION_TASK_EVENT_ID_KEY_PREFIX}_${auth.user?.id ?? 'anonymous'}`;
@@ -412,6 +417,7 @@ const goNext = () => {
 };
 
 const buildPendingResult = (question: QuestionResponse, userAnswer: string): PendingAnswerResult => ({
+  requestId: crypto.randomUUID(),
   questionId: question.id,
   userAnswer,
   correct: userAnswer === question.correctOption,
@@ -434,7 +440,8 @@ const applyCommittedResult = (result: AnswerRecordResponse) => {
 const activeTeachingEventId = ref<number | null>(null);
 
 const persistAnswerRecord = async (payload: AnswerRecordSubmitPayload) => {
-  const result = await submitAnswerApi({ ...payload, eventId: activeTeachingEventId.value ?? undefined });
+  const result = await submitAnswerApi({ ...payload, eventId: activeTeachingEventId.value ?? undefined,
+    requestId: pendingAnswer.value?.requestId ?? crypto.randomUUID(), intent: isPractice.value ? 'PRACTICE' : 'ASSIGNMENT' });
   applyCommittedResult(result);
   persistQuestionViewState();
   return result;
@@ -500,10 +507,14 @@ const selectQuestion = (q: QuestionResponse) => {
 
 onMounted(async () => {
   try {
-    const eventData = await getTeacherEventApi();
+    const freePractice = isPractice.value && !route.query.eventId;
+    const eventData = freePractice
+      ? { id: 0, eventTitle: '自由补练（当前题库）', eventDescription: null, questionIds: [Number(route.query.questionId)] }
+      : isPractice.value && route.query.eventId
+      ? await getTaskApi(Number(route.query.eventId)) : await getTeacherEventApi();
     const [questionResult, recordResult, videoResult] = await Promise.all([
-      eventData ? getTaskQuestionsApi(eventData.id) : Promise.resolve([]),
-      getMyAnswersApi().catch(() => ({ records: [] })),
+      freePractice ? getQuestionByIdApi(Number(route.query.questionId)).then(q => [q]) : eventData ? getTaskQuestionsApi(eventData.id) : Promise.resolve([]),
+      eventData && !freePractice ? getTaskAnswersApi(eventData.id) : Promise.resolve({ records: [] }),
       getAllVideosApi().catch(() => []),
     ]);
 
@@ -513,7 +524,7 @@ onMounted(async () => {
       return;
     }
 
-    activeTeachingEventId.value = eventData.id;
+    activeTeachingEventId.value = freePractice ? null : eventData.id;
     const currentTaskEventId = String(eventData.id ?? '');
     const questionTaskEventIdKey = getQuestionTaskEventIdKey();
     const previousTaskEventId = sessionStorage.getItem(questionTaskEventIdKey);
@@ -544,15 +555,16 @@ onMounted(async () => {
       .filter((q): q is QuestionResponse => Boolean(q));
 
     const map: Record<number, AnswerRecordResponse> = {};
-    for (const rec of (recordResult.records ?? [])) {
+    for (const rec of (recordResult.records ?? []).filter(rec => !rec.practice)) {
       const matched = questions.value.find((q) => q.id === rec.questionId && rec.eventId === eventData.id);
       if (matched && !(matched.id in map)) {
         map[matched.id] = rec;
       }
     }
-    doneMap.value = map;
+    doneMap.value = isPractice.value ? {} : map;
 
-    restoreQuestionViewState();
+    if (!isPractice.value) restoreQuestionViewState();
+    if (isPractice.value) currentQuestion.value = questions.value.find(q => q.id === Number(route.query.questionId)) ?? questions.value[0] ?? null;
     currentQuestion.value = currentQuestion.value ?? questions.value[0] ?? null;
     if (currentQuestion.value && doneMap.value[currentQuestion.value.id]) {
       submitResult.value = doneMap.value[currentQuestion.value.id];
@@ -567,6 +579,11 @@ onMounted(async () => {
     show(error?.response?.data?.message ?? '题目加载失败，请刷新重试', 'error');
   }
 });
+
+const restartPractice = () => {
+  if (!currentQuestion.value) return;
+  delete doneMap.value[currentQuestion.value.id];pendingAnswer.value=null;submitResult.value=null;selectedOption.value='';errorReason.value='';
+};
 
 const submitAnswer = async () => {
   if (!currentQuestion.value || !selectedOption.value) return;

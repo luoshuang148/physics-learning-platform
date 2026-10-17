@@ -83,6 +83,11 @@ CREATE TABLE IF NOT EXISTS questions (
 -- 4. 答题记录表 (answer_records) - 存储用户答题记录
 -- ====================================================================
 CREATE TABLE IF NOT EXISTS answer_records (
+    request_id VARCHAR(64) NULL,
+    practice BOOLEAN NOT NULL DEFAULT FALSE,
+    question_snapshot LONGTEXT NULL,
+    attempt_order BIGINT NOT NULL AUTO_INCREMENT UNIQUE,
+    UNIQUE KEY uk_user_request(user_id,request_id),
     event_id BIGINT NULL COMMENT '教学任务ID，旧数据和自由练习可为空',
     INDEX idx_answer_records_event (event_id),
     id VARCHAR(36) PRIMARY KEY COMMENT '记录ID（UUID）',
@@ -201,11 +206,13 @@ CREATE TABLE teacher_event_questions (
  id BIGINT AUTO_INCREMENT PRIMARY KEY,
  event_id BIGINT NOT NULL,
  question_id BIGINT NOT NULL,
+ bank_question_id BIGINT NULL,
  position_number INT NOT NULL,
  snapshot_json LONGTEXT NOT NULL,
  snapshot_origin VARCHAR(20) NOT NULL DEFAULT 'PUBLISHED',
  UNIQUE KEY uk_event_question(event_id,question_id),
  UNIQUE KEY uk_event_position(event_id,position_number),
+ CONSTRAINT fk_task_bank_question FOREIGN KEY(bank_question_id) REFERENCES questions(id),
  CONSTRAINT fk_event_question_event FOREIGN KEY(event_id) REFERENCES teacher_events(id) ON DELETE CASCADE
 );
 

@@ -259,6 +259,21 @@ public class AnswerRecordController {
      * 教师查询系统内所有用户的答题记录。
      * 需要教师权限验证。
      */
+    @org.springframework.beans.factory.annotation.Autowired private com.zhixuewuli.repository.AnswerRecordRepository taskAnswerRepository;
+    @org.springframework.beans.factory.annotation.Autowired private com.zhixuewuli.common.util.QuestionResponseConverter taskAnswerConverter;
+    @GetMapping("/student/task/{eventId}")
+    public Result<AnswerRecordBatchResponse> taskAnswers(@PathVariable Long eventId,HttpServletRequest request){
+        var rows=taskAnswerRepository.findByUserIdAndEventIdOrderByAttemptOrderDesc((Long)request.getAttribute("userId"),eventId);
+        var data=rows.stream().map(row->taskAnswerConverter.convertToFullResponseDTO(row,row.getQuestion())).toList();
+        return Result.success(AnswerRecordBatchResponse.builder().records(data).totalCount((long)data.size()).build());
+    }
+    @GetMapping("/student/practice-review")
+    public Result<AnswerRecordBatchResponse> practiceReview(HttpServletRequest request){
+        var data=taskAnswerRepository.findPracticeReview((Long)request.getAttribute("userId")).stream()
+            .map(row->taskAnswerConverter.convertToFullResponseDTO(row,row.getQuestion())).toList();
+        return Result.success(AnswerRecordBatchResponse.builder().records(data).totalCount((long)data.size()).build());
+    }
+
     @GetMapping("/teacher/page")
     @Operation(summary = "教师分页查询答题记录")
     public Result<com.zhixuewuli.common.result.PageResult<AnswerRecordResponse>> getTeacherPage(

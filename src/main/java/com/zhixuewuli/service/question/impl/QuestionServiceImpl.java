@@ -70,6 +70,8 @@ public class QuestionServiceImpl implements QuestionService {
     private final QuestionRepository questionRepository;
     private final VideoRepository videoRepository;
     private final UserPermissionUtil userPermissionUtil;
+    private final com.zhixuewuli.repository.TeacherEventQuestionRepository taskQuestionRepository;
+    private final com.zhixuewuli.repository.AnswerRecordRepository answerRepository;
 
     @Override
     public Question createQuestion(QuestionCreateRequest request, Long teacherId) {
@@ -118,6 +120,8 @@ public class QuestionServiceImpl implements QuestionService {
                 });
 
         // 2. 执行删除
+        if(taskQuestionRepository.existsByQuestionId(id) || answerRepository.existsByQuestionId(id))
+            throw new com.zhixuewuli.common.exception.BusinessException("题目已有任务或作答关联，请保留历史题目");
         questionRepository.delete(question);
         log.info("题目删除成功，ID: {}", id);
     }

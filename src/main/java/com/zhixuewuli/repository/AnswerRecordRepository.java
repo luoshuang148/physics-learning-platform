@@ -16,6 +16,17 @@ import java.util.Optional;
 
 @Repository
 public interface AnswerRecordRepository extends JpaRepository<AnswerRecord, String> {
+        Optional<AnswerRecord> findByUserIdAndRequestId(Long userId,String requestId);
+        boolean existsByQuestionId(Long questionId);
+        boolean existsByUserIdAndEventIdAndQuestionIdAndPracticeFalse(Long userId,Long eventId,Long questionId);
+        List<AnswerRecord> findByUserIdAndEventIdOrderByAttemptOrderDesc(Long userId,Long eventId);
+        @Query("SELECT a FROM AnswerRecord a WHERE a.userId=:userId AND EXISTS (SELECT x.id FROM AnswerRecord x " +
+          "WHERE x.userId=a.userId AND x.questionId=a.questionId AND (x.eventId=a.eventId OR (x.eventId IS NULL AND a.eventId IS NULL)) AND x.correct=false) " +
+          "AND NOT EXISTS (SELECT b.id FROM AnswerRecord b WHERE b.userId=a.userId AND b.questionId=a.questionId " +
+          "AND (b.eventId=a.eventId OR (b.eventId IS NULL AND a.eventId IS NULL)) AND b.attemptOrder>a.attemptOrder) ORDER BY a.attemptOrder DESC")
+        @EntityGraph(attributePaths="question")
+        List<AnswerRecord> findPracticeReview(@org.springframework.data.repository.query.Param("userId") Long userId);
+
         @EntityGraph(attributePaths = "question")
         List<AnswerRecord> findByEventIdOrderByAnsweredAtDesc(Long eventId);
 

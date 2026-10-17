@@ -40,6 +40,7 @@ const router = createRouter({
     { path: '/student/home', component: StudentHomeView, meta: { requiresAuth: true, role: 'STUDENT', sidebarDefault: 'expanded' } },
     { path: '/student/task', component: StudentTaskView, meta: { requiresAuth: true, role: 'STUDENT', sidebarDefault: 'collapsed' } },
     { path: '/student/experiment', component: StudentExperimentView, meta: { requiresAuth: true, role: 'STUDENT', sidebarDefault: 'collapsed' } },
+    { path: '/student/practice', component: StudentQuestionView, meta: { requiresAuth: true, role: 'STUDENT' } },
     { path: '/student/question', component: StudentQuestionView, meta: { requiresAuth: true, role: 'STUDENT', sidebarDefault: 'collapsed' } },
     { path: '/student/question/video', component: StudentQuestionVideoView, meta: { requiresAuth: true, role: 'STUDENT', sidebarDefault: 'collapsed' } },
     { path: '/student/wrong-book', component: StudentWrongBookView, meta: { requiresAuth: true, role: 'STUDENT', sidebarDefault: 'collapsed' } },

@@ -49,6 +49,9 @@ class QuestionServiceUnitTest extends BaseUnitTest {
     @Mock
     private UserPermissionUtil userPermissionUtil;
 
+    @Mock private com.zhixuewuli.repository.TeacherEventQuestionRepository taskQuestionRepository;
+    @Mock private com.zhixuewuli.repository.AnswerRecordRepository answerRepository;
+
     @InjectMocks
     private QuestionServiceImpl questionService;
 

@@ -32,6 +32,9 @@ import java.time.LocalDateTime;
 @Data
 public class AnswerRecordSubmitRequest {
     private Long eventId;
+    @Size(max=64) private String requestId;
+    @jakarta.validation.constraints.Pattern(regexp="ASSIGNMENT|PRACTICE")
+    private String intent="PRACTICE";
 
     /**
      * 题目ID
@@ -49,6 +52,7 @@ public class AnswerRecordSubmitRequest {
      * 必须填写，不能为空白字符串。
      * 用户对该题目的实际作答内容。
      */
+    @jakarta.validation.constraints.Pattern(regexp="[ABCD]",message="答案必须为A/B/C/D")
     @NotBlank(message = "用户答案不能为空")
     @Schema(description = "用户答案", example = "A")
     private String userAnswer;

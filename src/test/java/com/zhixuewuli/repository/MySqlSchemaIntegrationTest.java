@@ -40,12 +40,14 @@ class MySqlSchemaIntegrationTest {
         User student = user("mysql_student", User.UserType.STUDENT);
         TeacherEventCreateRequest task = new TeacherEventCreateRequest(); task.setEventTitle("MySQL task");
         task.setEventTimestamp(LocalDateTime.now());
-        Long eventId = teaching.publishEvent(task, teacher.getId()).getId();
+
         Question question = new Question(); question.setContent("MySQL projection fixture"); question.setDifficulty(1);
         question.setOptions("{\"A\":\"a\",\"B\":\"b\",\"C\":\"c\",\"D\":\"d\"}"); question.setCorrectOption("A");
         question.setImageBase64("large-image-must-not-be-in-page"); question = questions.saveAndFlush(question);
+        task.setQuestionIds(java.util.List.of(question.getId()));
+        Long eventId = teaching.publishEvent(task, teacher.getId()).getId();
         var request = new AnswerRecordSubmitRequest(); request.setQuestionId(question.getId());
-        request.setUserAnswer("B"); request.setEventId(eventId);
+        request.setUserAnswer("B"); request.setIntent("ASSIGNMENT");request.setEventId(eventId);request.setRequestId("mysql-request");
         service.submitAnswerRecord(request, student.getId(), "mysql-session");
         var page = service.getTeacherAnswerPage(teacher.getId(), 1, 10, true, "mysql_student");
         assertThat(page.getRecords()).hasSize(1);

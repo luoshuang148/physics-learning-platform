@@ -5,7 +5,7 @@
         <div>
           <span class="wb-kicker">Wrong answer book</span>
           <h1 class="wb-title">错题本</h1>
-          <p class="wb-summary">先定位问题，再决定是否继续追问 AI。</p>
+          <p class="wb-summary">定位错因，针对性补练，并查看最新掌握状态。</p>
         </div>
         <div class="wb-tools">
           <input v-model="searchText" class="wb-search" placeholder="搜索题目内容…" />
@@ -51,7 +51,8 @@
 
           <div v-if="expandedId === item.recordId" class="wb-card-detail">
             <section class="wb-detail-block">
-              <h3 class="wb-section-title">题目内容</h3>
+              <h3 class="wb-section-title">题目内容 · {{ item.correct ? '已通过补练' : '待掌握' }}</h3>
+              <button class="wb-ai-clear-btn" @click="practice(item)">针对性补练</button>
               <div class="wb-detail-q"><LatexText :content="item.questionContent" /></div>
               <div v-if="item.imageBase64" class="wb-question-image-wrap">
                 <img :src="item.imageBase64" alt="题目配图" class="wb-question-image" />
@@ -196,12 +197,13 @@
 </template>
 
 <script setup lang="ts">
+import { useRouter } from 'vue-router';
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import AppShell from '@/layouts/AppShell.vue';
 import LatexText from '@/components/LatexText.vue';
 import StreamOutput from '@/components/StreamOutput.vue';
 import { useAuthStore } from '@/stores/auth';
-import { getMyWrongAnswersApi } from '@/api/answer-record';
+import { getPracticeReviewApi } from '@/api/answer-record';
 import { streamWrongQuestionAnalysis } from '@/api/ai';
 import { useAIStreamState } from '@/composables/useAIStreamState';
 import type { AnswerRecordResponse } from '@/types/answer-record';
@@ -258,6 +260,10 @@ interface SpeechRecognitionAlternative {
   transcript: string;
 }
 
+const practiceRouter = useRouter();
+const practice = (item: AnswerRecordResponse) => {
+ practiceRouter.push({path:'/student/practice',query:{eventId:item.eventId ?? undefined,questionId:item.questionId}});
+};
 const auth = useAuthStore();
 const { state: aiState, reset: resetAIState } = useAIStreamState();
 
@@ -608,7 +614,7 @@ const startInitialAnalysis = async (item: AnswerRecordResponse) => {
 onMounted(async () => {
   loading.value = true;
   try {
-    const res = await getMyWrongAnswersApi();
+    const res = await getPracticeReviewApi();
     const seen = new Set<string>();
     records.value = res.records.filter((r) => {
       if (seen.has(r.questionContent)) return false;

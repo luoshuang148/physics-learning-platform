@@ -41,6 +41,7 @@ import java.util.Map;
 public class QuestionResponseConverter {
 
     private final OptionMappingUtil optionMappingUtil;
+    private final com.fasterxml.jackson.databind.ObjectMapper snapshotJson;
 
     /**
      * 将答题记录实体转换为包含完整信息的响应DTO
@@ -53,6 +54,10 @@ public class QuestionResponseConverter {
         if (record == null) {
             throw new AnswerRecordNotFoundException("答题记录不能为空");
         }
+        if (record.getQuestionSnapshot() != null) {
+            try { question=snapshotJson.readValue(record.getQuestionSnapshot(),Question.class); }
+            catch(Exception error){throw new IllegalStateException("作答快照损坏",error);}
+        }
         if (question == null) {
             throw new QuestionNotFoundException("题目不存在");
         }
@@ -62,7 +67,7 @@ public class QuestionResponseConverter {
 
         return AnswerRecordResponse.builder()
                 .recordId(record.getId())
-                .eventId(record.getEventId())
+                .eventId(record.getEventId()).requestId(record.getRequestId()).practice(record.isPractice()).attemptOrder(record.getAttemptOrder())
                 .userId(record.getUserId())
                 .questionId(question.getId())
                 .userAnswer(record.getUserAnswer())

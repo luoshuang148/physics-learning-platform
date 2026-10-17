@@ -20,6 +20,7 @@ class TeacherEventArchiveRegressionTest extends BaseControllerIntegrationTest {
     @Autowired AnswerRecordRepository answers;
     @Autowired ConversationHistoryRepository histories;
     @Autowired StudentReportRepository reports;
+    @Autowired com.zhixuewuli.service.teacherEvent.TaskQuestionService taskQuestions;
 
     @Test
     void endingAnEventArchivesItWithoutDeletingLearningData() throws Exception {
@@ -72,13 +73,15 @@ class TeacherEventArchiveRegressionTest extends BaseControllerIntegrationTest {
         question.setOptions("{\"A\":\"a\",\"B\":\"b\",\"C\":\"c\",\"D\":\"d\"}"); question.setCorrectOption("A");
         jpaEntityManager.persist(question); jpaEntityManager.flush();
         var request = new com.zhixuewuli.dto.request.AnswerRecordSubmitRequest();
-        request.setQuestionId(question.getId()); request.setUserAnswer("A"); request.setEventId(1L);
+        taskQuestions.capture(1L,java.util.List.of(question));
+        request.setQuestionId(question.getId()); request.setUserAnswer("A"); request.setIntent("ASSIGNMENT");request.setEventId(1L);request.setRequestId("event-linked-once");
         answerService.submitAnswerRecord(request, 1001L, "event-linked");
         assertThat(answers.findAll()).extracting(AnswerRecord::getEventId).containsExactly(1L);
         var context = sessions.getOrCreateSession("event-linked", 1001L, ConversationType.REAL_TIME_QA, null, () -> "physics");
         sessions.addInteraction(context, "question", "answer", 10);
         assertThat(histories.findAll()).extracting(ConversationHistory::getEventId).containsExactly(1L);
         events.deleteCurrentEvent(2001L);
+        request.setRequestId("new-after-archive");
         assertThatThrownBy(() -> answerService.submitAnswerRecord(request, 1001L, "event-linked"))
                 .isInstanceOf(com.zhixuewuli.common.exception.BusinessException.class);
         assertThat(answers.count()).isEqualTo(1);

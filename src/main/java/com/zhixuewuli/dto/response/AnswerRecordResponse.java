@@ -46,6 +46,9 @@ import java.util.Map;
 @Schema(description = "答题记录响应")
 public class AnswerRecordResponse {
     private Long eventId;
+    private String requestId;
+    private boolean practice;
+    private Long attemptOrder;
     private String studentName;
 
     // ==================== 基础答题信息 ====================

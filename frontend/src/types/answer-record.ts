@@ -1,5 +1,7 @@
 export interface AnswerRecordSubmitPayload {
   eventId?: number;
+  requestId?: string;
+  intent?: 'ASSIGNMENT' | 'PRACTICE';
   questionId: number;
   userAnswer: string;
   errorReason?: string;
@@ -13,6 +15,9 @@ export interface RecordBatchDeletePayload {
 
 export interface AnswerRecordResponse {
   eventId: number | null;
+  practice?: boolean;
+  requestId?: string;
+  attemptOrder?: number;
   studentName?: string;
   recordId: string;
   userId: number;

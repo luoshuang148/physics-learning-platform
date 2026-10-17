@@ -8,6 +8,7 @@ SET MODE MySQL;
 SET REFERENTIAL_INTEGRITY FALSE;
 
 -- 清理所有表的数据（按依赖关系倒序）
+DELETE FROM teacher_event_questions;
 DELETE FROM student_reports;
 DELETE FROM teacher_events;
 DELETE FROM conversation_history;

@@ -11,6 +11,10 @@ import java.util.List;
 
 @Repository
 public interface UserRepository extends JpaRepository<User, Long> {
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("select u from User u where u.id=:id")
+    Optional<User> lockById(@org.springframework.data.repository.query.Param("id") Long id);
+
 
     /**
      * 根据用户名查找用户

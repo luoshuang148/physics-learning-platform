@@ -68,6 +68,8 @@ public class AnswerRecordServiceImpl implements AnswerRecordService {
     private final com.zhixuewuli.repository.TeacherEventRepository teacherEventRepository;
     private final UserPermissionUtil userPermissionUtil;
     private final QuestionResponseConverter questionResponseConverter;
+    private final com.zhixuewuli.service.teacherEvent.TaskQuestionService taskQuestions;
+    private final com.fasterxml.jackson.databind.ObjectMapper snapshotJson;
 
     @Override
     @Transactional(readOnly = true)
@@ -102,14 +104,38 @@ public class AnswerRecordServiceImpl implements AnswerRecordService {
             String sessionId) {
         log.info("处理答题记录提交 - UserId: {}, QuestionId: {}", currentUserId, request.getQuestionId());
 
-        Long eventId = teacherEventRepository.findByIsGlobalTrue().map(com.zhixuewuli.entity.TeacherEvent::getId).orElse(null);
-        if (request.getEventId() != null && !request.getEventId().equals(eventId)) {
-            throw new BusinessException("教学任务已切换，请刷新后再提交");
+        Long eventId=request.getEventId();
+        if("ASSIGNMENT".equals(request.getIntent()) && eventId==null) throw new IllegalArgumentException("任务作答必须指定eventId");
+        boolean practice=eventId==null || "PRACTICE".equals(request.getIntent());
+        if(eventId!=null || request.getRequestId()!=null) {
+            if(request.getRequestId()==null || request.getRequestId().isBlank()) throw new IllegalArgumentException("任务提交必须提供requestId");
+            userRepository.lockById(currentUserId).orElseThrow(()->new IllegalArgumentException("用户不存在"));
+            var previous=answerRecordRepository.findByUserIdAndRequestId(currentUserId,request.getRequestId());
+            if(previous.isPresent()) {
+                var old=previous.get();
+                if(!java.util.Objects.equals(old.getEventId(),eventId)||!old.getQuestionId().equals(request.getQuestionId())
+                    ||!old.getUserAnswer().equals(request.getUserAnswer())||old.isPractice()!=practice
+                    ||!java.util.Objects.equals(old.getErrorReason(),request.getErrorReason()))
+                    throw new com.zhixuewuli.common.exception.teacherevent.EventAlreadyExistsException("requestId已用于不同的提交内容");
+                return convertToFullResponseDTO(old);
+            }
         }
-
+        if(eventId!=null) {
+            if(!practice && answerRecordRepository.existsByUserIdAndEventIdAndQuestionIdAndPracticeFalse(currentUserId,eventId,request.getQuestionId()))
+                throw new com.zhixuewuli.common.exception.teacherevent.EventAlreadyExistsException("本题已完成，请使用补练入口");
+            var event=teacherEventRepository.lockById(eventId).orElseThrow(()->new IllegalArgumentException("教学任务不存在"));
+            if(!Boolean.TRUE.equals(event.getIsGlobal())&&!practice)
+                throw new com.zhixuewuli.common.exception.teacherevent.EventAlreadyExistsException("教学任务已归档，请刷新或选择补练");
+        }
+        // Unscoped legacy submissions are free practice and never attach themselves to the current assignment.
+        Question taskQuestion=eventId==null ? null : taskQuestions.get(eventId,request.getQuestionId());
+        if(taskQuestion!=null) {
+            try {if(!snapshotJson.readTree(taskQuestion.getOptions()).has(request.getUserAnswer())) throw new IllegalArgumentException("答案选项无效");}
+            catch(com.fasterxml.jackson.core.JsonProcessingException e){throw new IllegalStateException("任务选项损坏",e);}
+        }
         try {
             // 1. 验证题目存在性
-            Question question = questionRepository.findById(request.getQuestionId())
+            Question question = taskQuestion!=null ? taskQuestion : questionRepository.findById(request.getQuestionId())
                     .orElseThrow(() -> new QuestionNotFoundException(request.getQuestionId()));
 
             // 2. 判断答案正确性
@@ -122,15 +148,17 @@ public class AnswerRecordServiceImpl implements AnswerRecordService {
             record.setId(UUID.randomUUID().toString());
             record.setSessionId(sessionId);
             record.setEventId(eventId);
+            record.setRequestId(request.getRequestId());record.setPractice(practice || eventId==null);
+            record.setQuestionSnapshot(snapshotJson.writeValueAsString(question));
             record.setUserId(currentUserId);
             record.setQuestionId(request.getQuestionId());
             record.setUserAnswer(request.getUserAnswer());
             record.setCorrect(isCorrect);
             record.setErrorReason(request.getErrorReason());
-            record.setAnsweredAt(request.getAnsweredAt() != null ? request.getAnsweredAt() : LocalDateTime.now());
+            record.setAnsweredAt(LocalDateTime.now(java.time.ZoneOffset.UTC));
 
             // 4. 保存记录
-            AnswerRecord savedRecord = answerRecordRepository.save(record);
+            AnswerRecord savedRecord = eventId==null ? answerRecordRepository.save(record) : answerRecordRepository.saveAndFlush(record);
             log.info("答题记录保存成功 - RecordId: {}, UserId: {}", savedRecord.getId(), currentUserId);
 
             // 5. 使用转换器构建完整响应
@@ -158,11 +186,7 @@ public class AnswerRecordServiceImpl implements AnswerRecordService {
             }
         }
 
-        // 获取关联的题目信息
-        Question question = questionRepository.findById(record.getQuestionId())
-                .orElseThrow(() -> new QuestionNotFoundException(record.getQuestionId()));
-
-        return questionResponseConverter.convertToFullResponseDTO(record, question);
+        return convertToFullResponseDTO(record);
     }
 
     @Override
@@ -443,8 +467,8 @@ public class AnswerRecordServiceImpl implements AnswerRecordService {
      */
     private AnswerRecordResponse convertToFullResponseDTO(AnswerRecord record) {
         // 获取关联的题目信息
-        Question question = record.getQuestion();
-        if (question == null) {
+        Question question = record.getQuestionSnapshot()!=null ? null : record.getQuestion();
+        if (question == null && record.getQuestionSnapshot()==null) {
             question = questionRepository.findById(record.getQuestionId())
                     .orElseThrow(() -> new QuestionNotFoundException(record.getQuestionId()));
         }

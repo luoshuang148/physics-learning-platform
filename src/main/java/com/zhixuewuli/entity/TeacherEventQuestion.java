@@ -15,6 +15,9 @@ public class TeacherEventQuestion {
  @ManyToOne(fetch=FetchType.LAZY) @JoinColumn(name="event_id",insertable=false,updatable=false)
  @org.hibernate.annotations.OnDelete(action=org.hibernate.annotations.OnDeleteAction.CASCADE)
  private TeacherEvent event;
+ @Column(name="bank_question_id") private Long bankQuestionId;
+ @ManyToOne(fetch=FetchType.LAZY) @JoinColumn(name="bank_question_id",insertable=false,updatable=false)
+ private Question bankQuestion;
  @Column(name="question_id",nullable=false) private Long questionId;
  @Column(name="position_number",nullable=false) private int positionNumber;
  @Column(name="snapshot_json",columnDefinition="LONGTEXT",nullable=false) private String snapshotJson;

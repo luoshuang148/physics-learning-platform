@@ -70,6 +70,7 @@ class AnswerRecordServiceUnitTest extends BaseUnitTest {
         @Mock
     private com.zhixuewuli.repository.TeacherEventRepository teacherEventRepository;
 
+    @Mock private com.fasterxml.jackson.databind.ObjectMapper snapshotJson;
     @InjectMocks
         private AnswerRecordServiceImpl answerRecordService;
 

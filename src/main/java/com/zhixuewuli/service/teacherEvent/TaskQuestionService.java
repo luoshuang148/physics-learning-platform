@@ -32,12 +32,12 @@ public class TaskQuestionService {
  public void capture(Long eventId,List<Question> ordered) {
   int position=0;
   for(Question question:ordered) {
-   var row=new TeacherEventQuestion();row.setEventId(eventId);row.setQuestionId(question.getId());row.setPositionNumber(position++);
+   var row=new TeacherEventQuestion();row.setEventId(eventId);row.setQuestionId(question.getId());row.setBankQuestionId(question.getId());row.setPositionNumber(position++);
    try {row.setSnapshotJson(json.writeValueAsString(question));}catch(Exception e){throw new IllegalStateException("题目快照保存失败",e);}
    snapshots.save(row);
   }
  }
- public List<Long> ids(Long eventId) {return snapshots.findByEventIdOrderByPositionNumberAsc(eventId).stream().map(TeacherEventQuestion::getQuestionId).toList();}
+ public List<Long> ids(Long eventId) {return snapshots.findQuestionIdsByEventId(eventId);}
  public Question get(Long eventId,Long questionId) {
   var row=snapshots.findByEventIdAndQuestionId(eventId,questionId).orElseThrow(()->new IllegalArgumentException("题目不属于该任务"));
   if("MISSING".equals(row.getSnapshotOrigin())) throw new IllegalArgumentException("升级前题目已缺失，无法恢复原题");

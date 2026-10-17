@@ -71,3 +71,10 @@ export const getAnswerRecordPageApi = async (params: { page: number; size: numbe
     '/answer-records/teacher/page', { params });
   return data.data;
 };
+
+export const getTaskAnswersApi = async (eventId: number): Promise<AnswerRecordBatchResponse> => {
+ const {data}=await request.get<ApiResponse<AnswerRecordBatchResponse>>(`/answer-records/student/task/${eventId}`);return data.data;
+};
+export const getPracticeReviewApi = async (): Promise<AnswerRecordBatchResponse> => {
+ const {data}=await request.get<ApiResponse<AnswerRecordBatchResponse>>('/answer-records/student/practice-review');return data.data;
+};
