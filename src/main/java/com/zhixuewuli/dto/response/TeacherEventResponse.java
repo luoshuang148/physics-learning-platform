@@ -23,6 +23,7 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 @NoArgsConstructor
 public class TeacherEventResponse {
+    private java.util.List<Long> questionIds;
 
     @Schema(description = "事件ID", example = "1")
     private Long id;

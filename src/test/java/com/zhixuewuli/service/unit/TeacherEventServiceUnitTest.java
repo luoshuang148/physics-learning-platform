@@ -54,6 +54,9 @@ class TeacherEventServiceUnitTest {
     @Mock
     private StudentReportRepository studentReportRepository;
 
+    @Mock
+    private com.zhixuewuli.service.teacherEvent.TaskQuestionService taskQuestions;
+
     @InjectMocks
     private TeacherEventServiceImpl teacherEventService;
 

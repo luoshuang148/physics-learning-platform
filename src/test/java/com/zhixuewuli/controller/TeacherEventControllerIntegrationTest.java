@@ -95,7 +95,7 @@ public class TeacherEventControllerIntegrationTest extends BaseControllerIntegra
         void testPublishEvent_Success() throws Exception {
                 // Given: 无事件的教师和有效的事件创建请求
                 // 注意：测试数据中已有全局事件，需要先删除
-                mockMvc.perform(delete(TEACHER_EVENTS_ENDPOINT)
+                mockMvc.perform(delete(TEACHER_EVENTS_ENDPOINT).param("expectedEventId",expectedEventId())
                                 .header("Authorization",
                                                 createAuthHeader(TEACHER_WITH_EVENT_ID, TEACHER_WITH_EVENT_USERNAME)))
                                 .andExpect(status().isOk());
@@ -283,7 +283,7 @@ public class TeacherEventControllerIntegrationTest extends BaseControllerIntegra
                 // Given: 有事件的教师
 
                 // When: 发送删除事件请求
-                ResultActions result = mockMvc.perform(delete(TEACHER_EVENTS_ENDPOINT)
+                ResultActions result = mockMvc.perform(delete(TEACHER_EVENTS_ENDPOINT).param("expectedEventId",expectedEventId())
                                 .header("Authorization",
                                                 createAuthHeader(TEACHER_WITH_EVENT_ID, TEACHER_WITH_EVENT_USERNAME)))
                                 .andDo(print());
@@ -300,13 +300,13 @@ public class TeacherEventControllerIntegrationTest extends BaseControllerIntegra
         @Test
         void testDeleteEvent_NotFound() throws Exception {
                 // Given: 先删除已存在的全局事件
-                mockMvc.perform(delete(TEACHER_EVENTS_ENDPOINT)
+                mockMvc.perform(delete(TEACHER_EVENTS_ENDPOINT).param("expectedEventId",expectedEventId())
                                 .header("Authorization",
                                                 createAuthHeader(TEACHER_WITH_EVENT_ID, TEACHER_WITH_EVENT_USERNAME)))
                                 .andExpect(status().isOk());
                 
                 // When: 再次发送删除事件请求 (事件已不存在)
-                ResultActions result = mockMvc.perform(delete(TEACHER_EVENTS_ENDPOINT)
+                ResultActions result = mockMvc.perform(delete(TEACHER_EVENTS_ENDPOINT).param("expectedEventId",expectedEventId())
                                 .header("Authorization",
                                                 createAuthHeader(TEACHER_NO_EVENT_ID, TEACHER_NO_EVENT_USERNAME)))
                                 .andDo(print());
@@ -321,7 +321,7 @@ public class TeacherEventControllerIntegrationTest extends BaseControllerIntegra
         void testDeleteEvent_NonTeacherUser() throws Exception {
                 // Given: 学生用户尝试删除事件
                 // When: 发送删除事件请求
-                ResultActions result = mockMvc.perform(delete(TEACHER_EVENTS_ENDPOINT)
+                ResultActions result = mockMvc.perform(delete(TEACHER_EVENTS_ENDPOINT).param("expectedEventId",expectedEventId())
                                 .header("Authorization", createAuthHeader(STUDENT_USER_ID, STUDENT_USER_USERNAME)))
                                 .andDo(print());
 
@@ -333,7 +333,7 @@ public class TeacherEventControllerIntegrationTest extends BaseControllerIntegra
         @Test
         void testDeleteEvent_Unauthorized() throws Exception {
                 // When: 发送无认证的删除事件请求
-                ResultActions result = mockMvc.perform(delete(TEACHER_EVENTS_ENDPOINT))
+                ResultActions result = mockMvc.perform(delete(TEACHER_EVENTS_ENDPOINT).param("expectedEventId",expectedEventId()))
                                 .andDo(print());
 
                 // Then: 验证未认证错误
@@ -419,7 +419,7 @@ public class TeacherEventControllerIntegrationTest extends BaseControllerIntegra
                 // 全局事件可以被任何教师删除
 
                 // When: 教师 2002 尝试删除事件
-                ResultActions result = mockMvc.perform(delete(TEACHER_EVENTS_ENDPOINT)
+                ResultActions result = mockMvc.perform(delete(TEACHER_EVENTS_ENDPOINT).param("expectedEventId",expectedEventId())
                                 .header("Authorization",
                                                 createAuthHeader(TEACHER_NO_EVENT_ID, TEACHER_NO_EVENT_USERNAME)))
                                 .andDo(print());
@@ -455,7 +455,7 @@ public class TeacherEventControllerIntegrationTest extends BaseControllerIntegra
         @Test
         void testTeacherFullPermission_FullCRUDFlow() throws Exception {
                 // Given: 无事件的教师 (先删除已存在的全局事件)
-                mockMvc.perform(delete(TEACHER_EVENTS_ENDPOINT)
+                mockMvc.perform(delete(TEACHER_EVENTS_ENDPOINT).param("expectedEventId",expectedEventId())
                                 .header("Authorization",
                                                 createAuthHeader(TEACHER_WITH_EVENT_ID, TEACHER_WITH_EVENT_USERNAME)))
                                 .andExpect(status().isOk());
@@ -482,7 +482,7 @@ public class TeacherEventControllerIntegrationTest extends BaseControllerIntegra
                                 .andExpect(jsonPath("$.data.eventTitle").value("期中考试"));
 
                 // 3. 删除事件
-                mockMvc.perform(delete(TEACHER_EVENTS_ENDPOINT)
+                mockMvc.perform(delete(TEACHER_EVENTS_ENDPOINT).param("expectedEventId",expectedEventId())
                                 .header("Authorization", authHeader))
                                 .andExpect(status().isOk())
                                 .andExpect(jsonPath("$.code").value(200));
@@ -519,7 +519,7 @@ public class TeacherEventControllerIntegrationTest extends BaseControllerIntegra
                                 .andExpect(jsonPath("$.data").exists());
 
                 // 3. 尝试删除事件 - 应该被禁止
-                mockMvc.perform(delete(TEACHER_EVENTS_ENDPOINT)
+                mockMvc.perform(delete(TEACHER_EVENTS_ENDPOINT).param("expectedEventId",expectedEventId())
                                 .header("Authorization", authHeader))
                                 .andExpect(status().isForbidden());
         }
@@ -532,7 +532,7 @@ public class TeacherEventControllerIntegrationTest extends BaseControllerIntegra
         @Test
         void testGlobalEventUniqueness_RapidPublishTwice() throws Exception {
                 // Given: 先删除已存在的全局事件，确保从无到有测试
-                mockMvc.perform(delete(TEACHER_EVENTS_ENDPOINT)
+                mockMvc.perform(delete(TEACHER_EVENTS_ENDPOINT).param("expectedEventId",expectedEventId())
                                 .header("Authorization",
                                                 createAuthHeader(TEACHER_WITH_EVENT_ID, TEACHER_WITH_EVENT_USERNAME)))
                                 .andExpect(status().isOk());
@@ -578,7 +578,7 @@ public class TeacherEventControllerIntegrationTest extends BaseControllerIntegra
         @Test
         void testGlobalEventUniqueness_DifferentTeachersRapidPublish() throws Exception {
                 // Given: 先删除已存在的全局事件
-                mockMvc.perform(delete(TEACHER_EVENTS_ENDPOINT)
+                mockMvc.perform(delete(TEACHER_EVENTS_ENDPOINT).param("expectedEventId",expectedEventId())
                                 .header("Authorization",
                                                 createAuthHeader(TEACHER_WITH_EVENT_ID, TEACHER_WITH_EVENT_USERNAME)))
                                 .andExpect(status().isOk());
@@ -616,4 +616,7 @@ public class TeacherEventControllerIntegrationTest extends BaseControllerIntegra
                 assertThat(teacherEventRepository.findByIsGlobalTrue()).isPresent();
                 assertThat(teacherEventRepository.count()).isEqualTo(2L);
         }
+        @org.springframework.beans.factory.annotation.Autowired
+        private com.zhixuewuli.service.teacherEvent.TeacherEventService currentTasks;
+        private String expectedEventId(){var current=currentTasks.getGlobalEvent();return current==null?"1":current.getId().toString();}
 }

@@ -220,7 +220,7 @@ import { useAIStreamState } from '@/composables/useAIStreamState';
 import {
   createTeacherEventApi,
   deleteTeacherEventApi,
-  getTeacherEventHistoryApi,
+  getTeacherEventHistoryApi, replaceTeacherEventApi,
   getTeacherEventApi,
 } from '@/api/teacher-event';
 import { getAllQuestionsApi } from '@/api/question';
@@ -537,7 +537,7 @@ const load = async () => {
     }
     if (eventData.status === 'fulfilled' && eventData.value) {
       current.value = eventData.value;
-      const ids = parseQuestionIds(eventData.value.eventDescription ?? null);
+      const ids = eventData.value.questionIds ?? parseQuestionIds(eventData.value.eventDescription ?? null);
       const title = eventData.value.eventTitle;
       if ((seriesOptions as readonly string[]).includes(title) && ids.length) {
         seriesConfig.value[title as SeriesKey] = ids;
@@ -561,28 +561,18 @@ onUnmounted(() => {
 const publishTask = async () => {
   const ids = seriesConfig.value[editingSeries.value] ?? [];
   if (!ids.length) { show('请先为当前实验系列加入至少一道题目', 'info'); return; }
-  const encoded = 'QIDS:' + ids.join(',');
-  if (encoded.length > 100) { show('题目过多，超出字段长度限制', 'error'); return; }
+
   const payload = {
     eventTitle: editingSeries.value,
-    eventDescription: encoded,
+    questionIds: ids,
     eventTimestamp: new Date().toISOString().slice(0, 19),
   };
   try {
-    current.value = await createTeacherEventApi(payload);
+    current.value = current.value
+      ? await replaceTeacherEventApi(current.value.id,payload)
+      : await createTeacherEventApi(payload);
     show(`${editingSeries.value} 已发布，共 ${ids.length} 题`, 'success');
   } catch (error: any) {
-    if (error?.response?.status === 409) {
-      try {
-        await deleteTeacherEventApi();
-        current.value = await createTeacherEventApi(payload);
-        await loadHistory();
-        show('旧任务已归档，新任务发布成功', 'success');
-      } catch (e: any) {
-        show(e?.response?.data?.message ?? '替换任务失败', 'error');
-      }
-      return;
-    }
     show(error?.response?.data?.message ?? '发布失败，请重试', 'error');
   }
 };
@@ -601,7 +591,7 @@ onMounted(loadHistory);
 
 const deleteTask = async () => {
   try {
-    await deleteTeacherEventApi();
+    await deleteTeacherEventApi(current.value!.id);
     current.value = null;
     showEventReport.value = false;
     clearEventReport();

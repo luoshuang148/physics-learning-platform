@@ -127,14 +127,14 @@ public class TeacherEventController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "权限不足（非教师身份）")
         }
     )
-    public Result<Void> deleteCurrentEvent(HttpServletRequest httpRequest) {
+    public Result<Void> deleteCurrentEvent(HttpServletRequest httpRequest, @RequestParam Long expectedEventId) {
     
         log.info("收到删除全局事件请求");
     
         // 从请求属性中获取用户 ID（由拦截器解析 JWT 提供）
         Long currentUserId = (Long) httpRequest.getAttribute("userId");
     
-        teacherEventService.deleteCurrentEvent(currentUserId);
+        teacherEventService.archiveEvent(expectedEventId,currentUserId);
         return Result.success();
     }
 
@@ -168,5 +168,18 @@ public class TeacherEventController {
         // 不再需要传递 userId，直接调用 getGlobalEvent()
         TeacherEventResponse response = teacherEventService.getGlobalEvent();
         return Result.success(response);
+    }
+
+    @GetMapping("/{id}")
+    public Result<TeacherEventResponse> getEvent(@PathVariable Long id){return Result.success(teacherEventService.getEvent(id));}
+    @GetMapping("/{id}/questions")
+    public Result<java.util.List<com.zhixuewuli.dto.response.QuestionResponse>> getQuestions(@PathVariable Long id){return Result.success(teacherEventService.getEventQuestions(id));}
+    @PutMapping("/{id}/replace")
+    public Result<TeacherEventResponse> replace(@PathVariable Long id,@Valid @RequestBody TeacherEventCreateRequest payload,HttpServletRequest request){
+        return Result.success(teacherEventService.replaceEvent(id,payload,(Long)request.getAttribute("userId")));
+    }
+    @DeleteMapping("/{id}")
+    public Result<Void> archive(@PathVariable Long id,HttpServletRequest request){
+        teacherEventService.archiveEvent(id,(Long)request.getAttribute("userId"));return Result.success();
     }
 }

@@ -21,6 +21,8 @@ import java.time.LocalDateTime;
 @Schema(description = "教师事件创建请求")
 @Data
 public class TeacherEventCreateRequest {
+    @Size(min=1,max=200)
+    private java.util.List<@NotNull Long> questionIds;
 
     @NotBlank(message = "事件标题不能为空")
     @Size(max = 20, message = "事件标题长度不能超过20字符")

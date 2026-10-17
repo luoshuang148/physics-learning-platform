@@ -12,6 +12,7 @@ export interface RecordBatchDeletePayload {
 }
 
 export interface AnswerRecordResponse {
+  eventId: number | null;
   studentName?: string;
   recordId: string;
   userId: number;

@@ -186,7 +186,7 @@ const parseQuestionIds = (desc: string | null) => {
   return desc.slice(5).split(',').map(Number).filter(n => n > 0);
 };
 
-const eventQuestionCount = computed(() => parseQuestionIds(event.value?.eventDescription ?? null).length);
+const eventQuestionCount = computed(() => (event.value?.questionIds ?? parseQuestionIds(event.value?.eventDescription ?? null)).length);
 const studentUsers = computed(() => users.value.filter(u => u.userType === 'STUDENT'));
 const wrongAnswerCount = computed(() => Math.max(totalAnswers.value - correctAnswerCount.value, 0));
 const accuracyRate = computed(() => totalAnswers.value ? (correctAnswerCount.value / totalAnswers.value) * 100 : 0);

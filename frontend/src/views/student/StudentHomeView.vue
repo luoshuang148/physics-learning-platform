@@ -173,7 +173,7 @@ const parseQuestionIds = (desc: string | null) => {
   return desc.slice(5).split(',').map(Number).filter(n => n > 0);
 };
 
-const taskQuestionCount = computed(() => parseQuestionIds(task.value?.eventDescription ?? null).length);
+const taskQuestionCount = computed(() => (task.value?.questionIds ?? parseQuestionIds(task.value?.eventDescription ?? null)).length);
 void taskQuestionCount;
 
 const formatTime = (time: string) =>

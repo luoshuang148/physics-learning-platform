@@ -194,10 +194,9 @@ import { useRoute, useRouter } from 'vue-router';
 import AppShell from '@/layouts/AppShell.vue';
 import LatexText from '@/components/LatexText.vue';
 import { useAuthStore } from '@/stores/auth';
-import { getAllQuestionsApi } from '@/api/question';
 import { getAllVideosApi } from '@/api/video';
 import { submitAnswerApi, getMyAnswersApi } from '@/api/answer-record';
-import { getTeacherEventApi } from '@/api/teacher-event';
+import { getTaskQuestionsApi, getTeacherEventApi } from '@/api/teacher-event';
 import { useToast } from '@/composables/useToast';
 import WrongAnalysisPanel from '@/components/WrongAnalysisPanel.vue';
 import AppToast from '@/components/AppToast.vue';
@@ -501,10 +500,10 @@ const selectQuestion = (q: QuestionResponse) => {
 
 onMounted(async () => {
   try {
-    const [questionResult, recordResult, eventData, videoResult] = await Promise.all([
-      getAllQuestionsApi(),
+    const eventData = await getTeacherEventApi();
+    const [questionResult, recordResult, videoResult] = await Promise.all([
+      eventData ? getTaskQuestionsApi(eventData.id) : Promise.resolve([]),
       getMyAnswersApi().catch(() => ({ records: [] })),
-      getTeacherEventApi(),
       getAllVideosApi().catch(() => []),
     ]);
 
@@ -531,7 +530,7 @@ onMounted(async () => {
 
     activeTaskTitle.value = eventData.eventTitle;
     videos.value = Array.isArray(videoResult) ? videoResult : [];
-    const orderedIds = parseQuestionIds(eventData.eventDescription ?? null);
+    const orderedIds = eventData.questionIds ?? parseQuestionIds(eventData.eventDescription ?? null);
     if (orderedIds.length === 0) {
       show('当前任务未配置题目，请联系教师重新发布', 'error');
       questions.value = [];
@@ -546,7 +545,7 @@ onMounted(async () => {
 
     const map: Record<number, AnswerRecordResponse> = {};
     for (const rec of (recordResult.records ?? [])) {
-      const matched = questions.value.find((q) => q.content === rec.questionContent);
+      const matched = questions.value.find((q) => q.id === rec.questionId && rec.eventId === eventData.id);
       if (matched && !(matched.id in map)) {
         map[matched.id] = rec;
       }

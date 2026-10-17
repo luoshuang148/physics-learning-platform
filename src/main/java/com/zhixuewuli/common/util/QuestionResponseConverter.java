@@ -62,6 +62,7 @@ public class QuestionResponseConverter {
 
         return AnswerRecordResponse.builder()
                 .recordId(record.getId())
+                .eventId(record.getEventId())
                 .userId(record.getUserId())
                 .questionId(question.getId())
                 .userAnswer(record.getUserAnswer())

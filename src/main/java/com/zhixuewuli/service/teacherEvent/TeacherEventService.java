@@ -26,6 +26,10 @@ import com.zhixuewuli.dto.response.TeacherEventResponse;
  * @see TeacherEventResponse 事件响应 DTO
  */
 public interface TeacherEventService {
+    TeacherEventResponse replaceEvent(Long expectedId, TeacherEventCreateRequest request, Long userId);
+    void archiveEvent(Long expectedId,Long userId);
+    TeacherEventResponse getEvent(Long id);
+    java.util.List<com.zhixuewuli.dto.response.QuestionResponse> getEventQuestions(Long id);
     com.zhixuewuli.common.result.PageResult<TeacherEventResponse> getEventHistory(Long userId, int page, int size);
 
 

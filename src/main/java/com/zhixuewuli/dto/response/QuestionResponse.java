@@ -57,6 +57,7 @@ import java.util.Map;
 @NoArgsConstructor
 @AllArgsConstructor
 public class QuestionResponse {
+    private String snapshotOrigin;
 
     /**
      * 题目ID

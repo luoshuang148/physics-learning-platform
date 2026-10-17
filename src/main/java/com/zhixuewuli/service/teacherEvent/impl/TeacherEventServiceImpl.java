@@ -52,6 +52,7 @@ public class TeacherEventServiceImpl implements TeacherEventService {
     private final TeacherEventRepository teacherEventRepository;
     private final UserRepository userRepository;
     private final UserPermissionUtil userPermissionUtil;
+    private final com.zhixuewuli.service.teacherEvent.TaskQuestionService taskQuestions;
     
     // 关联数据 Repository（用于删除时手动清理）
 
@@ -70,6 +71,7 @@ public class TeacherEventServiceImpl implements TeacherEventService {
                 throw new EventAlreadyExistsException("全局事件已存在");
             }
     
+            var orderedQuestions = taskQuestions.prepare(request);
             // 3. 获取教师信息
             User teacher = userRepository.findById(currentUserId)
                     .orElseThrow(() -> new UserNotFoundException("用户不存在"));
@@ -80,11 +82,12 @@ public class TeacherEventServiceImpl implements TeacherEventService {
             event.setTeacherName(teacher.getRealName());
             event.setEventTitle(request.getEventTitle());
             event.setEventDescription(request.getEventDescription());
-            event.setEventTimestamp(request.getEventTimestamp());
+            event.setEventTimestamp(java.time.LocalDateTime.now(java.time.ZoneOffset.UTC));
             event.setIsGlobal(true);  // 设置为全局事件
     
             // 5. 保存事件
             TeacherEvent savedEvent = teacherEventRepository.saveAndFlush(event);
+            taskQuestions.capture(savedEvent.getId(), orderedQuestions);
             log.info("全局事件发布成功 - EventId: {}, UserId: {}", savedEvent.getId(), currentUserId);
     
             // 6. 转换为响应 DTO
@@ -92,6 +95,8 @@ public class TeacherEventServiceImpl implements TeacherEventService {
     
         } catch (org.springframework.dao.DataIntegrityViolationException e) {
             throw new EventAlreadyExistsException("已有活动中的教学任务，请先归档");
+        } catch (IllegalArgumentException e) {
+            throw e;
         } catch (BusinessException e) {
             // 重新抛出业务异常，触发事务回滚
             throw e;
@@ -123,6 +128,8 @@ public class TeacherEventServiceImpl implements TeacherEventService {
                 teacherEventRepository.saveAndFlush(event);
             });
 
+        } catch (IllegalArgumentException e) {
+            throw e;
         } catch (BusinessException e) {
             // 重新抛出业务异常，触发事务回滚
             throw e;
@@ -130,6 +137,34 @@ public class TeacherEventServiceImpl implements TeacherEventService {
             log.error("删除全局事件失败 - UserId: {}", currentUserId, e);
             throw new RuntimeException("删除事件失败：" + e.getMessage(), e);
         }
+    }
+
+    @Override @Transactional
+    public void archiveEvent(Long expectedId,Long userId) {
+        userPermissionUtil.checkTeacherPermission(userId);
+        TeacherEvent event=teacherEventRepository.lockById(expectedId).orElse(null);
+        if(event == null || !Boolean.TRUE.equals(event.getIsGlobal())) {
+            if(teacherEventRepository.existsByIsGlobalTrue()) throw new EventAlreadyExistsException("任务已切换，请刷新后操作");
+            return;
+        }
+        event.setIsGlobal(false);teacherEventRepository.saveAndFlush(event);
+    }
+
+    @Override @Transactional
+    public TeacherEventResponse replaceEvent(Long expectedId,TeacherEventCreateRequest request,Long userId) {
+        userPermissionUtil.checkTeacherPermission(userId);
+        var event=teacherEventRepository.lockById(expectedId).orElseThrow(EventNotFoundException::new);
+        if(!Boolean.TRUE.equals(event.getIsGlobal())) throw new EventAlreadyExistsException("任务已切换，请刷新后操作");
+        taskQuestions.prepare(request); // Fail before freeing the current slot; remaining errors roll back both writes.
+        event.setIsGlobal(false);teacherEventRepository.saveAndFlush(event);
+        return publishEvent(request,userId);
+    }
+
+    @Override @Transactional(readOnly=true)
+    public TeacherEventResponse getEvent(Long id){return convertToResponse(teacherEventRepository.findById(id).orElseThrow(EventNotFoundException::new));}
+    @Override @Transactional(readOnly=true)
+    public java.util.List<com.zhixuewuli.dto.response.QuestionResponse> getEventQuestions(Long id){
+        getEvent(id);return taskQuestions.responses(id);
     }
 
     @Override
@@ -180,6 +215,7 @@ public class TeacherEventServiceImpl implements TeacherEventService {
     private TeacherEventResponse convertToResponse(TeacherEvent event) {
         return TeacherEventResponse.builder()
                 .id(event.getId())
+                .questionIds(taskQuestions.ids(event.getId()))
                 .teacherId(event.getTeacherId())
                 .teacherName(event.getTeacherName())
                 .eventTitle(event.getEventTitle())

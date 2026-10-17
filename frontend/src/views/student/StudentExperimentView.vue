@@ -515,7 +515,7 @@ const goQuestion = async () => {
 
   try {
     const task = await getTeacherEventApi();
-    const questionIds = String(task?.eventDescription ?? '')
+    const questionIds = task?.questionIds ?? String(task?.eventDescription ?? '')
       .replace(/^QIDS:/, '')
       .split(',')
       .map((item) => Number(item.trim()))

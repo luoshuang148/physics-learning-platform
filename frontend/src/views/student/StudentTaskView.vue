@@ -67,7 +67,7 @@ const parseQuestionIds = (description: string | null): number[] => {
     .filter((id) => Number.isInteger(id) && id > 0);
 };
 
-const taskQuestionIds = computed(() => parseQuestionIds(task.value?.eventDescription ?? null));
+const taskQuestionIds = computed(() => (task.value?.questionIds ?? parseQuestionIds(task.value?.eventDescription ?? null)));
 
 const formatTime = (time: string) => new Date(time).toLocaleString();
 

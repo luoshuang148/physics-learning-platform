@@ -13,6 +13,7 @@ export interface QuestionUpdatePayload extends QuestionPayload {
 }
 
 export interface QuestionResponse {
+  snapshotOrigin?: string;
   id: number;
   content: string;
   options: Record<string, string>;

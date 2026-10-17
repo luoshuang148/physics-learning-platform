@@ -22,6 +22,9 @@ import java.util.Optional;
  */
 @Repository
 public interface TeacherEventRepository extends JpaRepository<TeacherEvent, Long> {
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("select e from TeacherEvent e where e.id=:id")
+    Optional<TeacherEvent> lockById(@Param("id") Long id);
     org.springframework.data.domain.Page<TeacherEvent> findByIsGlobalFalse(org.springframework.data.domain.Pageable page);
 
 

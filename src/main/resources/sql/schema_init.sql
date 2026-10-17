@@ -197,6 +197,18 @@ CREATE TABLE IF NOT EXISTS experiments (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='实验配置表';
 
 -- ====================================================================
+CREATE TABLE teacher_event_questions (
+ id BIGINT AUTO_INCREMENT PRIMARY KEY,
+ event_id BIGINT NOT NULL,
+ question_id BIGINT NOT NULL,
+ position_number INT NOT NULL,
+ snapshot_json LONGTEXT NOT NULL,
+ snapshot_origin VARCHAR(20) NOT NULL DEFAULT 'PUBLISHED',
+ UNIQUE KEY uk_event_question(event_id,question_id),
+ UNIQUE KEY uk_event_position(event_id,position_number),
+ CONSTRAINT fk_event_question_event FOREIGN KEY(event_id) REFERENCES teacher_events(id) ON DELETE CASCADE
+);
+
 -- 与增量升级一致：学习数据引用的任务不能被物理删除。
 ALTER TABLE answer_records ADD CONSTRAINT fk_answer_event FOREIGN KEY (event_id) REFERENCES teacher_events(id);
 ALTER TABLE conversation_history ADD CONSTRAINT fk_history_event FOREIGN KEY (event_id) REFERENCES teacher_events(id);
