@@ -301,7 +301,7 @@ class AliyunAIReportAsyncTest extends AIAsyncTestBase {
                 .thenReturn(mockAnswerRecords);
         when(questionRepository.findByIdIn(anyList())).thenReturn(mockQuestions);
         when(userRepository.findById(TEST_USER_ID)).thenReturn(Optional.of(mockUser));
-        when(studentReportRepository.findByUserIdAndSessionId(TEST_USER_ID, TEST_SESSION_ID)).thenReturn(Optional.empty());
+        when(studentReportRepository.findByUserIdAndSessionIdAndEventId(TEST_USER_ID, TEST_SESSION_ID, null)).thenReturn(Optional.empty());
 
         final Runnable[] completionHook = new Runnable[1];
         doAnswer(invocation -> {

@@ -65,6 +65,7 @@ public class AnswerRecordServiceImpl implements AnswerRecordService {
     private final AnswerRecordRepository answerRecordRepository;
     private final QuestionRepository questionRepository;
     private final UserRepository userRepository;
+    private final com.zhixuewuli.repository.TeacherEventRepository teacherEventRepository;
     private final UserPermissionUtil userPermissionUtil;
     private final QuestionResponseConverter questionResponseConverter;
 
@@ -101,6 +102,11 @@ public class AnswerRecordServiceImpl implements AnswerRecordService {
             String sessionId) {
         log.info("处理答题记录提交 - UserId: {}, QuestionId: {}", currentUserId, request.getQuestionId());
 
+        Long eventId = teacherEventRepository.findByIsGlobalTrue().map(com.zhixuewuli.entity.TeacherEvent::getId).orElse(null);
+        if (request.getEventId() != null && !request.getEventId().equals(eventId)) {
+            throw new BusinessException("教学任务已切换，请刷新后再提交");
+        }
+
         try {
             // 1. 验证题目存在性
             Question question = questionRepository.findById(request.getQuestionId())
@@ -115,6 +121,7 @@ public class AnswerRecordServiceImpl implements AnswerRecordService {
             AnswerRecord record = new AnswerRecord();
             record.setId(UUID.randomUUID().toString());
             record.setSessionId(sessionId);
+            record.setEventId(eventId);
             record.setUserId(currentUserId);
             record.setQuestionId(request.getQuestionId());
             record.setUserAnswer(request.getUserAnswer());

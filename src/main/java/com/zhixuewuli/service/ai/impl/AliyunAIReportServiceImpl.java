@@ -119,6 +119,8 @@ public class AliyunAIReportServiceImpl implements AliyunAIReportService {
                             throw new AnswerRecordNotFoundException("该会话无答题记录，无法生成报告");
                         }
 
+                        var eventIds = records.stream().map(AnswerRecord::getEventId).distinct().toList();
+                        Long reportEventId = eventIds.size() == 1 ? eventIds.getFirst() : null;
                         // 批量加载题目
                         Map<Long, Question> questionMap = loadQuestionsFromRecords(records);
 
@@ -180,7 +182,7 @@ public class AliyunAIReportServiceImpl implements AliyunAIReportService {
                                         log.info("学生报告流式结束，开始持久化 - 用户ID: {}, 会话ID: {}, 报告长度: {}字符",
                                                 userId, sessionId, fullReportContent.length());
                                         transactionTemplate.executeWithoutResult(status -> {
-                                            saveStudentReport(userId, sessionId, fullReportContent.toString());
+                                            saveStudentReport(userId, sessionId, reportEventId, fullReportContent.toString());
                                         });
                                     } else {
                                         log.warn("学生报告流式结束但内容为空，跳过持久化 - 用户ID: {}, 会话ID: {}",
@@ -737,7 +739,7 @@ public class AliyunAIReportServiceImpl implements AliyunAIReportService {
      * @param sessionId     会话ID
      * @param reportContent 完整的报告内容
      */
-    private void saveStudentReport(Long userId, String sessionId, String reportContent) {
+    private void saveStudentReport(Long userId, String sessionId, Long eventId, String reportContent) {
         try {
             // 查询学生信息获取真实姓名
             User student = userRepository.findById(userId)
@@ -745,7 +747,7 @@ public class AliyunAIReportServiceImpl implements AliyunAIReportService {
 
             // 检查是否已存在相同会话的报告
             Optional<StudentReport> existingReport = studentReportRepository
-                    .findByUserIdAndSessionId(userId, sessionId);
+                    .findByUserIdAndSessionIdAndEventId(userId, sessionId, eventId);
 
             StudentReport studentReport;
             if (existingReport.isPresent()) {
@@ -763,6 +765,7 @@ public class AliyunAIReportServiceImpl implements AliyunAIReportService {
                 log.info("创建新学生报告 - 用户ID: {}, 会话ID: {}", userId, sessionId);
             }
 
+            studentReport.setEventId(eventId);
             // 保存到数据库
             studentReportRepository.save(studentReport);
             log.info("学生报告持久化保存成功 - 用户ID: {}, 会话ID: {}, 报告长度: {}字符",

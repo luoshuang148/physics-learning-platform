@@ -1,4 +1,5 @@
 export interface AnswerRecordSubmitPayload {
+  eventId?: number;
   questionId: number;
   userAnswer: string;
   errorReason?: string;

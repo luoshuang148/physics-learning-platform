@@ -39,6 +39,7 @@ import java.util.UUID;
  */
 @Entity
 @Table(name = "answer_records", indexes = {
+        @Index(name = "idx_answer_records_event", columnList = "event_id"),
         @Index(name = "idx_question_answered", columnList = "question_id, answered_at"),
         @Index(name = "idx_user_answered", columnList = "user_id, answered_at"),
         @Index(name = "idx_session_answered", columnList = "session_id, answered_at"),
@@ -50,6 +51,10 @@ import java.util.UUID;
 @Data
 @EqualsAndHashCode(callSuper = false)
 public class AnswerRecord extends BaseTimeEntity {
+
+    /** Teaching event captured when this learning record is created; null denotes legacy/free practice. */
+    @Column(name = "event_id")
+    private Long eventId;
 
     /**
      * 答题记录唯一标识符

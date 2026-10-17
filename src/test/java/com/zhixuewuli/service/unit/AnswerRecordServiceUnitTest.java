@@ -67,7 +67,10 @@ class AnswerRecordServiceUnitTest extends BaseUnitTest {
         @Mock
         private QuestionResponseConverter questionResponseConverter;
 
-        @InjectMocks
+        @Mock
+    private com.zhixuewuli.repository.TeacherEventRepository teacherEventRepository;
+
+    @InjectMocks
         private AnswerRecordServiceImpl answerRecordService;
 
         private AnswerRecord mockAnswerRecord;

@@ -13,6 +13,7 @@ import lombok.EqualsAndHashCode;
  */
 @Entity
 @Table(name = "student_reports", indexes = {
+        @Index(name = "idx_student_reports_event", columnList = "event_id"),
         @Index(name = "idx_student_report_session_id", columnList = "session_id"),
         @Index(name = "idx_user_created", columnList = "user_id, created_at"),
         @Index(name = "idx_user_session", columnList = "user_id, session_id")
@@ -20,6 +21,10 @@ import lombok.EqualsAndHashCode;
 @Data
 @EqualsAndHashCode(callSuper = true)
 public class StudentReport extends BaseTimeEntity {
+
+    /** Teaching event captured when this learning record is created; null denotes legacy/free practice. */
+    @Column(name = "event_id")
+    private Long eventId;
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

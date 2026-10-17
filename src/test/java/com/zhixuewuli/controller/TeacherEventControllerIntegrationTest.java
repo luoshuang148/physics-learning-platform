@@ -614,6 +614,6 @@ public class TeacherEventControllerIntegrationTest extends BaseControllerIntegra
 
                 // 最终验证：数据库中只有一条全局事件
                 assertThat(teacherEventRepository.findByIsGlobalTrue()).isPresent();
-                assertThat(teacherEventRepository.count()).isEqualTo(1L);
+                assertThat(teacherEventRepository.count()).isEqualTo(2L);
         }
 }

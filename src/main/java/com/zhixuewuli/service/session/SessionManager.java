@@ -33,6 +33,7 @@ public class SessionManager {
     private final ConversationHistoryRepository conversationHistoryRepository;
     private final AnswerRecordRepository answerRecordRepository;
     private final AIBusinessProperties aiProperties;
+    private final com.zhixuewuli.repository.TeacherEventRepository teacherEventRepository;
 
     // 会话存储：复合键 -> SessionContextInternalDTO
     private final Map<String, SessionContextInternalDTO> sessionStore = new ConcurrentHashMap<>();
@@ -66,7 +67,8 @@ public class SessionManager {
     public SessionContextInternalDTO getOrCreateSession(String sessionId, Long userId,
             ConversationType conversationType, Long questionId,
             Supplier<String> initialContextSupplier) {
-        String sessionKey = userId + ":" + generateSessionKey(sessionId, conversationType, questionId);
+        Long eventId = teacherEventRepository.findByIsGlobalTrue().map(com.zhixuewuli.entity.TeacherEvent::getId).orElse(null);
+        String sessionKey = userId + ":" + generateSessionKey(sessionId, conversationType, questionId) + ":event:" + eventId;
         SessionContextInternalDTO existing = sessionStore.get(sessionKey);
         if (existing != null) {
             if (!Boolean.TRUE.equals(existing.getIsActive())) {
@@ -89,6 +91,7 @@ public class SessionManager {
             String initialContext = initialContextSupplier.get();
             SessionContextInternalDTO context = SessionContextInternalDTO.builder()
                     .sessionId(sessionId)
+                    .eventId(eventId)
                     .userId(userId)
                     .conversationType(conversationType)
                     .questionId(questionId)
@@ -103,8 +106,8 @@ public class SessionManager {
                     .totalInteractionCount(0)
                     .build();
             var persisted = conversationHistoryRepository
-                    .findByUserIdAndSessionIdAndConversationTypeAndQuestionIdAndIsActiveOrderBySequenceNumberAsc(
-                            userId, sessionId, conversationType, questionId, true);
+                    .findByUserIdAndSessionIdAndConversationTypeAndQuestionIdAndEventIdAndIsActiveOrderBySequenceNumberAsc(
+                            userId, sessionId, conversationType, questionId, eventId, true);
             long tokens = 0;
             int sequence = 0;
             for (ConversationHistory history : persisted) {
@@ -132,6 +135,7 @@ public class SessionManager {
 
         ConversationHistory history = new ConversationHistory();
         history.setUserId(context.getUserId());
+        history.setEventId(context.getEventId());
         history.setSessionId(context.getSessionId());
         history.setQuestion(question);
         history.setAnswer(answer);

@@ -45,12 +45,17 @@ import com.zhixuewuli.dto.internal.ConversationType;
 @EqualsAndHashCode(callSuper = false)
 @Entity
 @Table(name = "conversation_history", indexes = {
+        @Index(name = "idx_conversation_history_event", columnList = "event_id"),
         @Index(name = "idx_session_active_created", columnList = "session_id, is_active, created_at"),
         @Index(name = "idx_session_active_seq", columnList = "session_id, is_active, sequence_number"),
         @Index(name = "idx_user_session_active_seq", columnList = "user_id, session_id, is_active, sequence_number")
 })
 @Schema(description = "对话历史实体")
 public class ConversationHistory extends BaseTimeEntity {
+
+    /** Teaching event captured when this learning record is created; null denotes legacy/free practice. */
+    @Column(name = "event_id")
+    private Long eventId;
 
     /**
      * 对话记录唯一标识符 - 主键自增长

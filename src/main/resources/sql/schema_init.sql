@@ -8,7 +8,7 @@ SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci;
 SET FOREIGN_KEY_CHECKS = 0;
 
 -- 删除数据库（如果存在）
-DROP DATABASE IF EXISTS zhixuewuli;
+-- Fresh installation only. Existing installations use the versioned upgrade scripts.
 
 -- 创建数据库并指定字符集
 CREATE DATABASE IF NOT EXISTS zhixuewuli 
@@ -84,6 +84,8 @@ CREATE TABLE IF NOT EXISTS questions (
 -- 4. 答题记录表 (answer_records) - 存储用户答题记录
 -- ====================================================================
 CREATE TABLE IF NOT EXISTS answer_records (
+    event_id BIGINT NULL COMMENT '教学任务ID，旧数据和自由练习可为空',
+    INDEX idx_answer_records_event (event_id),
     id VARCHAR(36) PRIMARY KEY COMMENT '记录ID（UUID）',
     user_id BIGINT NOT NULL COMMENT '用户ID',
     question_id BIGINT NOT NULL COMMENT '题目ID',
@@ -111,6 +113,8 @@ CREATE TABLE IF NOT EXISTS answer_records (
 -- 5. AI对话历史表 (conversation_history) - 存储AI对话记录
 -- ====================================================================
 CREATE TABLE IF NOT EXISTS conversation_history (
+    event_id BIGINT NULL COMMENT '教学任务ID，旧数据和自由练习可为空',
+    INDEX idx_conversation_history_event (event_id),
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     user_id BIGINT NOT NULL COMMENT '用户ID',
     session_id VARCHAR(255) NOT NULL COMMENT '会话ID',
@@ -143,6 +147,8 @@ CREATE TABLE IF NOT EXISTS teacher_events (
     event_title VARCHAR(20) NOT NULL COMMENT '事件标题',
     event_description VARCHAR(100) COMMENT '事件描述',
     event_timestamp DATETIME NOT NULL COMMENT '事件时间戳',
+    active_slot INT GENERATED ALWAYS AS (CASE WHEN is_global = TRUE THEN 1 ELSE NULL END),
+    UNIQUE KEY uk_active_event (active_slot),
     is_global BOOLEAN DEFAULT TRUE COMMENT '是否为全局事件',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
@@ -156,6 +162,8 @@ CREATE TABLE IF NOT EXISTS teacher_events (
 -- 7. 学生报告表 (student_reports) - 存储AI生成的学生个人学习报告
 -- ====================================================================
 CREATE TABLE IF NOT EXISTS student_reports (
+    event_id BIGINT NULL COMMENT '教学任务ID，旧数据和自由练习可为空',
+    INDEX idx_student_reports_event (event_id),
     id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '报告ID',
     user_id BIGINT NOT NULL COMMENT '学生用户ID',
     real_name VARCHAR(100) NOT NULL COMMENT '学生真实姓名',

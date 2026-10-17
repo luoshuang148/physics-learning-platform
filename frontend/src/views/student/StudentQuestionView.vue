@@ -432,8 +432,10 @@ const applyCommittedResult = (result: AnswerRecordResponse) => {
     : '错因已提交并保存成功。';
 };
 
+const activeTeachingEventId = ref<number | null>(null);
+
 const persistAnswerRecord = async (payload: AnswerRecordSubmitPayload) => {
-  const result = await submitAnswerApi(payload);
+  const result = await submitAnswerApi({ ...payload, eventId: activeTeachingEventId.value ?? undefined });
   applyCommittedResult(result);
   persistQuestionViewState();
   return result;
@@ -512,6 +514,7 @@ onMounted(async () => {
       return;
     }
 
+    activeTeachingEventId.value = eventData.id;
     const currentTaskEventId = String(eventData.id ?? '');
     const questionTaskEventIdKey = getQuestionTaskEventIdKey();
     const previousTaskEventId = sessionStorage.getItem(questionTaskEventIdKey);

@@ -17,10 +17,18 @@
               class="status-report-btn"
               @click="openEventReport"
             >{{ eventReportButtonText }}</button>
-            <button v-if="current" class="status-delete-btn" @click="deleteTask">撤销发布</button>
+            <button v-if="current" class="status-delete-btn" @click="deleteTask">归档任务</button>
           </div>
         </div>
       </section>
+
+      <details class="event-report-panel">
+        <summary>已归档任务（{{ historyTotal }}）</summary>
+        <p>归档后保留答题、对话和学习报告。</p>
+        <p v-for="event in archivedEvents" :key="event.id">#{{ event.id }} · {{ event.eventTitle }} · {{ event.eventTimestamp }}</p>
+        <button class="status-report-btn" :disabled="historyPage <= 1" @click="historyPage--; loadHistory()">上一页</button>
+        <button class="status-report-btn" :disabled="historyPage * 10 >= historyTotal" @click="historyPage++; loadHistory()">下一页</button>
+      </details>
 
       <section v-if="shouldShowEventReportPanel" class="event-report-panel">
         <div class="report-panel-head">
@@ -211,6 +219,7 @@ import { useAIStreamState } from '@/composables/useAIStreamState';
 import {
   createTeacherEventApi,
   deleteTeacherEventApi,
+  getTeacherEventHistoryApi,
   getTeacherEventApi,
 } from '@/api/teacher-event';
 import { getAllQuestionsApi } from '@/api/question';
@@ -539,7 +548,8 @@ const publishTask = async () => {
       try {
         await deleteTeacherEventApi();
         current.value = await createTeacherEventApi(payload);
-        show('已替换旧任务并发布成功', 'success');
+        await loadHistory();
+        show('旧任务已归档，新任务发布成功', 'success');
       } catch (e: any) {
         show(e?.response?.data?.message ?? '替换任务失败', 'error');
       }
@@ -549,13 +559,26 @@ const publishTask = async () => {
   }
 };
 
+const archivedEvents = ref<import('@/types/teacher-event').TeacherEventResponse[]>([]);
+const historyPage = ref(1);
+const historyTotal = ref(0);
+const loadHistory = async () => {
+  try {
+    const data = await getTeacherEventHistoryApi(historyPage.value);
+    archivedEvents.value = data.records;
+    historyTotal.value = data.total;
+  } catch (error: any) { show(error?.response?.data?.message ?? '读取归档任务失败', 'error'); }
+};
+onMounted(loadHistory);
+
 const deleteTask = async () => {
   try {
     await deleteTeacherEventApi();
     current.value = null;
     showEventReport.value = false;
     clearEventReport();
-    show('任务已撤销', 'success');
+    await loadHistory();
+    show('任务已归档，学习记录已保留', 'success');
   } catch {
     show('操作失败', 'error');
   }

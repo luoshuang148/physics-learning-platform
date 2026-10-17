@@ -16,6 +16,7 @@ import java.util.Optional;
  */
 @Repository
 public interface StudentReportRepository extends JpaRepository<StudentReport, Long> {
+    Optional<StudentReport> findByUserIdAndSessionIdAndEventId(Long userId, String sessionId, Long eventId);
 
     /**
      * 根据用户 ID 查找该学生的所有报告（按创建时间倒序）

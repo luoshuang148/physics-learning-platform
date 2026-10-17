@@ -93,7 +93,7 @@ class TeacherEventServiceUnitTest {
         doNothing().when(userPermissionUtil).checkTeacherPermission(teacherId);
         when(teacherEventRepository.existsByIsGlobalTrue()).thenReturn(false);
         when(userRepository.findById(teacherId)).thenReturn(Optional.of(mockTeacher));
-        when(teacherEventRepository.save(any(TeacherEvent.class))).thenReturn(mockEvent);
+        when(teacherEventRepository.saveAndFlush(any(TeacherEvent.class))).thenReturn(mockEvent);
 
         // When
         TeacherEventResponse result = teacherEventService.publishEvent(createRequest, teacherId);
@@ -109,7 +109,7 @@ class TeacherEventServiceUnitTest {
         verify(userPermissionUtil).checkTeacherPermission(teacherId);
         verify(teacherEventRepository).existsByIsGlobalTrue();
         verify(userRepository).findById(teacherId);
-        verify(teacherEventRepository).save(any(TeacherEvent.class));
+        verify(teacherEventRepository).saveAndFlush(any(TeacherEvent.class));
     }
 
     @Test
@@ -125,7 +125,7 @@ class TeacherEventServiceUnitTest {
         verify(userPermissionUtil).checkTeacherPermission(teacherId);
         verify(teacherEventRepository, never()).existsByIsGlobalTrue();
         verify(userRepository, never()).findById(anyLong());
-        verify(teacherEventRepository, never()).save(any(TeacherEvent.class));
+        verify(teacherEventRepository, never()).saveAndFlush(any(TeacherEvent.class));
     }
 
     @Test
@@ -142,7 +142,7 @@ class TeacherEventServiceUnitTest {
         verify(userPermissionUtil).checkTeacherPermission(teacherId);
         verify(teacherEventRepository).existsByIsGlobalTrue();
         verify(userRepository, never()).findById(anyLong());
-        verify(teacherEventRepository, never()).save(any(TeacherEvent.class));
+        verify(teacherEventRepository, never()).saveAndFlush(any(TeacherEvent.class));
     }
 
     @Test
@@ -160,7 +160,7 @@ class TeacherEventServiceUnitTest {
         verify(userPermissionUtil).checkTeacherPermission(teacherId);
         verify(teacherEventRepository).existsByIsGlobalTrue();
         verify(userRepository).findById(teacherId);
-        verify(teacherEventRepository, never()).save(any(TeacherEvent.class));
+        verify(teacherEventRepository, never()).saveAndFlush(any(TeacherEvent.class));
     }
 
     @Test
@@ -168,7 +168,7 @@ class TeacherEventServiceUnitTest {
         // Given
         doNothing().when(userPermissionUtil).checkTeacherPermission(teacherId);
         when(teacherEventRepository.existsByIsGlobalTrue()).thenReturn(true);
-        when(teacherEventRepository.deleteAllEvents()).thenReturn(1);
+        when(teacherEventRepository.findByIsGlobalTrue()).thenReturn(Optional.of(mockEvent));
 
         // When
         teacherEventService.deleteCurrentEvent(teacherId);
@@ -176,10 +176,11 @@ class TeacherEventServiceUnitTest {
         // Then
         verify(userPermissionUtil).checkTeacherPermission(teacherId);
         verify(teacherEventRepository).existsByIsGlobalTrue();
-        verify(teacherEventRepository).deleteAllEvents();
-        verify(answerRecordRepository).deleteAll();
-        verify(conversationHistoryRepository).deleteAll();
-        verify(studentReportRepository).deleteAll();
+        assertThat(mockEvent.getIsGlobal()).isFalse();
+        verify(teacherEventRepository).saveAndFlush(mockEvent);
+        verify(answerRecordRepository, never()).deleteAll();
+        verify(conversationHistoryRepository, never()).deleteAll();
+        verify(studentReportRepository, never()).deleteAll();
     }
 
     @Test
@@ -255,14 +256,14 @@ class TeacherEventServiceUnitTest {
         doNothing().when(userPermissionUtil).checkTeacherPermission(teacherId);
         when(teacherEventRepository.existsByIsGlobalTrue()).thenReturn(false);
         when(userRepository.findById(teacherId)).thenReturn(Optional.of(mockTeacher));
-        when(teacherEventRepository.save(any(TeacherEvent.class))).thenReturn(mockEvent);
+        when(teacherEventRepository.saveAndFlush(any(TeacherEvent.class))).thenReturn(mockEvent);
 
         // When
         TeacherEventResponse result = teacherEventService.publishEvent(createRequest, teacherId);
 
         // Then
         assertThat(result).isNotNull();
-        verify(teacherEventRepository).save(any(TeacherEvent.class));
+        verify(teacherEventRepository).saveAndFlush(any(TeacherEvent.class));
     }
 
     @Test
@@ -273,13 +274,13 @@ class TeacherEventServiceUnitTest {
         doNothing().when(userPermissionUtil).checkTeacherPermission(teacherId);
         when(teacherEventRepository.existsByIsGlobalTrue()).thenReturn(false);
         when(userRepository.findById(teacherId)).thenReturn(Optional.of(mockTeacher));
-        when(teacherEventRepository.save(any(TeacherEvent.class))).thenReturn(mockEvent);
+        when(teacherEventRepository.saveAndFlush(any(TeacherEvent.class))).thenReturn(mockEvent);
 
         // When
         TeacherEventResponse result = teacherEventService.publishEvent(createRequest, teacherId);
 
         // Then
         assertThat(result).isNotNull();
-        verify(teacherEventRepository).save(any(TeacherEvent.class));
+        verify(teacherEventRepository).saveAndFlush(any(TeacherEvent.class));
     }
 }

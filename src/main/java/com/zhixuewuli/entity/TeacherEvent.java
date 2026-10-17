@@ -59,6 +59,10 @@ import java.time.LocalDateTime;
 @EqualsAndHashCode(callSuper = false)
 public class TeacherEvent extends BaseTimeEntity {
 
+    @Column(name = "active_slot", unique = true, insertable = false, updatable = false,
+            columnDefinition = "integer GENERATED ALWAYS AS (CASE WHEN is_global = TRUE THEN 1 ELSE NULL END)")
+    private Integer activeSlot;
+
     /**
      * 事件唯一标识符 - 主键自增长
      * 
@@ -96,7 +100,7 @@ public class TeacherEvent extends BaseTimeEntity {
      * insertable 和 updatable 设为 false，避免与 teacherId 字段冲突。
      * </p>
      */
-    @OneToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "teacher_id", insertable = false, updatable = false)
     private User teacher;
 

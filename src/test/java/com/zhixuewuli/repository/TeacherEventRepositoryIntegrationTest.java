@@ -360,6 +360,7 @@ class TeacherEventRepositoryIntegrationTest extends BaseIntegrationTest {
         event.setEventTitle(title);
         event.setEventDescription(description);
         event.setEventTimestamp(LocalDateTime.now());
+        event.setIsGlobal(!teacherEventRepository.existsByIsGlobalTrue());
         return teacherEventRepository.save(event);
     }
 }

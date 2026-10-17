@@ -31,6 +31,7 @@ import java.time.LocalDateTime;
 @Schema(description = "答题记录提交请求参数")
 @Data
 public class AnswerRecordSubmitRequest {
+    private Long eventId;
 
     /**
      * 题目ID

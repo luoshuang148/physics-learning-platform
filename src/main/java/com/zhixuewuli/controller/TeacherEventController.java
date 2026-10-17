@@ -49,6 +49,14 @@ public class TeacherEventController {
 
     private final TeacherEventService teacherEventService;
 
+    @GetMapping("/history")
+    public Result<com.zhixuewuli.common.result.PageResult<TeacherEventResponse>> history(
+            @RequestParam(defaultValue = "1") int page, @RequestParam(defaultValue = "20") int size,
+            HttpServletRequest request) {
+        return Result.success(teacherEventService.getEventHistory((Long) request.getAttribute("userId"), page, size));
+    }
+
+
     /**
      * 发布教师事件
      * 
@@ -98,7 +106,7 @@ public class TeacherEventController {
     /**
      * 删除当前事件
      * 
-     * 删除全局事件记录并清理关联数据（答案记录、对话历史、学生报告）。
+     * 归档当前事件，保留学习记录和报告。
      * 删除操作幂等：事件不存在也视为成功。
      * 
      * @param authorization Authorization 头部，包含 JWT 令牌
@@ -111,8 +119,8 @@ public class TeacherEventController {
      */
     @DeleteMapping
     @Operation(
-        summary = "删除当前事件",
-        description = "删除全局事件记录并清理关联数据，删除操作幂等",
+        summary = "归档当前事件",
+        description = "归档当前事件并保留学习数据，操作幂等",
         responses = {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "删除成功"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "未认证"),

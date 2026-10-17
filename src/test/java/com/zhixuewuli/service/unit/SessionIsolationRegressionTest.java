@@ -17,7 +17,7 @@ import static org.mockito.Mockito.mock;
 
 class SessionIsolationRegressionTest extends BaseUnitTest {
     private final SessionManager manager = new SessionManager(mock(ConversationHistoryRepository.class),
-            mock(AnswerRecordRepository.class), new AIBusinessProperties());
+            mock(AnswerRecordRepository.class), new AIBusinessProperties(), mock(com.zhixuewuli.repository.TeacherEventRepository.class));
 
     @Test
     void identicalClientSessionIdsMustNotShareUserContext() {

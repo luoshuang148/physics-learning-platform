@@ -16,6 +16,7 @@ class SessionPersistenceRegressionTest extends BaseControllerIntegrationTest {
     @Autowired ConversationHistoryRepository histories;
     @Autowired AnswerRecordRepository answers;
     @Autowired AIBusinessProperties properties;
+    @Autowired TeacherEventRepository events;
 
     @Test
     void historyAndClearAreRestrictedToTheAuthenticatedOwner() {
@@ -33,7 +34,7 @@ class SessionPersistenceRegressionTest extends BaseControllerIntegrationTest {
     void aNewManagerRestoresSequenceHistoryAndTokenUsage() {
         Long alice = user("recover_alice");
         history(alice, "previous-response", 7, 90);
-        var restarted = new SessionManager(histories, answers, properties);
+        var restarted = new SessionManager(histories, answers, properties, events);
         var recovered = restarted.getOrCreateSession("shared-id", alice, ConversationType.REAL_TIME_QA,
                 null, () -> "physics");
         assertThat(recovered.getInteractionRecords().values()).extracting(ConversationHistory::getAnswer)

@@ -22,6 +22,8 @@ import java.util.Optional;
  */
 @Repository
 public interface TeacherEventRepository extends JpaRepository<TeacherEvent, Long> {
+    org.springframework.data.domain.Page<TeacherEvent> findByIsGlobalFalse(org.springframework.data.domain.Pageable page);
+
 
     /**
      * 根据教师 ID 查找事件

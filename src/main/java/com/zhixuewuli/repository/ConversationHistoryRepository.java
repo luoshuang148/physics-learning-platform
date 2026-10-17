@@ -11,8 +11,8 @@ import java.util.List;
 public interface ConversationHistoryRepository extends JpaRepository<ConversationHistory, Long> {
         List<ConversationHistory> findByUserIdAndSessionIdAndIsActiveOrderByCreatedAtAsc(
                         Long userId, String sessionId, Boolean active);
-        List<ConversationHistory> findByUserIdAndSessionIdAndConversationTypeAndQuestionIdAndIsActiveOrderBySequenceNumberAsc(
-                        Long userId, String sessionId, ConversationType type, Long questionId, Boolean active);
+        List<ConversationHistory> findByUserIdAndSessionIdAndConversationTypeAndQuestionIdAndEventIdAndIsActiveOrderBySequenceNumberAsc(
+                        Long userId, String sessionId, ConversationType type, Long questionId, Long eventId, Boolean active);
         @org.springframework.transaction.annotation.Transactional
         void deleteBySessionIdAndUserId(String sessionId, Long userId);
 

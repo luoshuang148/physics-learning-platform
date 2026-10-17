@@ -26,6 +26,8 @@ import com.zhixuewuli.dto.response.TeacherEventResponse;
  * @see TeacherEventResponse 事件响应 DTO
  */
 public interface TeacherEventService {
+    com.zhixuewuli.common.result.PageResult<TeacherEventResponse> getEventHistory(Long userId, int page, int size);
+
 
     /**
      * 发布教师事件
@@ -47,7 +49,7 @@ public interface TeacherEventService {
     /**
      * 删除当前教师的事件
      * 
-     * 删除全局事件记录并清理关联数据（答案记录、对话历史、学生报告）。
+     * 归档当前全局事件，保留答题记录、对话历史和学生报告。
      * 如果事件不存在，也视为成功（幂等操作）。
      * 
      * @param currentUserId 当前用户 ID（从 JWT 获取，用于验证教师身份）

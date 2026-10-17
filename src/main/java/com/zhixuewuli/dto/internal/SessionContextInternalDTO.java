@@ -16,6 +16,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 @NoArgsConstructor
 public class SessionContextInternalDTO {
 
+    private Long eventId;
     private String sessionId;
     private Long userId;
     private ConversationType conversationType;

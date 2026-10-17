@@ -54,9 +54,6 @@ public class TeacherEventServiceImpl implements TeacherEventService {
     private final UserPermissionUtil userPermissionUtil;
     
     // 关联数据 Repository（用于删除时手动清理）
-    private final AnswerRecordRepository answerRecordRepository;
-    private final ConversationHistoryRepository conversationHistoryRepository;
-    private final StudentReportRepository studentReportRepository;
 
     @Override
     @Transactional(rollbackFor = { Exception.class })
@@ -87,12 +84,14 @@ public class TeacherEventServiceImpl implements TeacherEventService {
             event.setIsGlobal(true);  // 设置为全局事件
     
             // 5. 保存事件
-            TeacherEvent savedEvent = teacherEventRepository.save(event);
+            TeacherEvent savedEvent = teacherEventRepository.saveAndFlush(event);
             log.info("全局事件发布成功 - EventId: {}, UserId: {}", savedEvent.getId(), currentUserId);
     
             // 6. 转换为响应 DTO
             return convertToResponse(savedEvent);
     
+        } catch (org.springframework.dao.DataIntegrityViolationException e) {
+            throw new EventAlreadyExistsException("已有活动中的教学任务，请先归档");
         } catch (BusinessException e) {
             // 重新抛出业务异常，触发事务回滚
             throw e;
@@ -118,22 +117,12 @@ public class TeacherEventServiceImpl implements TeacherEventService {
                 return;
             }
     
-            // 3. 删除全局事件并手动清理关联数据
-            // 先删除事件本身
-            int deletedCount = teacherEventRepository.deleteAllEvents();
-            log.info("全局事件删除成功 - UserId: {}, 删除记录数：{}", currentUserId, deletedCount);
-                
-            // 手动清理三个关联表（因为无外键 CASCADE）
-            // 三表无相互依赖，删除顺序任意
-            answerRecordRepository.deleteAll();
-            log.info("清理答案记录完成");
-                
-            conversationHistoryRepository.deleteAll();
-            log.info("清理对话历史完成");
-                
-            studentReportRepository.deleteAll();
-            log.info("清理学生报告完成");
-    
+            // Ending a task preserves its learning records and frees the unique active slot.
+            teacherEventRepository.findByIsGlobalTrue().ifPresent(event -> {
+                event.setIsGlobal(false);
+                teacherEventRepository.saveAndFlush(event);
+            });
+
         } catch (BusinessException e) {
             // 重新抛出业务异常，触发事务回滚
             throw e;
@@ -165,6 +154,21 @@ public class TeacherEventServiceImpl implements TeacherEventService {
             log.error("查询全局事件失败", e);
             throw new RuntimeException("查询事件失败：" + e.getMessage(), e);
         }
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public com.zhixuewuli.common.result.PageResult<TeacherEventResponse> getEventHistory(Long userId, int page, int size) {
+        userPermissionUtil.checkTeacherPermission(userId);
+        if (page < 1 || size < 1 || size > 100 || (long) (page - 1) * size > Integer.MAX_VALUE) {
+            throw new IllegalArgumentException("分页参数不合法");
+        }
+        var result = teacherEventRepository.findByIsGlobalFalse(
+                org.springframework.data.domain.PageRequest.of(page - 1, size,
+                        org.springframework.data.domain.Sort.by("updatedAt", "id").descending()));
+        return com.zhixuewuli.common.result.PageResult.<TeacherEventResponse>builder()
+                .records(result.map(this::convertToResponse).getContent()).total(result.getTotalElements())
+                .pages(result.getTotalPages()).currentPage(page).pageSize(size).build();
     }
 
     /**

@@ -16,3 +16,9 @@ export const deleteTeacherEventApi = async (): Promise<void> => {
   await request.delete<ApiResponse<void>>('/teacher/events');
 };
 
+
+export const getTeacherEventHistoryApi = async (page = 1) => {
+  const { data } = await request.get<ApiResponse<import('@/types/common').PageResult<TeacherEventResponse>>>(
+    '/teacher/events/history', { params: { page, size: 10 } });
+  return data.data;
+};
