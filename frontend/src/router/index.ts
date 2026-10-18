@@ -15,7 +15,6 @@ const TeacherDashboardView = () => import('@/views/teacher/TeacherDashboardView.
 const TeacherUserManageView = () => import('@/views/teacher/TeacherUserManageView.vue');
 const TeacherRecordManageView = () => import('@/views/teacher/TeacherRecordManageView.vue');
 const TeacherQuestionManageView = () => import('@/views/teacher/TeacherQuestionManageView.vue');
-const TeacherErrorAnalysisView = () => import('@/views/teacher/TeacherErrorAnalysisView.vue');
 const TeacherStudentAnalysisView = () => import('@/views/teacher/TeacherStudentAnalysisView.vue');
 const TeacherEventView = () => import('@/views/teacher/TeacherEventView.vue');
 const TeacherAssignmentDetailView = () => import('@/views/teacher/TeacherAssignmentDetailView.vue');
@@ -46,7 +45,6 @@ const router = createRouter({
     { path: '/teacher/users', component: TeacherUserManageView, meta: { requiresAuth: true, role: 'TEACHER', sidebarDefault: 'expanded' } },
     { path: '/teacher/records', component: TeacherRecordManageView, meta: { requiresAuth: true, role: 'TEACHER', sidebarDefault: 'expanded' } },
     { path: '/teacher/questions', component: TeacherQuestionManageView, meta: { requiresAuth: true, role: 'TEACHER', sidebarDefault: 'expanded' } },
-    { path: '/teacher/errors', component: TeacherErrorAnalysisView, meta: { requiresAuth: true, role: 'TEACHER', sidebarDefault: 'expanded' } },
     { path: '/teacher/student-analysis', component: TeacherStudentAnalysisView, meta: { requiresAuth: true, role: 'TEACHER', sidebarDefault: 'expanded' } },
     { path: '/teacher/event-manage', component: TeacherEventView, meta: { requiresAuth: true, role: 'TEACHER', sidebarDefault: 'expanded' } },
     { path: '/teacher/assignments/:id', component: TeacherAssignmentDetailView, meta: { requiresAuth: true, role: 'TEACHER', sidebarDefault: 'expanded' } },

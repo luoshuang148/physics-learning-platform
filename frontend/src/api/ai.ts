@@ -208,17 +208,6 @@ export const streamStudentReport = (options: Omit<StreamOptions, 'body'> & { eve
 export const streamTeacherReport = (options: Omit<StreamOptions, 'body'> & { eventId?: number }) =>
   streamAI(`/ai/teacher/report${options.eventId == null ? '' : `?eventId=${options.eventId}`}`, { ...options, method: 'GET' });
 
-export const streamTeacherQuestionAnalysis = (
-  body: AIAskPayload,
-  options: Omit<StreamOptions, 'body' | 'method'>
-) => streamAI('/question-error-analysis/stream', {
-  ...options,
-  body,
-  method: 'POST',
-  sessionType: options.sessionType ?? 'teacher_question_analysis',
-});
-
-
 export const getAICapabilitiesApi = async (): Promise<{reports: boolean; tutoring: boolean; notice: string}> => {
   const {data}=await request.get('/ai/capabilities'); return data.data;
 };
