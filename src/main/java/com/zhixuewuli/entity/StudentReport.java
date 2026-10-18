@@ -22,6 +22,9 @@ import lombok.EqualsAndHashCode;
 @EqualsAndHashCode(callSuper = true)
 public class StudentReport extends BaseTimeEntity {
 
+    @Column(name="evidence_json",columnDefinition="TEXT")
+    private String evidenceJson;
+
     /** Teaching event captured when this learning record is created; null denotes legacy/free practice. */
     @Column(name = "event_id")
     private Long eventId;

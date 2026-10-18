@@ -122,10 +122,6 @@ public class AIController {
         // 前置校验：失败直接抛出异常，不创建 SSE 连接
         zhiPuAIAssistantService.validateAIAskRequest(request, userId, sessionId, true);
 
-        // ✅ 新增：题目存在性验证（错题分析专属）
-        questionRepository.findById(request.getQuestionId())
-                .orElseThrow(() -> new com.zhixuewuli.common.exception.question.QuestionNotFoundException(request.getQuestionId()));
-
         // 校验通过后创建 SSE 连接
         SseEmitter emitter = zhiPuAIAssistantService.createConfiguredEmitter();
 
@@ -151,7 +147,7 @@ public class AIController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "权限不足（非学生身份）")
         }
     )
-    public SseEmitter streamStudentReport(HttpServletRequest httpRequest) {
+    public SseEmitter streamStudentReport(HttpServletRequest httpRequest, @RequestParam(required = false) Long eventId) {
         Long userId = (Long) httpRequest.getAttribute("userId");
         String sessionId = (String) httpRequest.getAttribute("sessionId");
 
@@ -162,7 +158,7 @@ public class AIController {
         SseEmitter emitter = aliyunAIReportService.createConfiguredEmitter();
 
         // 调用服务方法
-        aliyunAIReportService.streamStudentReport(sessionId, emitter, userId);
+        aliyunAIReportService.streamStudentReport(sessionId, emitter, userId, eventId);
 
         return emitter;
     }
@@ -249,11 +245,11 @@ public class AIController {
     )
     public Result<StudentReportResponse> getStudentLatestReport(
             @io.swagger.v3.oas.annotations.Parameter(description = "学生用户 ID", required = true) @PathVariable Long studentId,
-            HttpServletRequest request) {
+            HttpServletRequest request, @RequestParam(required = false) Long eventId) {
 
         Long teacherId = (Long) request.getAttribute("userId");
 
-        StudentReportResponse response = aliyunAIReportService.getStudentLatestReport(teacherId, studentId);
+        StudentReportResponse response = aliyunAIReportService.getStudentLatestReport(teacherId, studentId, eventId);
         return Result.success(response);
     }
 

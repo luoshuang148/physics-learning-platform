@@ -247,7 +247,7 @@ public class SessionManagerUnitTest extends BaseUnitTest {
      * 验证即使数据库保存失败也不会影响内存操作
      */
     @Test
-    void testAddInteraction_databaseSaveFailure_shouldContinueWithMemoryOperation() {
+    void testAddInteraction_databaseSaveFailure_shouldRemainObservable() {
         // Given
         Supplier<String> contextSupplier = () -> TEST_CONTEXT;
         SessionContextInternalDTO session = sessionManager.getOrCreateSession(
@@ -261,14 +261,8 @@ public class SessionManagerUnitTest extends BaseUnitTest {
         when(conversationHistoryRepository.save(any(ConversationHistory.class)))
                 .thenThrow(new RuntimeException("数据库连接失败"));
 
-        // When - 不应该抛出异常
-        assertDoesNotThrow(() -> {
-            sessionManager.addInteraction(session, "问题", "回答", 50);
-        }, "数据库保存失败不应该阻止内存操作");
-
-        // Then - 验证内存操作仍然成功
-        assertEquals(1, session.getTotalInteractionCount().intValue(), "内存中的交互计数仍应增加");
-        assertFalse(session.getInteractionRecords().isEmpty(), "内存中的交互记录不应为空");
+        assertThrows(RuntimeException.class, () -> sessionManager.addInteraction(session, "问题", "回答", 50));
+        assertTrue(session.getInteractionRecords().isEmpty(), "数据库失败不能伪装为保存成功");
     }
 
     /**

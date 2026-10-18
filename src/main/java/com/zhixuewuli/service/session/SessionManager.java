@@ -68,6 +68,11 @@ public class SessionManager {
             ConversationType conversationType, Long questionId,
             Supplier<String> initialContextSupplier) {
         Long eventId = teacherEventRepository.findByIsGlobalTrue().map(com.zhixuewuli.entity.TeacherEvent::getId).orElse(null);
+        return getOrCreateSession(sessionId, userId, conversationType, questionId, eventId, initialContextSupplier);
+    }
+
+    public SessionContextInternalDTO getOrCreateSession(String sessionId, Long userId,
+            ConversationType conversationType, Long questionId, Long eventId, Supplier<String> initialContextSupplier) {
         String sessionKey = userId + ":" + generateSessionKey(sessionId, conversationType, questionId) + ":event:" + eventId;
         SessionContextInternalDTO existing = sessionStore.get(sessionKey);
         if (existing != null) {
@@ -86,7 +91,7 @@ public class SessionManager {
             }
         }
         return sessionStore.computeIfAbsent(sessionKey, key -> {
-            log.info("创建新会话上下文 - 会话ID: {}, 用户ID: {}, 类型: {}, 题目ID: {}",
+            log.debug("创建新会话上下文 - 会话ID: {}, 用户ID: {}, 类型: {}, 题目ID: {}",
                     sessionId, userId, conversationType, questionId);
             String initialContext = initialContextSupplier.get();
             SessionContextInternalDTO context = SessionContextInternalDTO.builder()
@@ -105,17 +110,15 @@ public class SessionManager {
                     .interactionRecords(new ConcurrentSkipListMap<>())
                     .totalInteractionCount(0)
                     .build();
+            var accounting = conversationHistoryRepository.accounting(userId, sessionId, conversationType, questionId, eventId);
             var persisted = conversationHistoryRepository
-                    .findByUserIdAndSessionIdAndConversationTypeAndQuestionIdAndEventIdAndIsActiveOrderBySequenceNumberAsc(
-                            userId, sessionId, conversationType, questionId, eventId, true);
-            long tokens = 0;
-            int sequence = 0;
-            for (ConversationHistory history : persisted) {
-                context.addInteractionRecord(history);
-                sequence = Math.max(sequence, history.getSequenceNumber() == null ? 0 : history.getSequenceNumber());
-                tokens += history.getTokenCount() == null ? 0 : Math.max(0, history.getTokenCount());
-            }
-            context.setTotalInteractionCount(sequence);
+                    .findByUserIdAndSessionIdAndConversationTypeAndQuestionIdAndEventIdAndIsActiveOrderBySequenceNumberDesc(
+                            userId, sessionId, conversationType, questionId, eventId, true,
+                            org.springframework.data.domain.PageRequest.of(0, Math.max(1, aiProperties.getMaxHistoryCount())));
+            persisted.stream().sorted(java.util.Comparator.comparing(ConversationHistory::getSequenceNumber))
+                    .forEach(context::addInteractionRecord);
+            long tokens = accounting == null ? 0 : accounting.getTokens();
+            context.setTotalInteractionCount(accounting == null ? 0 : accounting.getSequence());
             context.setUsedTokens((int) Math.min(Integer.MAX_VALUE, tokens));
             if (context.getMaxTokens() > 0 && tokens > context.getMaxTokens()) {
                 throw new SessionExpiredException(sessionId);
@@ -145,15 +148,8 @@ public class SessionManager {
         history.setQuestionId(context.getQuestionId());
         history.setIsActive(context.getIsActive());
 
-        // 先保存数据库
-        try {
-            conversationHistoryRepository.save(history);
-            log.debug("对话历史保存成功 - 会话ID: {}, 序列号: {}", context.getSessionId(), seq);
-        } catch (Exception e) {
-            log.error("对话历史保存失败 - 会话ID: {}, 用户ID: {}, 序列号: {}, 问题: {}",
-                    context.getSessionId(), context.getUserId(), seq, question, e);
-            // 数据库保存失败不影响主流程，继续执行内存操作
-        }
+        // A failed durable write must be observable by the stream callback.
+        conversationHistoryRepository.save(history);
 
         // 再添加到内存（加写锁已在 addInteractionRecord 内）
         context.addInteractionRecord(history);

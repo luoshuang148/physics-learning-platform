@@ -44,6 +44,18 @@ public class AIClientConfig {
     }
 
     @Bean
+    public io.micrometer.core.instrument.binder.MeterBinder aiResourceMetrics(
+            @org.springframework.beans.factory.annotation.Qualifier("aiTaskExecutor") Executor executor) {
+        return registry -> {
+            io.micrometer.core.instrument.Gauge.builder("ai.sse.active",streamUtils,StreamUtils::getActiveConnectionCount).register(registry);
+            if (executor instanceof ThreadPoolTaskExecutor pool) {
+                io.micrometer.core.instrument.Gauge.builder("ai.executor.active",pool,ThreadPoolTaskExecutor::getActiveCount).register(registry);
+                io.micrometer.core.instrument.Gauge.builder("ai.executor.queue",pool,p -> p.getThreadPoolExecutor().getQueue().size()).register(registry);
+            }
+        };
+    }
+
+    @Bean
     public RestTemplate restTemplate() {
         return new RestTemplate();
     }

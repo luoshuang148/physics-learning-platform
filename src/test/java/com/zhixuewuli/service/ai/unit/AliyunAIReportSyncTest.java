@@ -374,10 +374,6 @@ class AliyunAIReportSyncTest extends AIServiceSyncTestBase {
         // Given
         java.util.Map<Long, Question> questionMap = java.util.Map.of(TEST_QUESTION_ID, mockQuestion);
 
-        // 配置选项映射工具
-        when(optionMappingUtil.jsonToOptions(anyString())).thenReturn(
-                java.util.Map.of("A", "选项A", "B", "选项B", "C", "选项C", "D", "选项D"));
-
         // When
         String result = com.zhixuewuli.common.util.test.ReflectionTestUtil.invokePrivateMethod(
                 service,
@@ -390,7 +386,7 @@ class AliyunAIReportSyncTest extends AIServiceSyncTestBase {
         // Then
         assertThat(result).isNotNull();
         assertThat(result).contains("学习报告");
-        assertThat(result).contains(mockStudent.getRealName());
+        assertThat(result).doesNotContain(mockStudent.getRealName());
         assertThat(result).contains("题目");
         assertThat(result).contains("答题历史");
 
@@ -404,10 +400,6 @@ class AliyunAIReportSyncTest extends AIServiceSyncTestBase {
         // Given
         java.util.Map<Long, Question> questionMap = java.util.Map.of(TEST_QUESTION_ID, mockQuestion);
         java.util.Map<Long, String> studentNames = java.util.Map.of(TEST_USER_ID, "测试学生");
-
-        // 配置选项映射工具
-        when(optionMappingUtil.jsonToOptions(anyString())).thenReturn(
-                java.util.Map.of("A", "选项A", "B", "选项B", "C", "选项C", "D", "选项D"));
 
         // When
         String result = com.zhixuewuli.common.util.test.ReflectionTestUtil.invokePrivateMethod(
@@ -496,15 +488,10 @@ class AliyunAIReportSyncTest extends AIServiceSyncTestBase {
 
         when(userRepository.findById(userId)).thenReturn(Optional.empty());
 
-        // When
+        org.junit.jupiter.api.Assertions.assertThrows(Exception.class, () ->
         com.zhixuewuli.common.util.test.ReflectionTestUtil.invokePrivateMethod(
-                service,
-                "saveStudentReport",
-                new Class<?>[] { Long.class, String.class, Long.class, String.class },
-                userId,
-                sessionId,
-                null,
-                reportContent);
+                service, "saveStudentReport", new Class<?>[] { Long.class, String.class, Long.class, String.class },
+                userId, sessionId, null, reportContent));
 
         // Then
         verify(userRepository).findById(userId);

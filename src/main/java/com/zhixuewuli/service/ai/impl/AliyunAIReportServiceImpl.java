@@ -100,6 +100,11 @@ public class AliyunAIReportServiceImpl implements AliyunAIReportService {
     // ========== 学生报告 ==========
     @Override
     public void streamStudentReport(String sessionId, SseEmitter emitter, Long userId) {
+        streamStudentReport(sessionId, emitter, userId, null);
+    }
+
+    @Override
+    public void streamStudentReport(String sessionId, SseEmitter emitter, Long userId, Long eventId) {
         // 立即提交异步任务，不阻塞当前线程
         AIStreamExecutor.submit(aiTaskExecutor, userId, emitter, streamUtils, () -> {
             executeStreamOperation(
@@ -113,32 +118,26 @@ public class AliyunAIReportServiceImpl implements AliyunAIReportService {
                         emitter.onError(t -> cancelled.set(true));
 
                         // 查询该会话的答题记录
-                        List<AnswerRecord> records = answerRecordRepository
-                                .findByUserIdAndSessionIdOrderByAnsweredAtDesc(userId, sessionId);
+                        List<AnswerRecord> records = eventId == null ? answerRecordRepository
+                                .findByUserIdAndSessionIdOrderByAnsweredAtDesc(userId, sessionId)
+                                : answerRecordRepository.findByUserIdAndEventIdOrderByAttemptOrderDesc(userId, eventId);
                         if (records.isEmpty()) {
                             throw new AnswerRecordNotFoundException("该会话无答题记录，无法生成报告");
                         }
 
                         var eventIds = records.stream().map(AnswerRecord::getEventId).distinct().toList();
-                        Long reportEventId = eventIds.size() == 1 ? eventIds.getFirst() : null;
+                        Long reportEventId = eventId != null ? eventId : eventIds.size() == 1 ? eventIds.getFirst() : null;
                         // 批量加载题目
                         Map<Long, Question> questionMap = loadQuestionsFromRecords(records);
 
-                        // 获取学生姓名
-                        String studentName = userRepository.findById(userId)
-                                .map(User::getRealName)
-                                .orElse("该学生");
-
-                        // 构建提示词
-                        String prompt = buildStudentReportPrompt(records, questionMap, studentName);
-                        log.info("学生报告提示词构建完成，用户: {}, 长度: {}", studentName, prompt.length());
-
-                        // 获取学生报告专用模型
                         String model = aiBusinessProperties.getStudentReportGenerationModel();
-                        log.info("使用模型: {} 生成学生报告", model);
+                        var prepared = com.zhixuewuli.service.ai.report.ReportPreparation.prepare(records, questionMap, objectMapper, false, model);
+                        String prompt = prepared.prompt();
+                        emitter.send(SseEmitter.event().name("evidence").data(objectMapper.writeValueAsString(prepared.evidence())));
+                        emitter.send(SseEmitter.event().name("content").data(prepared.header()));
 
                         // 调用阿里AI客户端
-                        StringBuilder fullReportContent = new StringBuilder();
+                        StringBuilder fullReportContent = new StringBuilder(prepared.header());
 
                         aliyunAIClient.streamGenerate(prompt, model, new AIStreamCallback() {
                             @Override
@@ -178,11 +177,11 @@ public class AliyunAIReportServiceImpl implements AliyunAIReportService {
                                     boolean cancelledNow = isCancelled();
 
                                     // 在 onComplete 阶段做最终持久化，避免供应商最后一个 chunk 仅包含 usage 时漏存
-                                    if (fullReportContent.length() > 0) {
+                                    if (fullReportContent.length() > prepared.header().length()) {
                                         log.info("学生报告流式结束，开始持久化 - 用户ID: {}, 会话ID: {}, 报告长度: {}字符",
                                                 userId, sessionId, fullReportContent.length());
                                         transactionTemplate.executeWithoutResult(status -> {
-                                            saveStudentReport(userId, sessionId, reportEventId, fullReportContent.toString());
+                                            saveStudentReport(userId, sessionId, reportEventId, fullReportContent.toString(), objectMapper.valueToTree(prepared.evidence()).toString());
                                         });
                                     } else {
                                         log.warn("学生报告流式结束但内容为空，跳过持久化 - 用户ID: {}, 会话ID: {}",
@@ -220,7 +219,7 @@ public class AliyunAIReportServiceImpl implements AliyunAIReportService {
                                 }
                                 log.error("学生报告生成过程中发生错误", error);
                                 streamUtils.sendError(emitter, ResultCode.AI_SERVICE_UNAVAILABLE,
-                                        "报告生成失败: " + error.getMessage());
+                                        "报告生成失败，请稍后重试");
                             }
                         });
                     });
@@ -262,23 +261,12 @@ public class AliyunAIReportServiceImpl implements AliyunAIReportService {
                         if (allRecords.isEmpty()) {
                             throw new AnswerRecordNotFoundException("暂无任何学生答题数据，无法生成教师报告");
                         }
-                        List<Long> userIds = allRecords.stream().map(AnswerRecord::getUserId).distinct().toList();
-                        Map<Long, String> studentNames = new HashMap<>();
-                        for (Object[] row : userRepository.findIdsAndRealNamesByUserIds(userIds)) {
-                            Long uid = (Long) row[0];
-                            studentNames.put(uid, row[1] == null ? "学生" + uid : (String) row[1]);
-                        }
-
-                        // 批量加载题目
                         Map<Long, Question> questionMap = loadQuestionsFromRecords(allRecords);
-
-                        // 构建提示词（传入学生姓名Map，避免懒加载问题）
-                        String prompt = buildTeacherAnalysisPrompt(allRecords, questionMap, studentNames);
-                        log.info("教师分析提示词构建完成，长度: {}", prompt.length());
-
-                        // 获取教师报告专用模型
                         String model = aiBusinessProperties.getTeacherReportGenerationModel();
-                        log.info("使用模型: {} 生成教师报告", model);
+                        var prepared = com.zhixuewuli.service.ai.report.ReportPreparation.prepare(allRecords, questionMap, objectMapper, true, model);
+                        String prompt = prepared.prompt();
+                        emitter.send(SseEmitter.event().name("evidence").data(objectMapper.writeValueAsString(prepared.evidence())));
+                        emitter.send(SseEmitter.event().name("content").data(prepared.header()));
 
                         aliyunAIClient.streamGenerate(prompt, model, new AIStreamCallback() {
                             @Override
@@ -346,7 +334,7 @@ public class AliyunAIReportServiceImpl implements AliyunAIReportService {
                                 }
                                 log.error("教师分析生成过程中发生错误", error);
                                 streamUtils.sendError(emitter, ResultCode.AI_SERVICE_UNAVAILABLE,
-                                        "分析生成失败: " + error.getMessage());
+                                        "分析生成失败，请稍后重试");
                             }
                         });
                     });
@@ -389,152 +377,15 @@ public class AliyunAIReportServiceImpl implements AliyunAIReportService {
      * 
      */
     private String buildStudentReportPrompt(List<AnswerRecord> records, Map<Long, Question> questionMap, String studentName) {
-        StringBuilder promptBuilder = new StringBuilder();
-
-        // 按答题时间升序排列，保持题目出现的自然顺序
-        List<AnswerRecord> sortedRecords = records.stream()
-                .sorted(Comparator.comparing(AnswerRecord::getAnsweredAt))
-                .collect(Collectors.toList());
-
-        promptBuilder.append("请为学生「").append(studentName).append("」在本次学习中的以下答题记录生成一份学习报告：\n\n");
-
-        // 按题目分组
-        Map<Long, List<AnswerRecord>> recordsByQuestion = sortedRecords.stream()
-                .collect(Collectors.groupingBy(AnswerRecord::getQuestionId));
-
-        // 详细题目分析
-        int questionIndex = 1;
-        for (Map.Entry<Long, List<AnswerRecord>> entry : recordsByQuestion.entrySet()) {
-            List<AnswerRecord> questionRecords = entry.getValue();
-            AnswerRecord firstRecord = questionRecords.get(0);
-            Question question = questionMap.get(firstRecord.getQuestionId()); // 从传入的Map获取题目
-            if (question == null)
-                continue;
-
-            promptBuilder.append(questionIndex++).append(". ");
-            promptBuilder.append("题目：").append(getSafeContent(question)).append("\n");
-            promptBuilder.append("   选项：\n").append(formatOptionsForPrompt(question)).append("\n");
-            promptBuilder.append("   正确答案：").append(getSafeCorrectOption(question)).append("\n");
-            promptBuilder.append("   解析：").append(getSafeExplanation(question)).append("\n");
-
-            // 该题目的所有答题记录
-            promptBuilder.append("   答题历史：\n");
-            for (AnswerRecord record : questionRecords) {
-                String errorInfo = (record.getErrorReason() != null && !record.getErrorReason().isEmpty())
-                        ? "，错误原因：" + record.getErrorReason()
-                        : "";
-                promptBuilder.append("   - 时间: ").append(formatDateTime(record.getAnsweredAt()))
-                        .append(", 答案: ").append(record.getUserAnswer())
-                        .append(", 结果: ").append(getAnswerStatus(record))
-                        .append(errorInfo)
-                        .append("\n");
-            }
-            promptBuilder.append("\n");
-        }
-
-        // 报告要求
-        promptBuilder.append("\n请生成一份结构清晰的学习报告，包含以下内容：\n");
-        promptBuilder.append("1. 本次学习表现总体评估\n");
-        promptBuilder.append(
-                "2. 知识掌握情况详细分析（按照各个知识点分别列出，并且重点关注错因和未掌握知识点，可以有依据地结合答题情况与学生自述，适度推理学生错误背后的真相，而不是停留于单纯对学生自述错因的摘要）\n");
-        promptBuilder.append("3. 学习过程中的进步和不足（体现过程性和动态变化）\n");
-        promptBuilder.append("4. 个性化针对性的学习建议和改进方向\n");
-        promptBuilder.append("5. 如果学生表现好，则适当赞赏并提醒戒骄戒躁；如果学生表现一般或者表现差，则适当鼓励，但本项不是重点，不需要大量篇幅\n\n");
-        promptBuilder.append("要求：在报告开头和关键建议处请直接使用「").append(studentName).append("」同学来称呼，使报告更具亲和力和针对性。语言亲切自然，对错因、知识漏洞与不足的分析归纳切中要害，建议具体可行，鼓励在回答中体现具体数据支撑。涉及公式的部分，统一使用标准规范的LaTeX格式，例如将所有Unicode箭头替换为LaTeX命令，并且确保公式边界清晰,latex命令和变量之间需要留有空格，以免识别错误，如应该写成\\cdot t而非\\cdott。");
-
-        return promptBuilder.toString();
+        return com.zhixuewuli.service.ai.report.ReportPreparation.prepare(records, questionMap, objectMapper, false, "").prompt();
     }
 
     private String buildTeacherAnalysisPrompt(List<AnswerRecord> records, Map<Long, Question> questionMap, Map<Long, String> studentNames) {
-        StringBuilder promptBuilder = new StringBuilder();
-
-        promptBuilder.append("请基于以下学生答题数据生成一份教学分析报告：\n\n");
-
-        // 整体统计
-        long totalStudents = records.stream().map(AnswerRecord::getUserId).distinct().count();
-        long totalQuestions = records.size();
-        long correctAnswers = records.stream().filter(this::isAnswerCorrect).count();
-        double classAccuracy = totalQuestions > 0 ? (double) correctAnswers / totalQuestions * 100 : 0;
-
-        promptBuilder.append("整体教学统计：\n");
-        promptBuilder.append("- 参与学生数：").append(totalStudents).append("人\n");
-        promptBuilder.append("- 总答题数：").append(totalQuestions).append("道\n");
-        promptBuilder.append("- 整体正确率：").append(String.format("%.1f", classAccuracy)).append("%\n\n");
-
-        // 按题目分组
-        Map<Long, List<AnswerRecord>> recordsByQuestion = records.stream()
-                .collect(Collectors.groupingBy(AnswerRecord::getQuestionId));
-
-        promptBuilder.append("各题目详细答题情况：\n");
-
-        for (Map.Entry<Long, List<AnswerRecord>> entry : recordsByQuestion.entrySet()) {
-            Long questionId = entry.getKey();
-            List<AnswerRecord> questionRecords = entry.getValue();
-
-            Question question = questionMap.get(questionId);
-            if (question == null) {
-                log.warn("题目不存在，ID: {}", questionId);
-                continue;
-            }
-
-            // 题目信息
-            promptBuilder.append("【题目】").append(getSafeContent(question)).append("\n");
-            promptBuilder.append("选项：\n").append(formatOptionsForPrompt(question)).append("\n");
-            promptBuilder.append("正确答案：").append(getSafeCorrectOption(question)).append("\n");
-            promptBuilder.append("解析：").append(getSafeExplanation(question)).append("\n");
-
-            // 该题目的答题统计
-            long totalAttempts = questionRecords.size();
-            long correctAttempts = questionRecords.stream().filter(this::isAnswerCorrect).count();
-            double accuracy = totalAttempts > 0 ? (double) correctAttempts / totalAttempts * 100 : 0;
-            promptBuilder.append("答题统计：共").append(totalAttempts).append("人次，正确").append(correctAttempts)
-                    .append("人次，正确率").append(String.format("%.1f", accuracy)).append("%\n");
-
-            // 按学生分组，列出每个学生的每次答题（按时间升序）
-            Map<Long, List<AnswerRecord>> recordsByUser = questionRecords.stream()
-                    .collect(Collectors.groupingBy(AnswerRecord::getUserId));
-
-            promptBuilder.append("学生作答详情：\n");
-            for (Map.Entry<Long, List<AnswerRecord>> userEntry : recordsByUser.entrySet()) {
-                Long studentId = userEntry.getKey();
-                List<AnswerRecord> userRecords = userEntry.getValue();
-
-                // 获取学生姓名（从预加载的Map中获取，避免懒加载问题）
-                String studentName = studentNames.getOrDefault(studentId, "学生" + studentId);
-
-                // 对该学生的记录按答题时间升序排序
-                userRecords.sort(Comparator.comparing(AnswerRecord::getAnsweredAt));
-
-                // 列出该学生的所有答题记录（答案 + 结果 + 错误原因）
-                List<String> attemptDesc = new ArrayList<>();
-                for (AnswerRecord rec : userRecords) {
-                    String answer = rec.getUserAnswer();
-                    String result = isAnswerCorrect(rec) ? "正确" : "错误";
-                    String errorInfo = (rec.getErrorReason() != null && !rec.getErrorReason().isEmpty())
-                            ? "，错误原因：" + rec.getErrorReason()
-                            : "";
-                    attemptDesc.add(answer + "(" + result + ")" + errorInfo);
-                }
-                promptBuilder.append("  - ").append(studentName).append("：")
-                        .append(String.join(" → ", attemptDesc)).append("\n");
-            }
-            promptBuilder.append("\n");
-        }
-
-        // 报告要求
-        promptBuilder.append("\n请生成一份专业的高中教学分析报告，包含以下内容：\n");
-        promptBuilder.append("1. 学生整体学习情况分析\n");
-        promptBuilder.append("2. 各知识点掌握情况详细分析（按照各个知识点分别列出，并且重点关注发生错误较多的选项和知识点等）\n");
-        promptBuilder.append("3. 学生常见错误思维模式、错误原因等分析（可以有依据地结合答题情况与学生自述，适度推理学生错误背后的真相，而不是停留于单纯对学生自述错因的摘要）\n");
-        promptBuilder.append("4. 学生成绩与掌握情况在整体里的分布，以及可能的整体进步趋势\n");
-        promptBuilder.append("5. 后续教学建议和针对重点\n\n");
-        promptBuilder.append("要求：分析深入透彻，提炼共性问题，关注学生整体学习情况与分布，鼓励在回答中体现具体数据支撑。涉及公式的部分，统一使用标准规范的LaTeX格式，例如将所有Unicode箭头替换为LaTeX命令，并且确保公式边界清晰,latex命令和变量之间需要留有空格，以免识别错误，如应该写成\\cdot t而非\\cdott。输出表格时，分隔行必须使用标准格式，即连续的短横线，如：|---|---|---|，不能使用带空格的短横线，否则无法正确渲染");
-
-        return promptBuilder.toString();
+        return com.zhixuewuli.service.ai.report.ReportPreparation.prepare(records, questionMap, objectMapper, true, "").prompt();
     }
 
     private Map<Long, Question> loadQuestionsFromRecords(List<AnswerRecord> records) {
-        Set<Long> questionIds = records.stream()
+        Set<Long> questionIds = records.stream().filter(r -> r.getQuestionSnapshot() == null)
                 .map(AnswerRecord::getQuestionId)
                 .collect(Collectors.toSet());
         if (questionIds.isEmpty()) {
@@ -724,6 +575,9 @@ public class AliyunAIReportServiceImpl implements AliyunAIReportService {
      * @param reportContent 完整的报告内容
      */
     private void saveStudentReport(Long userId, String sessionId, Long eventId, String reportContent) {
+        saveStudentReport(userId, sessionId, eventId, reportContent, null);
+    }
+    private void saveStudentReport(Long userId, String sessionId, Long eventId, String reportContent, String evidence) {
         try {
             // 查询学生信息获取真实姓名
             User student = userRepository.findById(userId)
@@ -750,6 +604,7 @@ public class AliyunAIReportServiceImpl implements AliyunAIReportService {
             }
 
             studentReport.setEventId(eventId);
+            studentReport.setEvidenceJson(evidence);
             // 保存到数据库
             studentReportRepository.save(studentReport);
             log.info("学生报告持久化保存成功 - 用户ID: {}, 会话ID: {}, 报告长度: {}字符",
@@ -757,14 +612,18 @@ public class AliyunAIReportServiceImpl implements AliyunAIReportService {
 
         } catch (Exception e) {
             log.error("保存学生报告失败 - 用户ID: {}, 会话ID: {}", userId, sessionId, e);
-            // 不抛出异常，避免影响正常的SSE流传输
+            throw new IllegalStateException("学习报告保存失败，请重试", e);
         }
     }
 
     @Override
     @Transactional(readOnly = true)
     public StudentReportResponse getStudentLatestReport(Long teacherId, Long studentId) {
-        log.info("获取学生最新报告 - 教师ID: {}, 学生ID: {}", teacherId, studentId);
+        return getStudentLatestReport(teacherId, studentId, null);
+    }
+    @Override
+    @Transactional(readOnly = true)
+    public StudentReportResponse getStudentLatestReport(Long teacherId, Long studentId, Long eventId) {
 
         // 1. 教师身份验证
         userPermissionUtil.checkTeacherPermission(teacherId);
@@ -777,7 +636,7 @@ public class AliyunAIReportServiceImpl implements AliyunAIReportService {
                 });
 
         // 3. 获取学生最新报告
-        Optional<StudentReport> latestReportOpt = studentReportRepository.findLatestByUserId(studentId);
+        Optional<StudentReport> latestReportOpt = eventId == null ? studentReportRepository.findLatestByUserId(studentId) : studentReportRepository.findFirstByUserIdAndEventIdOrderByUpdatedAtDesc(studentId, eventId);
 
         if (latestReportOpt.isEmpty()) {
             log.warn("学生无报告记录 - 学生ID: {}", studentId);
@@ -788,6 +647,9 @@ public class AliyunAIReportServiceImpl implements AliyunAIReportService {
 
         // 4. 构建响应对象
         StudentReportResponse response = new StudentReportResponse();
+        response.setEventId(latestReport.getEventId());
+        response.setSessionId(latestReport.getSessionId());
+        response.setEvidenceJson(latestReport.getEvidenceJson());
         response.setStudentRealName(student.getRealName());
         response.setLatestReportContent(latestReport.getReportContent());
         response.setReportCreateTime(latestReport.getCreatedAt());

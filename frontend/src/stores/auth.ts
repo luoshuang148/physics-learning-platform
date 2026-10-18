@@ -71,10 +71,12 @@ export const useAuthStore = defineStore('auth', () => {
 
   const clearStudentReportCache = () => {
     localStorage.removeItem('student_report_cache');
+    sessionStorage.removeItem('student_report_cache');
   };
 
   const clearTeacherReportCache = () => {
     localStorage.removeItem('teacher_event_report_cache');
+    sessionStorage.removeItem('teacher_event_report_cache');
   };
 
   const clearStudentSessionState = () => {

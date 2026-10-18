@@ -137,11 +137,9 @@ public class QuestionErrorAnalysisServiceImpl implements QuestionErrorAnalysisSe
             String sessionId) {
         AIStreamExecutor.executeStream("教师题目分析", teacherId, emitter, streamUtils, () -> {
             log.info("教师题目分析开始 - 教师ID: {}, 会话ID: {}, 题目ID: {}", teacherId, sessionId, request.getQuestionId());
-            System.out.println("DEBUG QuestionErrorAnalysisServiceImpl: Starting executeTeacherQuestionAnalysisStream");
 
             // 1. 权限验证
             userPermissionUtil.checkTeacherPermission(teacherId);
-            System.out.println("DEBUG QuestionErrorAnalysisServiceImpl: Permission check passed");
 
             // 2. 验证题目存在答题记录
             Long questionId = request.getQuestionId();
@@ -150,7 +148,6 @@ public class QuestionErrorAnalysisServiceImpl implements QuestionErrorAnalysisSe
                 log.error("题目无答题记录 - QuestionId: {}", questionId);
                 throw new AnswerRecordNotFoundException("题目ID: " + questionId, "题目无答题记录");
             }
-            System.out.println("DEBUG QuestionErrorAnalysisServiceImpl: Question has " + recordCount + " answer records");
 
             // 3. 获取或创建会话上下文
             SessionContextInternalDTO sessioncontext = sessionManager.getOrCreateSession(
@@ -160,15 +157,10 @@ public class QuestionErrorAnalysisServiceImpl implements QuestionErrorAnalysisSe
                     request.getQuestionId(),
                     () -> buildTeacherQuestionAnalysisContext(request.getQuestionId()));
                 streamUtils.bindContext(emitter, sessioncontext);
-            System.out.println("DEBUG QuestionErrorAnalysisServiceImpl: Got session context, lock is "
-                    + (sessioncontext.getLock() == null ? "null" : "not null"));
 
             // 4. 判断是否为首次交互
             boolean isFirstInteraction = sessioncontext.getInteractionRecords() == null
                     || sessioncontext.getInteractionRecords().isEmpty();
-            System.out.println("DEBUG QuestionErrorAnalysisServiceImpl: isFirstInteraction = " + isFirstInteraction
-                    + ", interactionRecords = " + (sessioncontext.getInteractionRecords() == null ? "null"
-                            : "not null, size=" + sessioncontext.getInteractionRecords().size()));
             log.debug("判断是否为首次交互: {}, interactionRecords: {}", isFirstInteraction,
                     sessioncontext.getInteractionRecords() == null ? "null"
                             : "size=" + sessioncontext.getInteractionRecords().size());
@@ -182,28 +174,20 @@ public class QuestionErrorAnalysisServiceImpl implements QuestionErrorAnalysisSe
                 String defaultPrompt = aiBusinessProperties.getTeacherQuestionAnalysisDefaultPrompt();
                 finalRequest.setQuestion(defaultPrompt);
                 log.info("首次交互，使用默认提示词：{}", defaultPrompt);
-                System.out.println("DEBUG QuestionErrorAnalysisServiceImpl: Created finalRequest with default prompt");
             } else {
                 finalRequest = request;
                 log.debug("非首次交互，使用原始请求");
-                System.out.println(
-                        "DEBUG QuestionErrorAnalysisServiceImpl: isFirstInteraction=false, using original request");
             }
 
             // 6. 构建提示词（使用 finalRequest）
-            System.out.println("DEBUG QuestionErrorAnalysisServiceImpl: About to build prompt");
             String prompt = buildTeacherQuestionAnalysisPrompt(finalRequest, sessioncontext);
-            System.out.println("DEBUG QuestionErrorAnalysisServiceImpl: Prompt built, length=" + prompt.length());
             log.debug("教师题目分析提示词构建完成，长度: {}", prompt.length());
 
             // 7. 获取教师报告专用模型
-            System.out.println("DEBUG QuestionErrorAnalysisServiceImpl: About to get model");
             String model = aiBusinessProperties.getTeacherReportGenerationModel();
-            System.out.println("DEBUG QuestionErrorAnalysisServiceImpl: Got model=" + model);
             log.debug("使用AI模型: {}", model);
 
             // 8. 调用阿里云客户端流式生成
-            System.out.println("DEBUG QuestionErrorAnalysisServiceImpl: About to call aliyunAIClient.streamGenerate");
             log.debug("调用阿里云客户端流式生成");
             StringBuilder fullResponse = new StringBuilder();
             aliyunAIClient.streamGenerate(prompt, model, new AIStreamCallback() {
@@ -273,91 +257,37 @@ public class QuestionErrorAnalysisServiceImpl implements QuestionErrorAnalysisSe
                         return;
                     }
                     log.error("教师题目分析过程中发生错误", error);
-                    streamUtils.sendError(emitter, ResultCode.AI_SERVICE_UNAVAILABLE, "分析失败: " + error.getMessage());
+                    streamUtils.sendError(emitter, ResultCode.AI_SERVICE_UNAVAILABLE, "分析失败，请稍后重试");
                 }
             });
-            System.out.println(
-                    "DEBUG QuestionErrorAnalysisServiceImpl: aliyunAIClient.streamGenerate called and callback returned");
         });
-        System.out.println("DEBUG QuestionErrorAnalysisServiceImpl: AIStreamExecutor.executeStream completed");
     }
 
     /**
      * 构建教师题目分析的初始上下文（题目详情 + 所有学生答题记录）
      */
     private String buildTeacherQuestionAnalysisContext(Long questionId) {
-        Question question = questionRepository.findById(questionId)
-                .orElseThrow(() -> new QuestionNotFoundException(questionId));
-
-        // 获取该题目的所有答题记录，按答题时间倒序排列
         List<AnswerRecord> records = answerRecordRepository.findByQuestionIdOrderByAnsweredAtDesc(questionId);
-
-        StringBuilder context = new StringBuilder();
-        context.append("请根据以下题目及学生的答题情况回答问题。\n\n");
-        context.append("【题目信息】\n");
-        context.append("题目内容：").append(question.getContent()).append("\n\n");
-        if (question.getOptions() != null) {
-            context.append("题目选项：\n").append(formatOptionsForPrompt(question)).append("\n\n");
+        Map<Long,Question> fallback=records.stream().anyMatch(r->r.getQuestionSnapshot()==null) || records.isEmpty()
+                ? questionRepository.findById(questionId).map(q->Map.of(questionId,q)).orElse(Map.of()) : Map.of();
+        if(records.isEmpty()) {
+            Question question=fallback.get(questionId);
+            if(question==null) throw new QuestionNotFoundException(questionId);
+            return "本题暂无学生作答，不能推断班级掌握情况。题目："+question.getContent()+"\n参考答案："+question.getCorrectOption();
         }
-        context.append("正确答案：").append(question.getCorrectOption()).append("\n\n");
-        if (question.getExplanation() != null) {
-            context.append("题目解析：").append(question.getExplanation()).append("\n\n");
-        }
-
-        context.append("【学生答题情况】\n");
-        if (records.isEmpty()) {
-            context.append("暂无学生答题记录。\n");
-        } else {
-            // 按用户分组显示所有答题记录
-            Map<Long, List<AnswerRecord>> recordsByUser = records.stream()
-                    .collect(java.util.stream.Collectors.groupingBy(
-                            AnswerRecord::getUserId,
-                            java.util.stream.Collectors.toList()));
-
-            for (Map.Entry<Long, List<AnswerRecord>> entry : recordsByUser.entrySet()) {
-                List<AnswerRecord> userRecords = entry.getValue();
-                if (!userRecords.isEmpty()) {
-                    AnswerRecord firstRecord = userRecords.get(0);
-                    User student = firstRecord.getUser();
-                    String studentName = student != null ? student.getRealName() : "未知学生";
-
-                    context.append("学生：").append(studentName).append("\n");
-
-                    // 显示该学生的所有答题记录，按时间倒序
-                    for (int i = 0; i < userRecords.size(); i++) {
-                        AnswerRecord record = userRecords.get(i);
-                        context.append("  第").append(i + 1).append("次答题：\n");
-                        context.append("    答题时间：").append(record.getAnsweredAt()).append("\n");
-                        context.append("    答案：").append(record.getUserAnswer()).append("\n");
-                        context.append("    是否正确：").append(record.getCorrect() ? "正确" : "错误").append("\n");
-                        context.append("    错误原因：")
-                                .append(record.getErrorReason() != null ? record.getErrorReason() : "无")
-                                .append("\n");
-                    }
-                    context.append("\n");
-                }
-            }
-        }
-        return context.toString();
+        return com.zhixuewuli.service.ai.report.ReportPreparation.prepare(records,fallback,objectMapper,true,
+                aiBusinessProperties.getTeacherReportGenerationModel()).prompt();
     }
 
     /**
      * 构建教师题目分析的提示词（包含会话历史 + 当前问题）
      */
     private String buildTeacherQuestionAnalysisPrompt(AIAskRequest request, SessionContextInternalDTO context) {
-        System.out.println("DEBUG QuestionErrorAnalysisServiceImpl: buildTeacherQuestionAnalysisPrompt called");
-        System.out.println("DEBUG QuestionErrorAnalysisServiceImpl: context.getLock() is "
-                + (context.getLock() == null ? "null" : "not null"));
         StringBuilder prompt = new StringBuilder();
         prompt.append(context.getContext()).append("\n\n");
-
-        System.out.println("DEBUG QuestionErrorAnalysisServiceImpl: About to acquire read lock");
         context.getLock().readLock().lock();
         try {
-            System.out.println("DEBUG QuestionErrorAnalysisServiceImpl: Read lock acquired");
             Map<Integer, ConversationHistory> records = context.getInteractionRecords();
-            System.out.println("DEBUG QuestionErrorAnalysisServiceImpl: interactionRecords is "
-                    + (records == null ? "null" : "not null, size=" + records.size()));
             if (records != null && !records.isEmpty()) {
                 prompt.append("【历史对话】\n");
                 records.values().forEach(history -> {
@@ -366,14 +296,10 @@ public class QuestionErrorAnalysisServiceImpl implements QuestionErrorAnalysisSe
                 });
             }
         } finally {
-            System.out.println("DEBUG QuestionErrorAnalysisServiceImpl: Releasing read lock");
             context.getLock().readLock().unlock();
         }
 
         prompt.append("【教师的问题】\n").append(request.getQuestion());
-        System.out.println(
-                "DEBUG QuestionErrorAnalysisServiceImpl: buildTeacherQuestionAnalysisPrompt returning, prompt length="
-                        + prompt.length());
         return prompt.toString();
     }
 

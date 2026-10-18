@@ -218,7 +218,7 @@ public class QuestionControllerIntegrationTest extends BaseControllerIntegration
 
                 // When: 发送删除题目请求
                 ResultActions result = mockMvc.perform(delete("/questions/teacher/delete/{id}", questionId)
-                                .header("Authorization", createAuthHeader(teacherId, teacherUsername)))
+                                .header("Authorization", createAuthHeader(2003L, "teacher_question_test")))
                                 .andDo(print());
 
                 // 强制刷新JPA更改到数据库
@@ -260,7 +260,7 @@ public class QuestionControllerIntegrationTest extends BaseControllerIntegration
 
                 // When: 发送删除题目请求
                 ResultActions result = mockMvc.perform(delete("/questions/teacher/delete/{id}", nonExistentId)
-                                .header("Authorization", createAuthHeader(teacherId, teacherUsername)))
+                                .header("Authorization", createAuthHeader(2003L, "teacher_question_test")))
                                 .andDo(print());
 
                 // Then: 验证题目不存在
@@ -291,7 +291,7 @@ public class QuestionControllerIntegrationTest extends BaseControllerIntegration
                 ResultActions result = mockMvc.perform(put("/questions/teacher/update")
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(request))
-                                .header("Authorization", createAuthHeader(teacherId, teacherUsername)))
+                                .header("Authorization", createAuthHeader(2003L, "teacher_question_test")))
                                 .andDo(print());
 
                 // Then: 验证更新成功
@@ -332,14 +332,14 @@ public class QuestionControllerIntegrationTest extends BaseControllerIntegration
         // 查询题目详情测试（无需认证）
         // ============================================================
 
-        @DisplayName("获取题目详情成功 - 无需认证")
+        @DisplayName("获取题目详情成功 - 教师认证")
         @Test
         void testGetQuestionById_Success() throws Exception {
                 // Given: 已存在的题目 ID
                 Long questionId = 4001L;
 
                 // When: 发送获取题目详情请求（无需认证）
-                ResultActions result = mockMvc.perform(get("/questions/teacher/get/{id}", questionId))
+                ResultActions result = mockMvc.perform(get("/questions/teacher/get/{id}", questionId).header("Authorization", createAuthHeader(2003L, "teacher_question_test")))
                                 .andDo(print());
 
                 // Then: 验证查询成功
@@ -358,7 +358,7 @@ public class QuestionControllerIntegrationTest extends BaseControllerIntegration
                 Long nonExistentId = 99999L;
 
                 // When: 发送获取题目详情请求
-                ResultActions result = mockMvc.perform(get("/questions/teacher/get/{id}", nonExistentId))
+                ResultActions result = mockMvc.perform(get("/questions/teacher/get/{id}", nonExistentId).header("Authorization", createAuthHeader(2003L, "teacher_question_test")))
                                 .andDo(print());
 
                 // Then: 验证题目不存在
@@ -373,7 +373,7 @@ public class QuestionControllerIntegrationTest extends BaseControllerIntegration
                 Long questionId = 4003L;
 
                 // When: 发送获取题目详情请求
-                ResultActions result = mockMvc.perform(get("/questions/teacher/get/{id}", questionId))
+                ResultActions result = mockMvc.perform(get("/questions/teacher/get/{id}", questionId).header("Authorization", createAuthHeader(2003L, "teacher_question_test")))
                                 .andDo(print())
                                 .andDo(mvcResult -> {
                                         System.err.println("响应状态: " + mvcResult.getResponse().getStatus());

@@ -28,6 +28,9 @@ import java.time.LocalDateTime;
 @Schema(description = "学生报告响应")
 @Data
 public class StudentReportResponse {
+    private Long eventId;
+    private String sessionId;
+    private String evidenceJson;
 
     /**
      * 学生真实姓名

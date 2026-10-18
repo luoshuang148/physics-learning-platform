@@ -41,3 +41,8 @@ ALTER TABLE answer_records ADD COLUMN content_snapshot LONGTEXT NULL, ADD COLUMN
 
 -- Invalidate tokens issued by releases without persistent version claims.
 ALTER TABLE users ADD COLUMN token_version BIGINT NOT NULL DEFAULT 1;
+
+ALTER TABLE student_reports ADD COLUMN evidence_json TEXT NULL;
+
+CREATE INDEX idx_task_attempt ON answer_records(user_id,event_id,question_id,attempt_order);
+CREATE INDEX idx_history_scope ON conversation_history(user_id,session_id,conversation_type,question_id,event_id,is_active,sequence_number);

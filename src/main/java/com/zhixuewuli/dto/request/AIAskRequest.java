@@ -57,6 +57,9 @@ public class AIAskRequest {
     @Schema(description = "题目ID", example = "2001")
     private Long questionId;
 
+    @Size(max=36)
+    private String recordId;
+
     /**
      * 图片Base64编码（仅支持PNG格式）
      * 

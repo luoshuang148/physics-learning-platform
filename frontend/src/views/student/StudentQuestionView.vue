@@ -96,6 +96,7 @@
             </div>
             <WrongAnalysisPanel
               :question-id="currentQuestion.id"
+              :record-id="currentCommittedResult?.recordId"
               :initial-error-reason="normalizedCommittedErrorReason"
             />
           </template>
@@ -127,11 +128,7 @@
                 type="button"
                 @click="playQuestionVideo(currentQuestion, currentPendingAnswer.userAnswer)"
               >查看讲解视频</button>
-              <WrongAnalysisPanel
-                v-if="currentPendingAnswer.correct"
-                :question-id="currentQuestion.id"
-                :initial-error-reason="''"
-              />
+
             </div>
             <div v-if="shouldShowPendingWrongReason" class="q-reason-box post-submit">
               <div class="q-reason-head">

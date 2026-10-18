@@ -16,6 +16,7 @@ import java.util.Optional;
  */
 @Repository
 public interface StudentReportRepository extends JpaRepository<StudentReport, Long> {
+    Optional<StudentReport> findFirstByUserIdAndEventIdOrderByUpdatedAtDesc(Long userId,Long eventId);
     Optional<StudentReport> findByUserIdAndSessionIdAndEventId(Long userId, String sessionId, Long eventId);
 
     /**

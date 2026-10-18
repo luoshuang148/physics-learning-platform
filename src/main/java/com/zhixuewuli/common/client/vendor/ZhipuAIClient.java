@@ -80,6 +80,7 @@ public class ZhipuAIClient extends AbstractStreamingClient {
      * @param callback   流式回调处理器
      */
     public void streamChat(String fullPrompt, String model, AIStreamCallback callback) {
+        callback = observed("zhipu", callback);
         validateConfiguration();
         logStreamStart(model, fullPrompt.length());
 
@@ -106,6 +107,7 @@ public class ZhipuAIClient extends AbstractStreamingClient {
      * @param callback 流式回调处理器
      */
     public void streamChatWithMessages(List<Map<String, Object>> messages, String model, AIStreamCallback callback) {
+        callback = observed("zhipu", callback);
         validateConfiguration();
         logStreamStart(model, messages.toString().length());
 

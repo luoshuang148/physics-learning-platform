@@ -229,6 +229,7 @@ class ZhiPuAIAssistantSyncTest extends AIServiceSyncTestBase {
         String mockBackground = "物理学基础知识";
         lenient().when(aiBusinessProperties.getContextBackground()).thenReturn(mockBackground);
 
+        when(answerRecordRepository.findTopByUserIdAndQuestionIdOrderByAnsweredAtDesc(TEST_USER_ID,TEST_QUESTION_ID)).thenReturn(Optional.of(mockAnswerRecord));
         // When
         String result = com.zhixuewuli.common.util.test.ReflectionTestUtil.invokePrivateMethod(
                 service,
@@ -243,7 +244,7 @@ class ZhiPuAIAssistantSyncTest extends AIServiceSyncTestBase {
         assertThat(result).contains("题目内容");
         assertThat(result).contains("选项");
         assertThat(result).contains("参考答案");
-        assertThat(result).contains("用户答案");
+        assertThat(result).contains("学生选择的答案是：A");
 
         // 验证依赖调用
         verify(questionRepository).findById(TEST_QUESTION_ID);
@@ -388,6 +389,7 @@ class ZhiPuAIAssistantSyncTest extends AIServiceSyncTestBase {
     @DisplayName("构建错题分析上下文-当题目不存在时验证依赖调用")
     void buildWrongQuestionContext_shouldVerifyDependencies_whenQuestionNotFound() throws Exception {
         // Given
+        when(answerRecordRepository.findTopByUserIdAndQuestionIdOrderByAnsweredAtDesc(TEST_USER_ID,TEST_QUESTION_ID)).thenReturn(Optional.of(mockAnswerRecord));
         when(questionRepository.findById(TEST_QUESTION_ID)).thenReturn(Optional.empty());
 
         // When

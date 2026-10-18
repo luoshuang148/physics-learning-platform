@@ -81,6 +81,7 @@ public class AliyunAIClient extends AbstractStreamingClient {
      * @param callback 流式回调处理器
      */
     public void streamGenerate(String prompt, String model, AIStreamCallback callback) {
+        callback = observed("aliyun", callback);
         validateConfiguration();
         logStreamStart(model, prompt.length());
 
@@ -111,6 +112,7 @@ public class AliyunAIClient extends AbstractStreamingClient {
      * @param callback 流式回调处理器
      */
     public void streamGenerateWithMessages(List<Map<String, Object>> messages, String model, AIStreamCallback callback) {
+        callback = observed("aliyun", callback);
         validateConfiguration();
         logStreamStart(model, messages.toString().length());
 

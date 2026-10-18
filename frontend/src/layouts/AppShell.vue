@@ -76,6 +76,7 @@
         </div>
         <div class="main-badge">{{ auth.user?.userType === 'TEACHER' ? 'Instructor Mode' : 'Learner Mode' }}</div>
       </div>
+      <p v-if="aiNotice" role="status" class="ai-capability-notice">{{ aiNotice }}</p>
       <slot />
     </main>
   </div>
@@ -200,6 +201,12 @@ import { useAuthStore } from '@/stores/auth';
 import { useRoute, useRouter } from 'vue-router';
 import { updateCurrentUserApi } from '@/api/user';
 import { marked } from 'marked';
+import { getAICapabilitiesApi } from '@/api/ai';
+const aiNotice=ref('');
+onMounted(async () => {
+  try { const capability=await getAICapabilitiesApi();aiNotice.value=(!capability.reports && !capability.tutoring ? 'AI 暂不可用。' : '') + capability.notice; }
+  catch { aiNotice.value='AI 功能状态暂时无法确认，请稍后重试。'; }
+});
 import studentGuideMarkdown from '../../../docs/学生使用指南.md?raw';
 import teacherGuideMarkdown from '../../../docs/教师使用指南.md?raw';
 

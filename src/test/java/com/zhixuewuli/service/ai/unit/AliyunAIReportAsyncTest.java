@@ -143,10 +143,19 @@ class AliyunAIReportAsyncTest extends AIAsyncTestBase {
         // 验证数据查询被调用
         verify(answerRecordRepository).findByUserIdAndSessionIdOrderByAnsweredAtDesc(TEST_USER_ID, TEST_SESSION_ID);
         verify(questionRepository).findByIdIn(anyList());
-        verify(userRepository, times(2)).findById(TEST_USER_ID);
+        verify(userRepository).findById(TEST_USER_ID);
 
         // 验证AI客户端被调用
         verify(aliyunAIClient).streamGenerate(any(), any(), any(AIStreamCallback.class));
+    }
+
+    @Test
+    void eventReportNeverFallsBackToAnotherTaskSession() {
+        when(answerRecordRepository.findByUserIdAndEventIdOrderByAttemptOrderDesc(TEST_USER_ID, 99L)).thenReturn(Collections.emptyList());
+        captureAndExecuteAsyncTask(() -> service.streamStudentReport(TEST_SESSION_ID, mockEmitter, TEST_USER_ID, 99L));
+        verify(answerRecordRepository).findByUserIdAndEventIdOrderByAttemptOrderDesc(TEST_USER_ID, 99L);
+        verify(answerRecordRepository, never()).findByUserIdAndSessionIdOrderByAnsweredAtDesc(any(), any());
+        verify(aliyunAIClient, never()).streamGenerate(any(), any(), any());
     }
 
     @Test
@@ -286,7 +295,7 @@ class AliyunAIReportAsyncTest extends AIAsyncTestBase {
 
         // Then
         try {
-            verify(mockEmitter, never()).send(any(SseEmitter.SseEventBuilder.class));
+            verify(mockEmitter, times(2)).send(any(SseEmitter.SseEventBuilder.class));
         } catch (Exception e) {
             // Mock 不会真实抛出异常
         }
@@ -328,7 +337,7 @@ class AliyunAIReportAsyncTest extends AIAsyncTestBase {
         // Then
         verify(studentReportRepository, times(1)).save(any());
         try {
-            verify(mockEmitter, times(1)).send(any(SseEmitter.SseEventBuilder.class));
+            verify(mockEmitter, times(3)).send(any(SseEmitter.SseEventBuilder.class));
         } catch (Exception e) {
             // Mock 不会真实抛出异常
         }

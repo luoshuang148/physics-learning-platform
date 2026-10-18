@@ -13,6 +13,11 @@ public interface ConversationHistoryRepository extends JpaRepository<Conversatio
                         Long userId, String sessionId, Boolean active);
         List<ConversationHistory> findByUserIdAndSessionIdAndConversationTypeAndQuestionIdAndEventIdAndIsActiveOrderBySequenceNumberAsc(
                         Long userId, String sessionId, ConversationType type, Long questionId, Long eventId, Boolean active);
+        interface Accounting { Long getTokens(); Integer getSequence(); }
+        @Query("SELECT COALESCE(SUM(CASE WHEN h.tokenCount > 0 THEN h.tokenCount ELSE 0 END),0) AS tokens, COALESCE(MAX(h.sequenceNumber),0) AS sequence FROM ConversationHistory h WHERE h.userId=:userId AND h.sessionId=:sessionId AND h.conversationType=:type AND (h.questionId=:questionId OR (h.questionId IS NULL AND :questionId IS NULL)) AND (h.eventId=:eventId OR (h.eventId IS NULL AND :eventId IS NULL)) AND h.isActive=true")
+        Accounting accounting(Long userId, String sessionId, ConversationType type, Long questionId, Long eventId);
+        List<ConversationHistory> findByUserIdAndSessionIdAndConversationTypeAndQuestionIdAndEventIdAndIsActiveOrderBySequenceNumberDesc(
+                        Long userId, String sessionId, ConversationType type, Long questionId, Long eventId, Boolean active, org.springframework.data.domain.Pageable limit);
         @org.springframework.transaction.annotation.Transactional
         void deleteBySessionIdAndUserId(String sessionId, Long userId);
 

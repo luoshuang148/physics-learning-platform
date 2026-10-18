@@ -22,8 +22,8 @@ export const clearSessionApi = async (sessionType?: string): Promise<void> => {
   });
 };
 
-export const getStudentLatestReportApi = async (studentId: number): Promise<StudentReportResponse> => {
-  const { data } = await request.get<ApiResponse<StudentReportResponse>>(`/ai/teacher/report/${studentId}`);
+export const getStudentLatestReportApi = async (studentId: number, eventId?: number): Promise<StudentReportResponse> => {
+  const { data } = await request.get<ApiResponse<StudentReportResponse>>(`/ai/teacher/report/${studentId}`, { params: { eventId } });
   return data.data;
 };
 
@@ -32,6 +32,7 @@ export interface StreamOptions {
   body?: AIAskPayload;
   sessionType?: string;
   signal?: AbortSignal;
+  onEvidence?: (payload: Record<string, unknown>) => void;
   onMessage?: (payload: SSEMessageEventPayload) => void;
   onProgress?: (payload: SSEProgressEventPayload) => void;
   onReasoning?: (payload: { reasoning: string }) => void;
@@ -82,6 +83,9 @@ const parseEventBlock = (block: string, parseState: SSEParseState): { type: stri
 };
 
 export const streamAI = async (endpoint: string, options: StreamOptions): Promise<void> => {
+  const capability = await getAICapabilitiesApi();
+  const available = endpoint.includes('report') ? capability.reports : capability.tutoring;
+  if (!available) throw new Error('AI 暂不可用，请稍后重试或联系教师。');
   const token = localStorage.getItem('zhixue_token');
   const sessionId = getSessionId(options.sessionType);
   const apiBaseUrl = resolveApiBaseUrl();
@@ -99,6 +103,7 @@ export const streamAI = async (endpoint: string, options: StreamOptions): Promis
 
   if (!response.ok || !response.body) {
     const text = await response.text();
+    if (response.status === 401) window.dispatchEvent(new CustomEvent('auth-expired'));
     throw new Error(text || `请求失败：${response.status}`);
   }
 
@@ -126,6 +131,9 @@ export const streamAI = async (endpoint: string, options: StreamOptions): Promis
     }
 
     switch (parsed.type) {
+      case 'evidence':
+        options.onEvidence?.(parseSuccess ? payload : {});
+        break;
       case 'content':
         options.onMessage?.({ content: parsed.data });
         break;
@@ -193,8 +201,8 @@ export const streamRealtimeQA = (body: AIAskPayload, options: Omit<StreamOptions
 export const streamWrongQuestionAnalysis = (body: AIAskPayload, options: Omit<StreamOptions, 'body' | 'method'>) =>
   streamAI('/ai/student/wrong-question-analysis', { ...options, body, method: 'POST', sessionType: options.sessionType ?? 'student_wrong_analysis' });
 
-export const streamStudentReport = (options: Omit<StreamOptions, 'body'>) =>
-  streamAI('/ai/student/report', { ...options, method: 'GET' });
+export const streamStudentReport = (options: Omit<StreamOptions, 'body'> & { eventId?: number }) =>
+  streamAI(`/ai/student/report${options.eventId == null ? '' : `?eventId=${options.eventId}`}`, { ...options, method: 'GET' });
 
 export const streamTeacherReport = (options: Omit<StreamOptions, 'body'> & { eventId?: number }) =>
   streamAI(`/ai/teacher/report${options.eventId == null ? '' : `?eventId=${options.eventId}`}`, { ...options, method: 'GET' });
@@ -209,3 +217,7 @@ export const streamTeacherQuestionAnalysis = (
   sessionType: options.sessionType ?? 'teacher_question_analysis',
 });
 
+
+export const getAICapabilitiesApi = async (): Promise<{reports: boolean; tutoring: boolean; notice: string}> => {
+  const {data}=await request.get('/ai/capabilities'); return data.data;
+};

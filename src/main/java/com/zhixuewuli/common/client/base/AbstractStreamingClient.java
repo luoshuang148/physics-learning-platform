@@ -49,6 +49,12 @@ import java.util.concurrent.TimeUnit;
  */
 @Slf4j
 public abstract class AbstractStreamingClient {
+    @Autowired(required=false)
+    protected com.zhixuewuli.common.metrics.AIMetrics metrics;
+    protected AIStreamCallback observed(String provider, AIStreamCallback callback) {
+        return metrics == null ? callback : metrics.observe(provider,callback);
+    }
+
 
     /**
      * JSON对象映射器

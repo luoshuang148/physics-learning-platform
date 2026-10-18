@@ -92,6 +92,7 @@ CREATE TABLE IF NOT EXISTS answer_records (
     UNIQUE KEY uk_user_request(user_id,request_id),
     event_id BIGINT NULL COMMENT '教学任务ID，旧数据和自由练习可为空',
     INDEX idx_answer_records_event (event_id),
+    INDEX idx_task_attempt (user_id,event_id,question_id,attempt_order),
     id VARCHAR(36) PRIMARY KEY COMMENT '记录ID（UUID）',
     user_id BIGINT NOT NULL COMMENT '用户ID',
     question_id BIGINT NOT NULL COMMENT '题目ID',
@@ -121,6 +122,7 @@ CREATE TABLE IF NOT EXISTS answer_records (
 CREATE TABLE IF NOT EXISTS conversation_history (
     event_id BIGINT NULL COMMENT '教学任务ID，旧数据和自由练习可为空',
     INDEX idx_conversation_history_event (event_id),
+    INDEX idx_history_scope (user_id,session_id,conversation_type,question_id,event_id,is_active,sequence_number),
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
     user_id BIGINT NOT NULL COMMENT '用户ID',
     session_id VARCHAR(255) NOT NULL COMMENT '会话ID',
@@ -168,6 +170,7 @@ CREATE TABLE IF NOT EXISTS teacher_events (
 -- 7. 学生报告表 (student_reports) - 存储AI生成的学生个人学习报告
 -- ====================================================================
 CREATE TABLE IF NOT EXISTS student_reports (
+    evidence_json TEXT NULL,
     event_id BIGINT NULL COMMENT '教学任务ID，旧数据和自由练习可为空',
     INDEX idx_student_reports_event (event_id),
     id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '报告ID',

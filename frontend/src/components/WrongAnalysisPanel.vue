@@ -107,6 +107,7 @@ import { streamWrongQuestionAnalysis } from '@/api/ai';
 
 const props = defineProps<{
   questionId: number;
+  recordId?: string;
   autoStart?: boolean;
   initialErrorReason?: string;
 }>();
@@ -163,10 +164,10 @@ const runAnalysis = async (question: string, appendUserMessage = false) => {
 
   try {
     await streamWrongQuestionAnalysis(
-      { question, questionId: props.questionId },
+      { question, questionId: props.questionId, recordId: props.recordId },
       {
         signal: abortController.signal,
-        sessionType: `student_question_wrong_${props.questionId}`,
+        sessionType: `student_question_wrong_${props.recordId ?? props.questionId}`,
         onMessage: (payload) => {
           const chunk = typeof payload === 'string' ? payload
             : (payload as any)?.content ?? String(payload ?? '');

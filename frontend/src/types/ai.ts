@@ -1,6 +1,7 @@
 export interface AIAskPayload {
   question: string;
   questionId?: number;
+  recordId?: string;
   imageBase64?: string;
 }
 

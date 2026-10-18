@@ -5,13 +5,13 @@
         <div class="report-hero-main">
           <span class="report-kicker">Learning report</span>
           <h1 class="report-title">学习报告</h1>
-          <p class="report-summary">查看本阶段答题情况，生成一份更适合继续学习的总结。</p>
+          <p class="report-summary">查看当前任务的原始作答与补练情况。AI 建议需核实，请勿在自述错因中填写个人敏感信息。</p>
         </div>
         <div class="report-actions">
           <button
             class="generate-btn"
             :class="{ loading: state.loading }"
-            :disabled="state.loading"
+            :disabled="state.loading || !reportsAvailable || !scopeReady"
             @click="generateReport"
           >
             <span v-if="!state.loading">生成报告</span>
@@ -25,6 +25,8 @@
         </div>
       </section>
 
+      <p v-if="!reportsAvailable">AI 报告暂不可用。</p>
+      <p v-if="evidence.model">模型：{{ evidence.model }} · 生成时间：{{ evidence.generatedAt }} · 输入摘要：{{ String(evidence.inputSha256).slice(0,12) }}</p>
       <section class="report-stats">
         <div class="stat-card">
           <span class="stat-label">当前状态</span>
@@ -74,9 +76,17 @@ import StreamOutput from '@/components/StreamOutput.vue';
 import { useAuthStore } from '@/stores/auth';
 import { useStudentReportStore } from '@/stores/studentReport';
 import { streamStudentReport } from '@/api/ai';
+import { useRoute } from 'vue-router';
+import { getTeacherEventApi } from '@/api/teacher-event';
+import { getAICapabilitiesApi } from '@/api/ai';
 import { useAIStreamState } from '@/composables/useAIStreamState';
 
 const auth = useAuthStore();
+const route=useRoute();
+const eventId=ref<number>();
+const reportsAvailable=ref(false);
+const scopeReady=ref(false);
+const evidence=ref<Record<string,unknown>>({});
 const reportStore = useStudentReportStore();
 const { state, reset } = useAIStreamState();
 const activeAbortController = ref<AbortController | null>(null);
@@ -97,7 +107,7 @@ const normalizeReportError = (raw: string | undefined) => {
 };
 
 const restoreCachedReport = () => {
-  reportStore.hydrateFromStorage();
+  reportStore.hydrateFromStorage(eventId.value);
   const cached = reportStore.cachedReport;
   if (!cached) return;
   state.value.content = cached.content;
@@ -111,7 +121,7 @@ const persistCurrentReport = () => {
     content: state.value.content,
     reasoning: state.value.reasoning,
     tokenUsage: state.value.tokenUsage,
-  });
+  }, eventId.value);
 };
 
 const isAbortError = (error: unknown) => {
@@ -128,6 +138,8 @@ const generateReport = async () => {
   activeAbortController.value = abortController;
   try {
     await streamStudentReport({
+      eventId: eventId.value,
+      onEvidence: (payload) => { evidence.value=payload; },
       signal: abortController.signal,
       onMessage: (payload) => { state.value.content += payload.content; },
       onProgress: (payload) => { state.value.progress = payload.progress ?? state.value.progress; },
@@ -162,8 +174,13 @@ const stopCurrentReport = () => {
   activeAbortController.value?.abort();
 };
 
-onMounted(() => {
-  restoreCachedReport();
+onMounted(async () => {
+  try {
+    const capability=await getAICapabilitiesApi();reportsAvailable.value=capability.reports;
+    eventId.value=route.query.eventId ? Number(route.query.eventId) : (await getTeacherEventApi())?.id;
+    if (!eventId.value) { state.value.error='暂无学习任务，请完成任务后再生成报告。';return; }
+    scopeReady.value=true;restoreCachedReport();
+  } catch { state.value.error='任务信息加载失败，请刷新重试。'; }
 });
 
 onUnmounted(() => {

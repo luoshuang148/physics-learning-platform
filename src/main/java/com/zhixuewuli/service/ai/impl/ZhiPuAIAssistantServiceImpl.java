@@ -113,6 +113,8 @@ public class ZhiPuAIAssistantServiceImpl implements ZhiPuAIAssistantService {
             throw new IllegalArgumentException("错题分析需要题目 ID");
         }
 
+        if (requireQuestionId) resolveWrongRecord(request, userId);
+
         // 权限验证（根据业务需要）
         // 可以添加用户是否存在、会话所有权等验证
         log.debug("智谱 AI 请求验证通过 - 用户 ID: {}, 会话 ID: {}, 需要题目 ID: {}",
@@ -162,10 +164,15 @@ public class ZhiPuAIAssistantServiceImpl implements ZhiPuAIAssistantService {
                     request.getQuestionId(),
                     emitter,
                     () -> {
-                        // 通过会话管理器获取或创建会话上下文
+                        AnswerRecord source = resolveWrongRecord(request, userId);
+                        Question snapshot = com.zhixuewuli.service.ai.report.ReportPreparation.question(source,
+                                source.getQuestionSnapshot() == null ? questionRepository.findById(source.getQuestionId())
+                                .map(q -> Map.of(q.getId(),q)).orElse(Map.of()) : Map.of(), objectMapper);
+                        String scopedSession = java.util.UUID.nameUUIDFromBytes((sessionId + ":" + source.getId())
+                                .getBytes(java.nio.charset.StandardCharsets.UTF_8)).toString();
                         SessionContextInternalDTO sessionContext = sessionManager.getOrCreateSession(
-                                sessionId, userId, ConversationType.WRONG_QUESTION_ANALYSIS, request.getQuestionId(),
-                                () -> buildWrongQuestionContext(userId, request.getQuestionId(), sessionId));
+                                scopedSession, userId, ConversationType.WRONG_QUESTION_ANALYSIS, request.getQuestionId(), source.getEventId(),
+                                () -> buildWrongQuestionContext(source, snapshot));
 
                         // 绑定上下文到 emitter，以便断连时自动取消任务
                         streamUtils.bindContext(emitter, sessionContext);
@@ -183,6 +190,7 @@ public class ZhiPuAIAssistantServiceImpl implements ZhiPuAIAssistantService {
                             finalRequest = request;
                             log.debug("错题分析非首次交互，使用原始问题");
                         }
+                        finalRequest.setImageBase64(snapshot == null ? null : snapshot.getImageBase64());
 
                         // 构建多模态消息（支持图片）
                         List<Map<String, Object>> messages = buildAnalysisMessages(finalRequest, sessionContext);
@@ -236,14 +244,27 @@ public class ZhiPuAIAssistantServiceImpl implements ZhiPuAIAssistantService {
     /**
      * 构建错题分析上下文
      */
+    private AnswerRecord resolveWrongRecord(AIAskRequest request, Long userId) {
+        AnswerRecord record = request.getRecordId() == null
+                ? answerRecordRepository.findTopByUserIdAndQuestionIdOrderByAnsweredAtDesc(userId,request.getQuestionId())
+                    .orElseThrow(() -> new AnswerRecordNotFoundException("请先提交本题作答"))
+                : answerRecordRepository.findById(request.getRecordId())
+                    .orElseThrow(() -> new AnswerRecordNotFoundException("作答记录不存在"));
+        if (!userId.equals(record.getUserId())) throw new InsufficientPermissionException("无权分析该作答记录");
+        if (!request.getQuestionId().equals(record.getQuestionId())) throw new IllegalArgumentException("题目与作答记录不匹配");
+        return record;
+    }
+
     private String buildWrongQuestionContext(Long userId, Long questionId, String sessionId) {
-        try {
-            Question question = questionRepository.findById(questionId)
-                    .orElseThrow(
-                            () -> new com.zhixuewuli.common.exception.question.QuestionNotFoundException(questionId));
-            AnswerRecord answerRecord = answerRecordRepository
-                    .findTopByUserIdAndQuestionIdOrderByAnsweredAtDesc(userId, questionId)
-                    .orElse(null);
+        AIAskRequest request = new AIAskRequest();request.setQuestionId(questionId);
+        AnswerRecord record=resolveWrongRecord(request,userId);
+        Question snapshot=com.zhixuewuli.service.ai.report.ReportPreparation.question(record,
+                record.getQuestionSnapshot()==null ? questionRepository.findById(questionId).map(q->Map.of(questionId,q)).orElse(Map.of()) : Map.of(),objectMapper);
+        return buildWrongQuestionContext(record,snapshot);
+    }
+
+    private String buildWrongQuestionContext(AnswerRecord answerRecord, Question question) {
+        if(question==null) throw new IllegalStateException("历史题目不可恢复");
             StringBuilder contextBuilder = new StringBuilder();
             contextBuilder.append(ContextBackground()).append("\n\n");
             contextBuilder.append("我们正在讨论下面的题目，请帮助学生解决困惑并掌握相关知识：\n\n");
@@ -277,10 +298,7 @@ public class ZhiPuAIAssistantServiceImpl implements ZhiPuAIAssistantService {
                 contextBuilder.append("用户答案：暂无答题记录\n");
             }
             return contextBuilder.toString();
-        } catch (Exception e) {
-            log.error("构建错题分析上下文失败 - 用户ID: {}, 题目ID: {}", userId, questionId, e);
-            return ContextBackground();
-        }
+
     }
    
     /**
@@ -341,7 +359,7 @@ public class ZhiPuAIAssistantServiceImpl implements ZhiPuAIAssistantService {
         messages.add(userMessage);
         
         // 记录最终提示词（不含图片）
-        log.info("========== 实时问答最终提示词 ==========\n{}\n=========================================", textContent);
+        log.debug("实时问答输入长度: {}", textContent.length());
         
         return messages;
     }
@@ -377,38 +395,14 @@ public class ZhiPuAIAssistantServiceImpl implements ZhiPuAIAssistantService {
         textPart.put("text", textContent.toString());
         contentList.add(textPart);
         
-        // 如果有题目图片，添加图片部分
-        if (context.getQuestionId() != null) {
-            questionRepository.findById(context.getQuestionId())
-                    .ifPresent(question -> {
-                        if (question.getImageBase64() != null && !question.getImageBase64().isEmpty()) {
-                            String imageData = question.getImageBase64();
-                            if (!imageData.startsWith("data:image/")) {
-                                imageData = "data:image/png;base64," + imageData;
-                            }
-                            
-                            Map<String, Object> imagePart = new HashMap<>();
-                            imagePart.put("type", "image_url");
-                            Map<String, String> imageUrl = new HashMap<>();
-                            imageUrl.put("url", imageData);
-                            imagePart.put("image_url", imageUrl);
-                            contentList.add(imagePart);
-                            log.debug("添加题目图片到消息，Base64长度: {}", imageData.length());
-                        }
-                    });
+        // Use the same immutable snapshot image as the text, never the current bank.
+        if (request.getImageBase64()!=null && !request.getImageBase64().isBlank()) {
+            String image=request.getImageBase64();
+            if(!image.startsWith("data:image/")) image="data:image/png;base64,"+image;
+            contentList.add(Map.of("type","image_url","image_url",Map.of("url",image)));
         }
-        
-        Map<String, Object> userMessage = new HashMap<>();
-        userMessage.put("role", "user");
-        userMessage.put("content", contentList);
-        
-        List<Map<String, Object>> messages = new ArrayList<>();
-        messages.add(userMessage);
-        
-        // 记录最终提示词（不含图片）
-        log.info("========== 错题分析最终提示词 ==========\n{}\n=========================================", textContent);
-        
-        return messages;
+
+        return List.of(Map.of("role", "user", "content", contentList));
     }
 
     /**
@@ -500,13 +494,13 @@ public class ZhiPuAIAssistantServiceImpl implements ZhiPuAIAssistantService {
                 @Override
                 public void onError(Exception error) {
                     log.error("AI流式响应处理失败", error);
-                    streamUtils.sendError(emitter, ResultCode.AI_SERVICE_UNAVAILABLE, "AI 处理失败：" + error.getMessage());
+                    streamUtils.sendError(emitter, ResultCode.AI_SERVICE_UNAVAILABLE, "AI 处理失败，请稍后重试");
                 }
             });
 
         } catch (Exception e) {
             log.error("AI流式响应处理失败", e);
-            streamUtils.sendError(emitter, ResultCode.AI_SERVICE_UNAVAILABLE, "AI处理失败: " + e.getMessage());
+            streamUtils.sendError(emitter, ResultCode.AI_SERVICE_UNAVAILABLE, "AI处理失败，请稍后重试");
         }
     }
 
@@ -606,13 +600,13 @@ public class ZhiPuAIAssistantServiceImpl implements ZhiPuAIAssistantService {
                 @Override
                 public void onError(Exception error) {
                     log.error("AI多模态流式响应处理失败", error);
-                    streamUtils.sendError(emitter, ResultCode.AI_SERVICE_UNAVAILABLE, "AI 处理失败：" + error.getMessage());
+                    streamUtils.sendError(emitter, ResultCode.AI_SERVICE_UNAVAILABLE, "AI 处理失败，请稍后重试");
                 }
             });
 
         } catch (Exception e) {
             log.error("AI多模态流式响应处理失败", e);
-            streamUtils.sendError(emitter, ResultCode.AI_SERVICE_UNAVAILABLE, "AI处理失败: " + e.getMessage());
+            streamUtils.sendError(emitter, ResultCode.AI_SERVICE_UNAVAILABLE, "AI处理失败，请稍后重试");
         }
     }
 

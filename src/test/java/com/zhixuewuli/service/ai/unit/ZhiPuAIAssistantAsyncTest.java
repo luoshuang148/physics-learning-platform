@@ -104,12 +104,14 @@ class ZhiPuAIAssistantAsyncTest extends AIAsyncTestBase {
     @DisplayName("错题分析-验证参数正确传递")
     void streamWrongQuestionAnalysis_shouldPassParameters() {
         // Given
+        var source=new com.zhixuewuli.entity.AnswerRecord();source.setId("source-record");source.setUserId(TEST_USER_ID);source.setQuestionId(TEST_QUESTION_ID);
+        when(answerRecordRepository.findTopByUserIdAndQuestionIdOrderByAnsweredAtDesc(TEST_USER_ID,TEST_QUESTION_ID)).thenReturn(java.util.Optional.of(source));
         Question mockQuestion = mock(Question.class);
-        when(mockQuestion.getContent()).thenReturn("测试题目内容");
-        when(mockQuestion.getOptions()).thenReturn("{\"A\":\"选项A\",\"B\":\"选项B\"}");
+        when(mockQuestion.getId()).thenReturn(TEST_QUESTION_ID);
+
 
         when(sessionManager.getOrCreateSession(anyString(), anyLong(), any(ConversationType.class),
-                anyLong(), any()))
+                anyLong(), isNull(), any()))
                 .thenReturn(mockSessionContext);
         when(questionRepository.findById(TEST_QUESTION_ID)).thenReturn(Optional.of(mockQuestion));
 
@@ -127,10 +129,10 @@ class ZhiPuAIAssistantAsyncTest extends AIAsyncTestBase {
 
         // 验证题目ID参数正确传递
         verify(sessionManager).getOrCreateSession(
-                eq(TEST_SESSION_ID),
+                anyString(),
                 eq(TEST_USER_ID),
                 eq(ConversationType.WRONG_QUESTION_ANALYSIS),
-                eq(TEST_QUESTION_ID), // 关键参数验证
+                eq(TEST_QUESTION_ID), isNull(), // includes historical event scope
                 any());
 
         // 注意：questionRepository.findById在会话管理器的上下文构建器中被调用，由于Mock未调用构建器，此处不验证

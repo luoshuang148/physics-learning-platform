@@ -49,6 +49,8 @@ public interface AliyunAIReportService {
      * @param emitter SSE发射器
      * @param userId  教师用户ID
      */
+    void streamStudentReport(String sessionId, SseEmitter emitter, Long userId, Long eventId);
+
     void streamTeacherAnalysis(SseEmitter emitter, Long userId);
 
     void streamTeacherAnalysis(SseEmitter emitter, Long userId, Long eventId);
@@ -71,4 +73,5 @@ public interface AliyunAIReportService {
      * @throws com.zhixuewuli.common.exception.answerrecord.AnswerRecordNotFoundException 当学生无报告记录时抛出
      */
     StudentReportResponse getStudentLatestReport(Long teacherId, Long studentId);
+    StudentReportResponse getStudentLatestReport(Long teacherId, Long studentId, Long eventId);
 }
