@@ -46,6 +46,7 @@ import java.util.concurrent.Executor;
 @Slf4j
 public class QuestionErrorAnalysisServiceImpl implements QuestionErrorAnalysisService {
 
+    private final com.zhixuewuli.service.ai.report.ReportInputRepository reportInputs;
     private final AnswerRecordRepository answerRecordRepository;
     private final QuestionRepository questionRepository;
     private final UserPermissionUtil userPermissionUtil;
@@ -267,15 +268,9 @@ public class QuestionErrorAnalysisServiceImpl implements QuestionErrorAnalysisSe
      * 构建教师题目分析的初始上下文（题目详情 + 所有学生答题记录）
      */
     private String buildTeacherQuestionAnalysisContext(Long questionId) {
-        List<AnswerRecord> records = answerRecordRepository.findByQuestionIdOrderByAnsweredAtDesc(questionId);
-        Map<Long,Question> fallback=records.stream().anyMatch(r->r.getQuestionSnapshot()==null) || records.isEmpty()
-                ? questionRepository.findById(questionId).map(q->Map.of(questionId,q)).orElse(Map.of()) : Map.of();
-        if(records.isEmpty()) {
-            Question question=fallback.get(questionId);
-            if(question==null) throw new QuestionNotFoundException(questionId);
-            return "本题暂无学生作答，不能推断班级掌握情况。题目："+question.getContent()+"\n参考答案："+question.getCorrectOption();
-        }
-        return com.zhixuewuli.service.ai.report.ReportPreparation.prepare(records,fallback,objectMapper,true,
+        List<AnswerRecord> records=reportInputs.question(questionId);
+        if(records.isEmpty()) return "本题暂无学生作答，不能推断班级掌握情况。";
+        return com.zhixuewuli.service.ai.report.ReportPreparation.prepare(records,Map.of(),objectMapper,true,
                 aiBusinessProperties.getTeacherReportGenerationModel()).prompt();
     }
 

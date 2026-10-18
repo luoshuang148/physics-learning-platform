@@ -72,7 +72,7 @@ public class QuestionResponseConverter {
                 .questionId(question.getId())
                 .userAnswer(record.getUserAnswer())
                 .correct(record.getCorrect())
-                .answeredAt(record.getAnsweredAt())
+                .answeredAt(record.getAnsweredAt()).timestampUtc(record.isTimestampUtc())
                 .errorReason(record.getErrorReason())
                 .questionContent(question.getContent())
                 .questionOptions(optionsMap)

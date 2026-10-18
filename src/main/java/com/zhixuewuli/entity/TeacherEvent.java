@@ -58,6 +58,8 @@ import java.time.LocalDateTime;
 @Data
 @EqualsAndHashCode(callSuper = false)
 public class TeacherEvent extends BaseTimeEntity {
+    @Column(name="timestamp_utc",nullable=false,columnDefinition="boolean default false")
+    private boolean timestampUtc=true;
 
     @Column(name = "active_slot", unique = true, insertable = false, updatable = false,
             columnDefinition = "integer GENERATED ALWAYS AS (CASE WHEN is_global = TRUE THEN 1 ELSE NULL END)")

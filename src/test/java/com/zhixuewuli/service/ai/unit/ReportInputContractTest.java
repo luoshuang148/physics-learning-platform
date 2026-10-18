@@ -11,6 +11,7 @@ import static org.assertj.core.api.Assertions.*;
 class ReportInputContractTest {
  @InjectMocks AliyunAIReportServiceImpl service;
  @InjectMocks com.zhixuewuli.service.questionErrorAnalysis.impl.QuestionErrorAnalysisServiceImpl questionService;
+ @Mock com.zhixuewuli.service.ai.report.ReportInputRepository inputs;
  @Mock com.zhixuewuli.repository.QuestionRepository questions;
  @Mock com.zhixuewuli.repository.AnswerRecordRepository answers;
  @Spy com.zhixuewuli.common.config.properties.AIBusinessProperties properties=new com.zhixuewuli.common.config.properties.AIBusinessProperties();
@@ -33,7 +34,7 @@ class ReportInputContractTest {
  @Test void teacherQuestionPromptAlsoOmitsPersonalNamesAndUsesSnapshot() throws Exception {
   var r=record(1,"ORIGINAL_TEACHER_SNAPSHOT",false,false);var user=new User();user.setRealName("PRIVATE_PERSON_NAME");r.setUser(user);
   var bank=new Question();bank.setContent("CHANGED_BANK");bank.setId(9L);
-  Mockito.lenient().when(questions.findById(9L)).thenReturn(Optional.of(bank));Mockito.when(answers.findByQuestionIdOrderByAnsweredAtDesc(9L)).thenReturn(List.of(r));
+  Mockito.lenient().when(questions.findById(9L)).thenReturn(Optional.of(bank));Mockito.when(inputs.question(9L)).thenReturn(List.of(r));
   var method=questionService.getClass().getDeclaredMethod("buildTeacherQuestionAnalysisContext",Long.class);method.setAccessible(true);
   assertThat((String)method.invoke(questionService,9L)).contains("ORIGINAL_TEACHER_SNAPSHOT").doesNotContain("PRIVATE_PERSON_NAME","CHANGED_BANK");
  }

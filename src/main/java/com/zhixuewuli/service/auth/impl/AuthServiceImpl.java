@@ -98,8 +98,11 @@ public class AuthServiceImpl implements AuthService {
         }
 
         // 更新最后登录时间
-        user.setLastLogin(java.time.LocalDateTime.now());
-        userRepository.save(user);
+        var loginTime=java.time.LocalDateTime.now(java.time.ZoneOffset.UTC);
+        int updated=userRepository.recordLoginIfVersionMatches(user.getId(),user.getTokenVersion(),loginTime);
+        if(updated!=1) throw new InvalidCredentialsException();
+        user.setLastLogin(loginTime); // detached after the narrow update; never merge stale security fields
+
 
         log.debug("用户登录成功，登录标识: {}, 实际用户名: {}", loginId, user.getUsername());
         return user;

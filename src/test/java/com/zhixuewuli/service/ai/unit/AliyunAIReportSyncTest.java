@@ -196,7 +196,7 @@ class AliyunAIReportSyncTest extends AIServiceSyncTestBase {
         assertThat(result).isNotNull();
         assertThat(result.getStudentRealName()).isEqualTo(mockStudent.getRealName());
         assertThat(result.getLatestReportContent()).isEqualTo(mockReport.getReportContent());
-        assertThat(result.getReportCreateTime()).isEqualTo(mockReport.getCreatedAt());
+        assertThat(result.getReportCreateTime()).isEqualTo(mockReport.getUpdatedAt());
 
         // 验证依赖调用
         verify(userPermissionUtil).checkTeacherPermission(teacherId);
@@ -429,8 +429,6 @@ class AliyunAIReportSyncTest extends AIServiceSyncTestBase {
         String reportContent = "测试报告内容";
 
         when(userRepository.findById(userId)).thenReturn(Optional.of(mockStudent));
-        when(studentReportRepository.findByUserIdAndSessionIdAndEventId(userId, sessionId, null))
-                .thenReturn(Optional.empty());
         when(studentReportRepository.save(any(StudentReport.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -447,7 +445,6 @@ class AliyunAIReportSyncTest extends AIServiceSyncTestBase {
         // Then
         // 验证依赖调用
         verify(userRepository).findById(userId);
-        verify(studentReportRepository).findByUserIdAndSessionIdAndEventId(userId, sessionId, null);
         verify(studentReportRepository).save(any(StudentReport.class));
 
         // 确保AI客户端未被调用

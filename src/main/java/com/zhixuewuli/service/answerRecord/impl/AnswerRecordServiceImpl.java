@@ -92,7 +92,7 @@ public class AnswerRecordServiceImpl implements AnswerRecordService {
         var rows = result.getContent().stream().map(row -> AnswerRecordResponse.builder()
                 .recordId(row.recordId()).userId(row.userId()).questionId(row.questionId())
                 .sessionId(row.sessionId()).userAnswer(row.userAnswer()).correct(row.correct())
-                .answeredAt(row.answeredAt()).errorReason(row.errorReason()).studentName(row.studentName())
+                .answeredAt(row.answeredAt()).timestampUtc(row.timestampUtc()).errorReason(row.errorReason()).studentName(row.studentName())
                 .questionContent(row.questionContent()).correctAnswer(row.correctAnswer())
                 .questionOptions(questionResponseConverter.parseOptionsFromJson(row.options()))
                 .questionAnalysis(row.analysis()).difficulty(questionResponseConverter.getDifficultyString(row.difficulty()))

@@ -24,7 +24,14 @@ FROM teacher_events e
 JOIN JSON_TABLE(IF(e.event_description LIKE 'QIDS:%' AND JSON_VALID(CONCAT('[',SUBSTRING(e.event_description,6),']')),
  CONCAT('[',SUBSTRING(e.event_description,6),']'),'[]'),'$[*]' COLUMNS(ord FOR ORDINALITY,question_id BIGINT PATH '$' NULL ON ERROR)) t
 LEFT JOIN questions q ON q.id=t.question_id
-WHERE t.question_id IS NOT NULL;
+WHERE t.question_id IS NOT NULL AND t.question_id>0
+ AND NOT EXISTS (
+  SELECT 1 FROM JSON_TABLE(
+   IF(e.event_description LIKE 'QIDS:%' AND JSON_VALID(CONCAT('[',SUBSTRING(e.event_description,6),']')),
+      CONCAT('[',SUBSTRING(e.event_description,6),']'),'[]'),
+   '$[*]' COLUMNS(ord FOR ORDINALITY,question_id BIGINT PATH '$' NULL ON ERROR)) earlier
+  WHERE earlier.question_id=t.question_id AND earlier.ord<t.ord
+ );
 ALTER TABLE answer_records ADD COLUMN request_id VARCHAR(64) NULL,
  ADD COLUMN practice BOOLEAN NOT NULL DEFAULT FALSE,
  ADD COLUMN question_snapshot LONGTEXT NULL,
@@ -49,3 +56,7 @@ CREATE INDEX idx_history_scope ON conversation_history(user_id,session_id,conver
 
 -- Cover task aggregates without reading large answer snapshot rows.
 CREATE INDEX idx_event_summary ON answer_records(event_id,practice,user_id,question_id,correct,attempt_order);
+
+-- Preserve unknown pre-upgrade clock interpretation; new entity writes explicitly use UTC.
+ALTER TABLE answer_records ADD COLUMN timestamp_utc BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE teacher_events ADD COLUMN timestamp_utc BOOLEAN NOT NULL DEFAULT FALSE;

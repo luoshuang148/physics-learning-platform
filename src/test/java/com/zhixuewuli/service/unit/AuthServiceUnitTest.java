@@ -23,6 +23,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.never;
@@ -76,6 +77,7 @@ class AuthServiceUnitTest extends BaseUnitTest {
         when(userRepository.findByRealName(validUsername)).thenReturn(Optional.empty());
         when(userRepository.findByUsername(validUsername)).thenReturn(Optional.of(mockUser));
         when(passwordUtil.matches(validPassword, mockUser.getPasswordHash())).thenReturn(true);
+        when(userRepository.recordLoginIfVersionMatches(eq(mockUser.getId()),eq(mockUser.getTokenVersion()),any())).thenReturn(1);
 
         // When
         User result = authService.authenticate(validUsername, validPassword);
@@ -90,7 +92,7 @@ class AuthServiceUnitTest extends BaseUnitTest {
         verify(userRepository).findByRealName(validUsername);
         verify(userRepository).findByUsername(validUsername);
         verify(passwordUtil).matches(validPassword, mockUser.getPasswordHash());
-        verify(userRepository).save(result);
+        verify(userRepository).recordLoginIfVersionMatches(eq(result.getId()),eq(result.getTokenVersion()),any());
     }
 
     @Test
@@ -106,6 +108,7 @@ class AuthServiceUnitTest extends BaseUnitTest {
 
         when(userRepository.findByRealName(loginId)).thenReturn(Optional.of(realNameMatchedUser));
         when(passwordUtil.matches(validPassword, realNameMatchedUser.getPasswordHash())).thenReturn(true);
+        when(userRepository.recordLoginIfVersionMatches(eq(realNameMatchedUser.getId()),eq(realNameMatchedUser.getTokenVersion()),any())).thenReturn(1);
 
         // When
         User result = authService.authenticate(loginId, validPassword);
@@ -115,7 +118,7 @@ class AuthServiceUnitTest extends BaseUnitTest {
         assertThat(result.getId()).isEqualTo(103L);
         verify(userRepository).findByRealName(loginId);
         verify(userRepository, never()).findByUsername(loginId);
-        verify(userRepository).save(result);
+        verify(userRepository).recordLoginIfVersionMatches(eq(result.getId()),eq(result.getTokenVersion()),any());
     }
 
     @Test

@@ -11,6 +11,10 @@ import java.util.List;
 
 @Repository
 public interface UserRepository extends JpaRepository<User, Long> {
+    @org.springframework.data.jpa.repository.Modifying(flushAutomatically=true,clearAutomatically=true)
+    @org.springframework.transaction.annotation.Transactional
+    @Query("update User u set u.lastLogin=:time where u.id=:id and u.tokenVersion=:expectedVersion and u.active=true")
+    int recordLoginIfVersionMatches(Long id, Long expectedVersion, java.time.LocalDateTime time);
     long countByUserTypeAndActiveTrue(UserType role);
     @org.springframework.data.jpa.repository.Modifying(flushAutomatically=true,clearAutomatically=true)
     @org.springframework.transaction.annotation.Transactional

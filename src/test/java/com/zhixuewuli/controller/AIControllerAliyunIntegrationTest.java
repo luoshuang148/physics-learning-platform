@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch;
@@ -136,6 +137,10 @@ public class AIControllerAliyunIntegrationTest extends BaseControllerIntegration
                 // 初始化测试题目 ID
                 questionIdWithErrors = 6001L; // 有错误记录的题目
                 questionIdWithoutErrors = 6003L; // 无错误记录的题目
+                // General teacher analysis now deliberately means the active task, never
+                // a cross-task latest-session blend. Attach this fixture explicitly.
+                jdbcTemplate.update("INSERT INTO teacher_events(id,teacher_id,teacher_name,event_title,event_timestamp,is_global,timestamp_utc) VALUES(890000,5001,'Fixture','Report fixture',CURRENT_TIMESTAMP,true,true)");
+                jdbcTemplate.update("UPDATE answer_records SET event_id=890000");
         }
 
         // ============================================================
@@ -329,39 +334,13 @@ public class AIControllerAliyunIntegrationTest extends BaseControllerIntegration
         @DisplayName("教师综合分析流式生成失败 - 无学生数据")
         @Test
         void testStreamTeacherAnalysis_NoStudentData() throws Exception {
-                // Given: 配置 AI 客户端 Mock - 模拟无数据场景
-                CountDownLatch latch = new CountDownLatch(1);
-                doAnswer(invocation -> {
-                        try {
-                                AIStreamCallback callback = invocation.getArgument(2);
-                                // 模拟 AI 响应 - 无数据时的提示
-                                callback.onContent("AI 分析：暂无任何学生答题数据。", true);
-                                callback.onComplete(20, 40, 60);
-                        } finally {
-                                latch.countDown();
-                        }
-                        return null;
-                }).when(aliyunAIClient).streamGenerate(any(), anyString(), any(AIStreamCallback.class));
-
-                // When: 发送教师综合分析请求
+                jdbcTemplate.update("DELETE FROM answer_records");
                 MvcResult mvcResult = mockMvc.perform(get("/ai/teacher/report")
                                 .header("Authorization", createAuthHeader(teacherId, teacherUsername)))
-                                .andExpect(request().asyncStarted())
-                                .andDo(print())
-                                .andReturn();
-
-                // Then: 等待异步处理完成
-                boolean completed = latch.await(10, TimeUnit.SECONDS);
-                assertThat(completed).withFailMessage("应该在超时前完成").isTrue();
-
-                // 验证异步响应
-                mockMvc.perform(asyncDispatch(mvcResult))
-                                .andExpect(status().isOk())
-                                .andExpect(content().contentTypeCompatibleWith(MediaType.TEXT_EVENT_STREAM));
-
-                // 验证 Mock 被调用
-                verify(aliyunAIClient, times(1)).streamGenerate(any(), anyString(),
-                                any(AIStreamCallback.class));
+                                .andExpect(request().asyncStarted()).andReturn();
+                MvcResult result=mockMvc.perform(asyncDispatch(mvcResult)).andExpect(status().isOk()).andReturn();
+                assertContainsEventName(result.getResponse().getContentAsString(),"error");
+                verify(aliyunAIClient,never()).streamGenerate(any(),anyString(),any(AIStreamCallback.class));
         }
 
         // ============================================================

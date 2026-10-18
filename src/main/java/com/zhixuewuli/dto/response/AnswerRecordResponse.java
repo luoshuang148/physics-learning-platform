@@ -45,6 +45,15 @@ import java.util.Map;
 @NoArgsConstructor
 @Schema(description = "答题记录响应")
 public class AnswerRecordResponse {
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    @Builder.Default
+    private boolean timestampUtc=true;
+    public String getTimeBasis() { return timestampUtc ? "UTC" : "LEGACY_LOCAL"; }
+    @com.fasterxml.jackson.annotation.JsonGetter("answeredAt")
+    public String learningTimestampForJson() {
+        return com.zhixuewuli.common.util.LearningTimeWire.format(answeredAt,timestampUtc);
+    }
+
     private Long eventId;
     private String requestId;
     private boolean practice;

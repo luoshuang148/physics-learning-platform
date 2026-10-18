@@ -23,6 +23,15 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 @NoArgsConstructor
 public class TeacherEventResponse {
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    @Builder.Default
+    private boolean timestampUtc=true;
+    public String getTimeBasis() { return timestampUtc ? "UTC" : "LEGACY_LOCAL"; }
+    @com.fasterxml.jackson.annotation.JsonGetter("eventTimestamp")
+    public String learningTimestampForJson() {
+        return com.zhixuewuli.common.util.LearningTimeWire.format(eventTimestamp,timestampUtc);
+    }
+
     private java.util.List<Long> questionIds;
 
     @Schema(description = "事件ID", example = "1")

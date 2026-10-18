@@ -2,6 +2,7 @@ import type { ApiResponse, SSECompleteEventPayload, SSEErrorEventPayload, SSEMes
 import type { AIAskPayload, ConversationHistory, StudentReportResponse } from '@/types/ai';
 import request, { resolveApiBaseUrl } from '@/utils/request';
 import { getSessionId } from '@/utils/session';
+import { requiredAICapability } from '@/utils/aiCapabilities';
 
 export const getSessionHistoryApi = async (sessionType?: string): Promise<ConversationHistory[]> => {
   const sessionId = getSessionId(sessionType);
@@ -84,7 +85,7 @@ const parseEventBlock = (block: string, parseState: SSEParseState): { type: stri
 
 export const streamAI = async (endpoint: string, options: StreamOptions): Promise<void> => {
   const capability = await getAICapabilitiesApi();
-  const available = endpoint.includes('report') ? capability.reports : capability.tutoring;
+  const available = capability[requiredAICapability(endpoint)];
   if (!available) throw new Error('AI 暂不可用，请稍后重试或联系教师。');
   const token = localStorage.getItem('zhixue_token');
   const sessionId = getSessionId(options.sessionType);

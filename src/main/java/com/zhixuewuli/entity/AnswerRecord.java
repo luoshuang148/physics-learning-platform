@@ -52,6 +52,11 @@ import java.util.UUID;
 @Data
 @EqualsAndHashCode(callSuper = false)
 public class AnswerRecord extends BaseTimeEntity {
+    @jakarta.persistence.Transient
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    private boolean reportLegacyBankFallback;
+    @Column(name="timestamp_utc",nullable=false,columnDefinition="boolean default false")
+    private boolean timestampUtc=true;
     @Column(name="content_snapshot",columnDefinition="LONGTEXT") private String contentSnapshot;
     @Column(name="options_snapshot",columnDefinition="LONGTEXT") private String optionsSnapshot;
     @Column(name="correct_snapshot",length=1) private String correctSnapshot;

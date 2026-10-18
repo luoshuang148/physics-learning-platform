@@ -42,6 +42,7 @@ import java.util.List;
  * @since 2026
  */
 @Entity
+@org.hibernate.annotations.DynamicUpdate
 @Table(name = "users", indexes = {
         @Index(name = "uk_real_name", columnList = "real_name"),
         @Index(name = "idx_class_user_active", columnList = "class_name, user_type, active")

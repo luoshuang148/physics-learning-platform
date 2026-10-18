@@ -37,6 +37,8 @@ import static org.mockito.Mockito.*;
 @DisplayName("阿里云AI报告异步流程测试")
 class AliyunAIReportAsyncTest extends AIAsyncTestBase {
 
+    @Mock private com.zhixuewuli.service.ai.report.ReportInputRepository reportInputs;
+
     @InjectMocks
     private AliyunAIReportServiceImpl service;
 
@@ -123,9 +125,8 @@ class AliyunAIReportAsyncTest extends AIAsyncTestBase {
     @DisplayName("学生报告-验证数据查询和提示词构建")
     void streamStudentReport_shouldQueryDataAndBuildPrompt() {
         // Given
-        when(answerRecordRepository.findByUserIdAndSessionIdOrderByAnsweredAtDesc(TEST_USER_ID, TEST_SESSION_ID))
+        when(reportInputs.student(TEST_USER_ID, TEST_SESSION_ID,null))
                 .thenReturn(mockAnswerRecords);
-        when(questionRepository.findByIdIn(anyList())).thenReturn(mockQuestions);
         when(userRepository.findById(TEST_USER_ID)).thenReturn(Optional.of(mockUser));
 
         doAnswer(invocation -> {
@@ -141,8 +142,7 @@ class AliyunAIReportAsyncTest extends AIAsyncTestBase {
         });
 
         // 验证数据查询被调用
-        verify(answerRecordRepository).findByUserIdAndSessionIdOrderByAnsweredAtDesc(TEST_USER_ID, TEST_SESSION_ID);
-        verify(questionRepository).findByIdIn(anyList());
+        verify(reportInputs).student(TEST_USER_ID, TEST_SESSION_ID,null);
         verify(userRepository).findById(TEST_USER_ID);
 
         // 验证AI客户端被调用
@@ -151,9 +151,9 @@ class AliyunAIReportAsyncTest extends AIAsyncTestBase {
 
     @Test
     void eventReportNeverFallsBackToAnotherTaskSession() {
-        when(answerRecordRepository.findByUserIdAndEventIdOrderByAttemptOrderDesc(TEST_USER_ID, 99L)).thenReturn(Collections.emptyList());
+        when(reportInputs.student(TEST_USER_ID, TEST_SESSION_ID,99L)).thenReturn(Collections.emptyList());
         captureAndExecuteAsyncTask(() -> service.streamStudentReport(TEST_SESSION_ID, mockEmitter, TEST_USER_ID, 99L));
-        verify(answerRecordRepository).findByUserIdAndEventIdOrderByAttemptOrderDesc(TEST_USER_ID, 99L);
+        verify(reportInputs).student(TEST_USER_ID, TEST_SESSION_ID,99L);
         verify(answerRecordRepository, never()).findByUserIdAndSessionIdOrderByAnsweredAtDesc(any(), any());
         verify(aliyunAIClient, never()).streamGenerate(any(), any(), any());
     }
@@ -162,7 +162,7 @@ class AliyunAIReportAsyncTest extends AIAsyncTestBase {
     @DisplayName("学生报告-验证无答题记录处理")
     void streamStudentReport_shouldHandleNoAnswerRecords() {
         // Given
-        when(answerRecordRepository.findByUserIdAndSessionIdOrderByAnsweredAtDesc(TEST_USER_ID, TEST_SESSION_ID))
+        when(reportInputs.student(TEST_USER_ID, TEST_SESSION_ID,null))
                 .thenReturn(Collections.emptyList());
 
         // When & Then
@@ -171,7 +171,7 @@ class AliyunAIReportAsyncTest extends AIAsyncTestBase {
         });
 
         // 验证抛出正确异常
-        verify(answerRecordRepository).findByUserIdAndSessionIdOrderByAnsweredAtDesc(TEST_USER_ID, TEST_SESSION_ID);
+        verify(reportInputs).student(TEST_USER_ID, TEST_SESSION_ID,null);
         verify(aliyunAIClient, never()).streamGenerate(any(), any(), any(AIStreamCallback.class));
     }
 
@@ -205,26 +205,7 @@ class AliyunAIReportAsyncTest extends AIAsyncTestBase {
     @DisplayName("教师分析报告-验证数据聚合逻辑")
     void streamTeacherAnalysis_shouldAggregateData() {
         // Given
-        List<Long> mockUserIds = Arrays.asList(1001L, 1002L, 1003L);
-        when(answerRecordRepository.findDistinctUserIds()).thenReturn(mockUserIds);
-
-        // 模拟每个用户的会话ID查询
-        when(answerRecordRepository.findDistinctSessionIdsByUserId(1001L))
-                .thenReturn(Arrays.asList("session-1"));
-        when(answerRecordRepository.findDistinctSessionIdsByUserId(1002L))
-                .thenReturn(Arrays.asList("session-2"));
-        when(answerRecordRepository.findDistinctSessionIdsByUserId(1003L))
-                .thenReturn(Arrays.asList("session-3"));
-
-        // 模拟会话记录查询
-        when(answerRecordRepository.findByUserIdAndSessionIdOrderByAnsweredAtDesc(eq(1001L), anyString()))
-                .thenReturn(mockAnswerRecords.subList(0, 1));
-        when(answerRecordRepository.findByUserIdAndSessionIdOrderByAnsweredAtDesc(eq(1002L), anyString()))
-                .thenReturn(mockAnswerRecords.subList(1, 2));
-        when(answerRecordRepository.findByUserIdAndSessionIdOrderByAnsweredAtDesc(eq(1003L), anyString()))
-                .thenReturn(new ArrayList<>());
-
-        when(questionRepository.findByIdIn(anyList())).thenReturn(mockQuestions);
+        when(reportInputs.teacher(null)).thenReturn(mockAnswerRecords);
 
         doAnswer(invocation -> {
             AIStreamCallback callback = invocation.getArgument(2);
@@ -238,12 +219,7 @@ class AliyunAIReportAsyncTest extends AIAsyncTestBase {
             service.streamTeacherAnalysis(mockEmitter, TEST_USER_ID);
         });
 
-        // 验证数据聚合逻辑
-        verify(answerRecordRepository).findDistinctUserIds();
-        verify(answerRecordRepository, times(3)).findDistinctSessionIdsByUserId(anyLong());
-        verify(answerRecordRepository, atLeastOnce()).findByUserIdAndSessionIdOrderByAnsweredAtDesc(anyLong(),
-                anyString());
-        verify(questionRepository).findByIdIn(anyList());
+        verify(reportInputs).teacher(null);
 
         // 验证AI调用
         verify(aliyunAIClient).streamGenerate(any(), any(), any(AIStreamCallback.class));
@@ -253,7 +229,7 @@ class AliyunAIReportAsyncTest extends AIAsyncTestBase {
     @DisplayName("异步任务提交验证")
     void streamStudentReport_shouldSubmitAsyncTask() {
         // Given
-        when(answerRecordRepository.findByUserIdAndSessionIdOrderByAnsweredAtDesc(TEST_USER_ID, TEST_SESSION_ID))
+        when(reportInputs.student(TEST_USER_ID, TEST_SESSION_ID,null))
                 .thenReturn(mockAnswerRecords);
 
         // When
@@ -267,9 +243,8 @@ class AliyunAIReportAsyncTest extends AIAsyncTestBase {
     @DisplayName("学生报告-连接结束后应停止后续推送")
     void streamStudentReport_shouldSkipSseAfterEmitterCompleted() {
         // Given
-        when(answerRecordRepository.findByUserIdAndSessionIdOrderByAnsweredAtDesc(TEST_USER_ID, TEST_SESSION_ID))
+        when(reportInputs.student(TEST_USER_ID, TEST_SESSION_ID,null))
                 .thenReturn(mockAnswerRecords);
-        when(questionRepository.findByIdIn(anyList())).thenReturn(mockQuestions);
         when(userRepository.findById(TEST_USER_ID)).thenReturn(Optional.of(mockUser));
 
         final Runnable[] completionHook = new Runnable[1];
@@ -306,11 +281,9 @@ class AliyunAIReportAsyncTest extends AIAsyncTestBase {
     @DisplayName("学生报告-取消前有部分内容时应持久化部分报告")
     void streamStudentReport_shouldPersistPartialReportWhenCancelledAfterContent() {
         // Given
-        when(answerRecordRepository.findByUserIdAndSessionIdOrderByAnsweredAtDesc(TEST_USER_ID, TEST_SESSION_ID))
+        when(reportInputs.student(TEST_USER_ID, TEST_SESSION_ID,null))
                 .thenReturn(mockAnswerRecords);
-        when(questionRepository.findByIdIn(anyList())).thenReturn(mockQuestions);
         when(userRepository.findById(TEST_USER_ID)).thenReturn(Optional.of(mockUser));
-        when(studentReportRepository.findByUserIdAndSessionIdAndEventId(TEST_USER_ID, TEST_SESSION_ID, null)).thenReturn(Optional.empty());
 
         final Runnable[] completionHook = new Runnable[1];
         doAnswer(invocation -> {

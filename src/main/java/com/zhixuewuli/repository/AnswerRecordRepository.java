@@ -55,7 +55,7 @@ public interface AnswerRecordRepository extends JpaRepository<AnswerRecord, Stri
 
         @Query(value = "SELECT new com.zhixuewuli.dto.response.AnswerRecordListRow(" +
                 "a.id,a.userId,a.questionId,a.sessionId,a.userAnswer,a.correct,a.answeredAt,a.errorReason," +
-                "u.realName,coalesce(a.contentSnapshot,q.content),coalesce(a.optionsSnapshot,q.options),coalesce(a.correctSnapshot,q.correctOption),coalesce(a.analysisSnapshot,q.explanation),coalesce(a.difficultySnapshot,q.difficulty)) " +
+                "u.realName,coalesce(a.contentSnapshot,q.content),coalesce(a.optionsSnapshot,q.options),coalesce(a.correctSnapshot,q.correctOption),coalesce(a.analysisSnapshot,q.explanation),coalesce(a.difficultySnapshot,q.difficulty),a.timestampUtc) " +
                 "FROM AnswerRecord a JOIN a.question q JOIN a.user u " +
                 "WHERE (:wrongOnly = false OR a.correct = false) AND (:eventId is null OR a.eventId=:eventId) " +
                 "AND LOWER(u.realName) LIKE LOWER(:name) ESCAPE '!' " +

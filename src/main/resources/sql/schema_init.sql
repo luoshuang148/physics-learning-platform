@@ -84,6 +84,7 @@ CREATE TABLE IF NOT EXISTS questions (
 -- 4. 答题记录表 (answer_records) - 存储用户答题记录
 -- ====================================================================
 CREATE TABLE IF NOT EXISTS answer_records (
+    timestamp_utc BOOLEAN NOT NULL DEFAULT TRUE,
     request_id VARCHAR(64) NULL,
     practice BOOLEAN NOT NULL DEFAULT FALSE,
     question_snapshot LONGTEXT NULL,
@@ -150,6 +151,7 @@ CREATE TABLE IF NOT EXISTS conversation_history (
 -- 6. 教师事件表 (teacher_events) - 存储教师发布的学习事件
 -- ====================================================================
 CREATE TABLE IF NOT EXISTS teacher_events (
+    timestamp_utc BOOLEAN NOT NULL DEFAULT TRUE,
     id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '事件 ID',
     teacher_id BIGINT NOT NULL COMMENT '关联教师 ID',
     teacher_name VARCHAR(100) NOT NULL COMMENT '教师姓名',

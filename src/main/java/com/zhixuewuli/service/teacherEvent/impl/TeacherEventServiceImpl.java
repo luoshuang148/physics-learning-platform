@@ -220,7 +220,7 @@ public class TeacherEventServiceImpl implements TeacherEventService {
                 .teacherName(event.getTeacherName())
                 .eventTitle(event.getEventTitle())
                 .eventDescription(event.getEventDescription())
-                .eventTimestamp(event.getEventTimestamp())
+                .eventTimestamp(event.getEventTimestamp()).timestampUtc(event.isTimestampUtc())
                 .isGlobal(event.getIsGlobal())  // 添加 isGlobal 字段
                 .createdAt(event.getCreatedAt())
                 .updatedAt(event.getUpdatedAt())

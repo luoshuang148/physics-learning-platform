@@ -48,6 +48,7 @@ import java.util.stream.Collectors;
 @Slf4j
 public class AliyunAIReportServiceImpl implements AliyunAIReportService {
 
+    private final com.zhixuewuli.service.ai.report.ReportInputRepository reportInputs;
     private final AliyunAIClient aliyunAIClient;
     private final AnswerRecordRepository answerRecordRepository;
     private final QuestionRepository questionRepository;
@@ -118,17 +119,16 @@ public class AliyunAIReportServiceImpl implements AliyunAIReportService {
                         emitter.onError(t -> cancelled.set(true));
 
                         // 查询该会话的答题记录
-                        List<AnswerRecord> records = eventId == null ? answerRecordRepository
-                                .findByUserIdAndSessionIdOrderByAnsweredAtDesc(userId, sessionId)
-                                : answerRecordRepository.findByUserIdAndEventIdOrderByAttemptOrderDesc(userId, eventId);
+                        List<AnswerRecord> records = reportInputs.student(userId,sessionId,eventId);
                         if (records.isEmpty()) {
                             throw new AnswerRecordNotFoundException("该会话无答题记录，无法生成报告");
                         }
 
                         var eventIds = records.stream().map(AnswerRecord::getEventId).distinct().toList();
+                        if(eventIds.size()>1) throw new IllegalArgumentException("请选择单个教学任务生成报告");
                         Long reportEventId = eventId != null ? eventId : eventIds.size() == 1 ? eventIds.getFirst() : null;
                         // 批量加载题目
-                        Map<Long, Question> questionMap = loadQuestionsFromRecords(records);
+                        Map<Long, Question> questionMap = Map.of();
 
                         String model = aiBusinessProperties.getStudentReportGenerationModel();
                         var prepared = com.zhixuewuli.service.ai.report.ReportPreparation.prepare(records, questionMap, objectMapper, false, model);
@@ -245,23 +245,11 @@ public class AliyunAIReportServiceImpl implements AliyunAIReportService {
                         emitter.onTimeout(() -> cancelled.set(true));
                         emitter.onError(t -> cancelled.set(true));
 
-                        List<AnswerRecord> allRecords = new ArrayList<>();
-                        if (eventId != null) {
-                            // Task reports must never fall back to another task's sessions.
-                            allRecords.addAll(answerRecordRepository.findByEventIdOrderByAnsweredAtDesc(eventId));
-                        } else {
-                            // The dashboard's general report keeps its latest-session-per-student semantics.
-                            for (Long uid : answerRecordRepository.findDistinctUserIds()) {
-                                String latestSessionId = answerRecordRepository.findDistinctSessionIdsByUserId(uid)
-                                        .stream().max(Comparator.comparing(SessionUtil::extractTimestamp)).orElse(null);
-                                if (latestSessionId != null) allRecords.addAll(answerRecordRepository
-                                        .findByUserIdAndSessionIdOrderByAnsweredAtDesc(uid, latestSessionId));
-                            }
-                        }
+                        List<AnswerRecord> allRecords = reportInputs.teacher(eventId);
                         if (allRecords.isEmpty()) {
                             throw new AnswerRecordNotFoundException("暂无任何学生答题数据，无法生成教师报告");
                         }
-                        Map<Long, Question> questionMap = loadQuestionsFromRecords(allRecords);
+                        Map<Long, Question> questionMap = Map.of();
                         String model = aiBusinessProperties.getTeacherReportGenerationModel();
                         var prepared = com.zhixuewuli.service.ai.report.ReportPreparation.prepare(allRecords, questionMap, objectMapper, true, model);
                         String prompt = prepared.prompt();
@@ -583,25 +571,13 @@ public class AliyunAIReportServiceImpl implements AliyunAIReportService {
             User student = userRepository.findById(userId)
                     .orElseThrow(() -> new UserNotFoundException("学生用户不存在，无法保存报告"));
 
-            // 检查是否已存在相同会话的报告
-            Optional<StudentReport> existingReport = studentReportRepository
-                    .findByUserIdAndSessionIdAndEventId(userId, sessionId, eventId);
-
-            StudentReport studentReport;
-            if (existingReport.isPresent()) {
-                // 如果已存在，则更新现有报告
-                studentReport = existingReport.get();
-                studentReport.setReportContent(reportContent);
-                log.info("更新学生报告 - 用户ID: {}, 会话ID: {}", userId, sessionId);
-            } else {
-                // 如果不存在，则创建新报告
-                studentReport = new StudentReport();
-                studentReport.setUserId(userId);
-                studentReport.setRealName(student.getRealName());
-                studentReport.setSessionId(sessionId);
-                studentReport.setReportContent(reportContent);
-                log.info("创建新学生报告 - 用户ID: {}, 会话ID: {}", userId, sessionId);
-            }
+            // Each completed generation is immutable. Concurrent generations and legacy
+            // duplicate scopes are safe, and provenance is never overwritten.
+            StudentReport studentReport = new StudentReport();
+            studentReport.setUserId(userId);
+            studentReport.setRealName(student.getRealName());
+            studentReport.setSessionId(sessionId);
+            studentReport.setReportContent(reportContent);
 
             studentReport.setEventId(eventId);
             studentReport.setEvidenceJson(evidence);
@@ -636,7 +612,7 @@ public class AliyunAIReportServiceImpl implements AliyunAIReportService {
                 });
 
         // 3. 获取学生最新报告
-        Optional<StudentReport> latestReportOpt = eventId == null ? studentReportRepository.findLatestByUserId(studentId) : studentReportRepository.findFirstByUserIdAndEventIdOrderByUpdatedAtDesc(studentId, eventId);
+        Optional<StudentReport> latestReportOpt = eventId == null ? studentReportRepository.findLatestByUserId(studentId) : studentReportRepository.findFirstByUserIdAndEventIdOrderByUpdatedAtDescIdDesc(studentId, eventId);
 
         if (latestReportOpt.isEmpty()) {
             log.warn("学生无报告记录 - 学生ID: {}", studentId);
@@ -652,7 +628,7 @@ public class AliyunAIReportServiceImpl implements AliyunAIReportService {
         response.setEvidenceJson(latestReport.getEvidenceJson());
         response.setStudentRealName(student.getRealName());
         response.setLatestReportContent(latestReport.getReportContent());
-        response.setReportCreateTime(latestReport.getCreatedAt());
+        response.setReportCreateTime(latestReport.getUpdatedAt() != null ? latestReport.getUpdatedAt() : latestReport.getCreatedAt());
 
         log.info("成功获取学生最新报告 - 学生ID: {}, 报告创建时间: {}",
                 studentId, latestReport.getCreatedAt());

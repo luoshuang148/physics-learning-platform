@@ -138,11 +138,12 @@
               <textarea
                 v-model="errorReason"
                 class="q-reason-input"
-                rows="4"
+                rows="4" maxlength="255"
+                :disabled="isPersistingAnswer || Boolean(currentPendingAnswer?.submission)"
                 placeholder="例如：我把受力方向看反了、把位移和路程混了、忽略了题目里的限制条件……"
               />
               <div class="q-reason-actions">
-                <button class="neon-btn ghost" :disabled="isPersistingAnswer" @click="skipErrorReasonAndSubmit">放弃填写</button>
+                <button class="neon-btn ghost" :disabled="isPersistingAnswer || Boolean(currentPendingAnswer?.submission)" @click="skipErrorReasonAndSubmit">放弃填写</button>
 
               <button class="neon-btn primary" :disabled="isPersistingAnswer" @click="submitPendingAnswer">{{ isPersistingAnswer ? '提交中…' : '提交并保存' }}</button>
               </div>
@@ -213,6 +214,7 @@ const QUESTION_TASK_EVENT_ID_KEY_PREFIX = 'student_question_task_event_id';
 const QUESTION_VIEW_STATE_LEGACY_KEY = 'student_question_view_state';
 
 interface PendingAnswerResult {
+  submission?: AnswerRecordSubmitPayload;
   requestId: string;
   questionId: number;
   userAnswer: string;
@@ -226,8 +228,8 @@ const route = useRoute();
 const router = useRouter();
 const isPractice = computed(() => route.path === '/student/practice');
 
-const getQuestionViewStateKey = () => `${QUESTION_VIEW_STATE_KEY_PREFIX}_${auth.user?.id ?? 'anonymous'}`;
-const getQuestionTaskEventIdKey = () => `${QUESTION_TASK_EVENT_ID_KEY_PREFIX}_${auth.user?.id ?? 'anonymous'}`;
+const getQuestionViewStateKey = () => `${QUESTION_VIEW_STATE_KEY_PREFIX}_v2_${auth.user?.id ?? 'anonymous'}_${activeTeachingEventId.value ?? 'free'}_${isPractice.value ? `practice_${route.query.questionId ?? 'first'}` : 'assignment'}`;
+const getQuestionTaskEventIdKey = () => `${QUESTION_TASK_EVENT_ID_KEY_PREFIX}_${auth.user?.id ?? 'anonymous'}_${isPractice.value ? 'practice' : 'assignment'}`;
 
 const links = [
   { label: '首页', to: '/student/home' },
@@ -302,18 +304,16 @@ const needsAnswerCommit = computed(() => Boolean(currentPendingAnswer.value));
 const persistQuestionViewState = () => {
   const currentQuestionId = currentQuestion.value?.id ?? null;
   const pending = pendingAnswer.value;
-  const doneEntries = Object.entries(doneMap.value);
   sessionStorage.setItem(getQuestionViewStateKey(), JSON.stringify({
     currentQuestionId,
     selectedOption: selectedOption.value,
     errorReason: errorReason.value,
     pendingAnswer: pending,
-    doneEntries,
     activeTaskTitle: activeTaskTitle.value,
   }));
 };
 
-const restoreQuestionViewState = () => {
+const restoreQuestionViewState = (serverRecords: AnswerRecordResponse[]) => {
   const stateKey = getQuestionViewStateKey();
   const raw = sessionStorage.getItem(stateKey);
   if (!raw) {
@@ -335,10 +335,21 @@ const restoreQuestionViewState = () => {
     pendingAnswer.value = parsed.pendingAnswer ?? null;
     activeTaskTitle.value = parsed.activeTaskTitle ?? activeTaskTitle.value;
 
-    if (Array.isArray(parsed.doneEntries)) {
-      doneMap.value = Object.fromEntries(
-        parsed.doneEntries.map(([key, value]) => [Number(key), value])
-      ) as Record<number, AnswerRecordResponse>;
+    // The database is authoritative. Cached completion can be stale, from practice,
+    // or from a response that never reached this tab.
+    const pending=pendingAnswer.value;
+    if(pending) {
+      const recovered=serverRecords.find(r=>r.requestId===pending.requestId
+        && r.questionId===pending.questionId && r.eventId===activeTeachingEventId.value
+        && Boolean(r.practice)===isPractice.value);
+      if(recovered) {
+        doneMap.value[recovered.questionId]=recovered;
+        pendingAnswer.value=null;selectedOption.value='';errorReason.value=recovered.errorReason ?? '';
+      } else if(!isPractice.value && doneMap.value[pending.questionId]) {
+        pendingAnswer.value=null;selectedOption.value='';
+      } else if(pending.submission) {
+        errorReason.value=pending.submission.errorReason ?? '';
+      }
     }
 
     if (parsed.currentQuestionId) {
@@ -438,8 +449,7 @@ const applyCommittedResult = (result: AnswerRecordResponse) => {
 const activeTeachingEventId = ref<number | null>(null);
 
 const persistAnswerRecord = async (payload: AnswerRecordSubmitPayload) => {
-  const result = await submitAnswerApi({ ...payload, eventId: activeTeachingEventId.value ?? undefined,
-    requestId: pendingAnswer.value?.requestId ?? crypto.randomUUID(), intent: isPractice.value ? 'PRACTICE' : 'ASSIGNMENT' });
+  const result = await submitAnswerApi(payload);
   applyCommittedResult(result);
   persistQuestionViewState();
   return result;
@@ -450,11 +460,18 @@ const submitPendingAnswer = async () => {
 
   isPersistingAnswer.value = true;
   try {
-    const result = await persistAnswerRecord({
-      questionId: currentQuestion.value.id,
-      userAnswer: currentPendingAnswer.value.userAnswer,
-      errorReason: currentPendingAnswer.value.correct ? '' : (errorReason.value.trim() || ''),
-    });
+    if(!currentPendingAnswer.value.submission) {
+      pendingAnswer.value={...currentPendingAnswer.value,submission:{
+        eventId:activeTeachingEventId.value ?? undefined,
+        requestId:currentPendingAnswer.value.requestId,
+        intent:isPractice.value ? 'PRACTICE' : 'ASSIGNMENT',
+        questionId:currentQuestion.value.id,userAnswer:currentPendingAnswer.value.userAnswer,
+        errorReason:currentPendingAnswer.value.correct ? '' : errorReason.value.trim(),
+      }};
+      // Persist the exact body before I/O; an unknown network result must retry it unchanged.
+      persistQuestionViewState();
+    }
+    const result=await persistAnswerRecord(pendingAnswer.value!.submission!);
 
     show(result.correct ? '本题答案已提交成功' : '错因已提交并保存成功', 'success');
 
@@ -528,7 +545,6 @@ onMounted(async () => {
     const previousTaskEventId = sessionStorage.getItem(questionTaskEventIdKey);
     if (currentTaskEventId && previousTaskEventId !== currentTaskEventId) {
       resetSessionId();
-      clearQuestionViewState();
       doneMap.value = {};
       pendingAnswer.value = null;
       selectedOption.value = '';
@@ -561,7 +577,7 @@ onMounted(async () => {
     }
     doneMap.value = isPractice.value ? {} : map;
 
-    if (!isPractice.value) restoreQuestionViewState();
+    restoreQuestionViewState(recordResult.records ?? []);
     if (isPractice.value) currentQuestion.value = questions.value.find(q => q.id === Number(route.query.questionId)) ?? questions.value[0] ?? null;
     currentQuestion.value = currentQuestion.value ?? questions.value[0] ?? null;
     if (currentQuestion.value && doneMap.value[currentQuestion.value.id]) {
@@ -580,7 +596,7 @@ onMounted(async () => {
 
 const restartPractice = () => {
   if (!currentQuestion.value) return;
-  delete doneMap.value[currentQuestion.value.id];pendingAnswer.value=null;submitResult.value=null;selectedOption.value='';errorReason.value='';
+  delete doneMap.value[currentQuestion.value.id];pendingAnswer.value=null;submitResult.value=null;selectedOption.value='';errorReason.value='';clearQuestionViewState();
 };
 
 const submitAnswer = async () => {

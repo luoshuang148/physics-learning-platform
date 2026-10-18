@@ -16,7 +16,7 @@ import java.util.Optional;
  */
 @Repository
 public interface StudentReportRepository extends JpaRepository<StudentReport, Long> {
-    Optional<StudentReport> findFirstByUserIdAndEventIdOrderByUpdatedAtDesc(Long userId,Long eventId);
+    Optional<StudentReport> findFirstByUserIdAndEventIdOrderByUpdatedAtDescIdDesc(Long userId,Long eventId);
     Optional<StudentReport> findByUserIdAndSessionIdAndEventId(Long userId, String sessionId, Long eventId);
 
     /**
@@ -74,6 +74,6 @@ public interface StudentReportRepository extends JpaRepository<StudentReport, Lo
      * @param userId 学生用户 ID
      * @return 最新报告（如果存在）
      */
-    @Query("SELECT sr FROM StudentReport sr WHERE sr.userId = ?1 ORDER BY sr.createdAt DESC LIMIT 1")
+    @Query("SELECT sr FROM StudentReport sr WHERE sr.userId = ?1 ORDER BY sr.updatedAt DESC, sr.id DESC LIMIT 1")
     Optional<StudentReport> findLatestByUserId(Long userId);
 }

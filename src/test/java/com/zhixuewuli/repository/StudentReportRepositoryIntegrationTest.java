@@ -252,6 +252,20 @@ class StudentReportRepositoryIntegrationTest extends BaseIntegrationTest {
     /**
      * 辅助方法：创建用户
      */
+    @Test
+    void latestReportUsesGenerationTimeAndDeterministicIdForLegacyDuplicates() {
+        User user=createUser("latest_generation_fixture","latest_generation_fixture");
+        var older=createReport(user,"a","regenerated A");var newer=createReport(user,"b","original B");
+        jpaEntityManager.flush();
+        jdbcTemplate.update("UPDATE student_reports SET created_at='2026-01-01 00:00:00',updated_at='2026-03-01 00:00:00' WHERE id=?",older.getId());
+        jdbcTemplate.update("UPDATE student_reports SET created_at='2026-02-01 00:00:00',updated_at='2026-02-01 00:00:00' WHERE id=?",newer.getId());
+        jpaEntityManager.clear();
+        assertThat(studentReportRepository.findLatestByUserId(user.getId()).orElseThrow().getId()).isEqualTo(older.getId());
+        jdbcTemplate.update("UPDATE student_reports SET updated_at='2026-03-01 00:00:00' WHERE user_id=?",user.getId());
+        jpaEntityManager.clear();
+        assertThat(studentReportRepository.findLatestByUserId(user.getId()).orElseThrow().getId()).isEqualTo(newer.getId());
+    }
+
     private User createUser(String username, String realName) {
         User user = new User();
         user.setUsername(username + "_" + System.currentTimeMillis());

@@ -203,6 +203,7 @@ import AppShell from '@/layouts/AppShell.vue';
 import LatexText from '@/components/LatexText.vue';
 import StreamOutput from '@/components/StreamOutput.vue';
 import { useAuthStore } from '@/stores/auth';
+import { scopedPracticeRows } from '@/utils/practiceReview';
 import { getPracticeReviewApi } from '@/api/answer-record';
 import { streamWrongQuestionAnalysis } from '@/api/ai';
 import { useAIStreamState } from '@/composables/useAIStreamState';
@@ -615,12 +616,7 @@ onMounted(async () => {
   loading.value = true;
   try {
     const res = await getPracticeReviewApi();
-    const seen = new Set<string>();
-    records.value = res.records.filter((r) => {
-      if (seen.has(r.questionContent)) return false;
-      seen.add(r.questionContent);
-      return true;
-    });
+    records.value = scopedPracticeRows(res.records);
   } finally {
     loading.value = false;
   }

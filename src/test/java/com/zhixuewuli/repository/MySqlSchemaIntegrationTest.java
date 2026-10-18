@@ -24,6 +24,7 @@ class MySqlSchemaIntegrationTest {
     @Autowired TeacherEventRepository events;
     @Autowired AnswerRecordRepository answers;
     @Autowired AnswerRecordService service;
+    @Autowired com.zhixuewuli.service.ai.report.ReportInputRepository reportInputs;
     @Autowired TeacherEventService teaching;
 
     @Test
@@ -53,6 +54,11 @@ class MySqlSchemaIntegrationTest {
         assertThat(page.getRecords()).hasSize(1);
         assertThat(page.getRecords().getFirst().getImageBase64()).isNull();
         assertThat(answers.findAll().getFirst().getEventId()).isEqualTo(eventId);
+        var input = reportInputs.student(student.getId(), "mysql-session", eventId);
+        assertThat(input).hasSize(1);
+        assertThat(input.getFirst().getContentSnapshot()).isEqualTo("MySQL projection fixture");
+        assertThat(input.getFirst().getQuestionSnapshot()).isNull();
+        assertThat(input.getFirst().isTimestampUtc()).isTrue();
         teaching.deleteCurrentEvent(teacher.getId());
         assertThat(answers.count()).isEqualTo(1);
         assertThat(events.findById(eventId).orElseThrow().getIsGlobal()).isFalse();

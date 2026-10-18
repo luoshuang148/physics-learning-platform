@@ -16,6 +16,7 @@ import com.zhixuewuli.entity.Question;
 import com.zhixuewuli.repository.AnswerRecordRepository;
 import com.zhixuewuli.repository.QuestionRepository;
 import com.zhixuewuli.service.ai.unit.AIAsyncTestBase;
+import com.zhixuewuli.service.ai.report.ReportInputRepository;
 import com.zhixuewuli.service.questionErrorAnalysis.impl.QuestionErrorAnalysisServiceImpl;
 import com.zhixuewuli.service.session.SessionManager;
 import org.junit.jupiter.api.BeforeEach;
@@ -54,6 +55,9 @@ class QuestionErrorAnalysisAsyncTest extends AIAsyncTestBase {
 
         @Mock
         private QuestionRepository questionRepository;
+
+        @Mock
+        private ReportInputRepository reportInputs;
 
         @Mock
         private UserPermissionUtil userPermissionUtil;
@@ -124,7 +128,7 @@ class QuestionErrorAnalysisAsyncTest extends AIAsyncTestBase {
                                                                 ", userId=" + invocation.getArgument(1) +
                                                                 ", conversationType=" + invocation.getArgument(2) +
                                                                 ", questionId=" + invocation.getArgument(3));
-                                                // 调用 supplier 获取上下文（这会触发 questionRepository.findById）
+                                                // 调用 supplier 获取有界的历史快照上下文
                                                 java.util.function.Supplier<String> contextSupplier = invocation
                                                                 .getArgument(4);
                                                 String context = contextSupplier.get();
@@ -228,8 +232,9 @@ class QuestionErrorAnalysisAsyncTest extends AIAsyncTestBase {
                                         anyLong(),
                                         any());
 
-                        // 验证题目查询被调用（首次交互时用于上下文构建）
-                        verify(questionRepository).findById(TEST_QUESTION_ID);
+                        // 首次上下文使用有界投影，避免加载含图片的完整题目实体。
+                        verify(reportInputs).question(TEST_QUESTION_ID);
+                        verify(questionRepository, never()).findById(TEST_QUESTION_ID);
 
                         // 验证 AI 客户端被调用
                         verify(aliyunAIClient).streamGenerate(any(), any(), any(AIStreamCallback.class));

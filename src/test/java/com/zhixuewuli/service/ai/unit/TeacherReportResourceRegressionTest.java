@@ -20,7 +20,8 @@ class TeacherReportResourceRegressionTest {
     private final StreamUtils streams = new StreamUtils(config);
     private final AnswerRecordRepository answers = mock(AnswerRecordRepository.class);
     private final AliyunAIClient client = mock(AliyunAIClient.class);
-    private final AliyunAIReportServiceImpl service = new AliyunAIReportServiceImpl(client, answers,
+    private final com.zhixuewuli.service.ai.report.ReportInputRepository inputs=mock(com.zhixuewuli.service.ai.report.ReportInputRepository.class);
+    private final AliyunAIReportServiceImpl service = new AliyunAIReportServiceImpl(inputs,client, answers,
             mock(QuestionRepository.class), mock(StudentReportRepository.class), mock(UserRepository.class),
             config, new AIBusinessProperties(), mock(OptionMappingUtil.class), mock(UserPermissionUtil.class),
             streams, new ObjectMapper(), mock(TransactionTemplate.class), Runnable::run);
@@ -37,17 +38,14 @@ class TeacherReportResourceRegressionTest {
     }
 
     @Test void preQueryFailureReleasesEmitter() {
-        when(answers.findDistinctUserIds()).thenThrow(new IllegalStateException("database unavailable"));
+        when(inputs.teacher(null)).thenThrow(new IllegalStateException("database unavailable"));
         var emitter = streams.createConfiguredEmitterWithLimit(60000L, 3000L);
         assertThatCode(() -> service.streamTeacherAnalysis(emitter, 1L)).doesNotThrowAnyException();
         assertThat(streams.getActiveConnectionCount()).isZero();
     }
 
     @Test void taskWithNoAnswersDoesNotFallBackToArchivedAnswers() {
-        when(answers.findDistinctUserIds()).thenReturn(List.of(7L));
-        when(answers.findDistinctSessionIdsByUserId(7L)).thenReturn(List.of("20260101000000_aabbccddeeff0011"));
-        AnswerRecord archived = new AnswerRecord(); archived.setUserId(7L); archived.setQuestionId(9L); archived.setEventId(10L);
-        when(answers.findByUserIdAndSessionIdOrderByAnsweredAtDesc(eq(7L), anyString())).thenReturn(List.of(archived));
+        when(inputs.teacher(11L)).thenReturn(List.of());
         var emitter = streams.createConfiguredEmitterWithLimit(60000L, 3000L);
         service.streamTeacherAnalysis(emitter, 1L, 11L);
         verify(answers, never()).findDistinctUserIds();

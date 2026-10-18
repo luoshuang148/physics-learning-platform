@@ -14,18 +14,23 @@ def command(binary):
     return cmd
 def sql(query,database=None):
     cmd=command('mysql')+['--batch','--skip-column-names']+([database] if database else [])
-    return subprocess.run(cmd,input=query,text=True,check=True,capture_output=True).stdout.strip()
+    result=subprocess.run(cmd,input=query,text=True,capture_output=True)
+    if result.returncode:raise RuntimeError(result.stderr.strip())
+    return result.stdout.strip()
 def file(name,database=None):return sql((ROOT/name).read_text(),database)
 if args.phase=='upgrade':
     file('src/test/resources/mysql/schema-v1.sql')
     sql("""INSERT INTO users(id,username,password_hash,real_name,user_type,active) VALUES(920001,'migration_teacher','unused-hash','Fixture','TEACHER',true);
     INSERT INTO questions(id,content,content_hash,options,correct_option,difficulty) VALUES(920001,'Legacy original','migration-fixture','{\"A\":\"a\",\"B\":\"b\"}','A',1);
-    INSERT INTO teacher_events(id,teacher_id,teacher_name,event_title,event_description,event_timestamp,is_global) VALUES(920001,920001,'Fixture','Legacy task','QIDS:920001,920002',CURRENT_TIMESTAMP,true);
+    INSERT INTO teacher_events(id,teacher_id,teacher_name,event_title,event_description,event_timestamp,is_global) VALUES(920001,920001,'Fixture','Legacy task','QIDS:920001,920002,920001',CURRENT_TIMESTAMP,true);
+    INSERT INTO teacher_events(id,teacher_id,teacher_name,event_title,event_description,event_timestamp,is_global) VALUES(920002,920001,'Fixture','Malformed legacy','QIDS:invalid-json',CURRENT_TIMESTAMP,false);
     INSERT INTO answer_records(id,user_id,question_id,session_id,selected_option,correct,answered_at) VALUES('migration-attempt',920001,920001,'legacy','B',false,CURRENT_TIMESTAMP);""",'zhixuewuli')
     file('src/main/resources/sql/upgrades/V2__archive_teaching_events.sql','zhixuewuli')
     file('src/main/resources/sql/upgrades/V3__task_snapshots_and_attempts.sql','zhixuewuli')
     assert sql('SELECT GROUP_CONCAT(snapshot_origin ORDER BY position_number) FROM teacher_event_questions','zhixuewuli')=='MIGRATED,MISSING'
     assert sql("SELECT CONCAT(practice,':',attempt_order) FROM answer_records WHERE id='migration-attempt'",'zhixuewuli')=='1:1'
+    assert sql('SELECT event_description FROM teacher_events WHERE id=920001','zhixuewuli')=='QIDS:920001,920002,920001'
+    assert sql('SELECT COUNT(*) FROM teacher_event_questions WHERE event_id=920002','zhixuewuli')=='0'
     assert sql('SELECT token_version FROM users WHERE id=920001','zhixuewuli')=='1'
     # Leave an upgraded empty schema for the same service contract tests as the fresh schema.
     sql('DELETE FROM answer_records;DELETE FROM teacher_event_questions;DELETE FROM teacher_events;DELETE FROM questions;DELETE FROM users;','zhixuewuli')
