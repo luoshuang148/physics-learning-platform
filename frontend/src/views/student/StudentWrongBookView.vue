@@ -436,10 +436,10 @@ const submitQuestionAsk = async (item: AnswerRecordResponse) => {
 
   try {
     await streamWrongQuestionAnalysis(
-      { question: prompt, questionId: item.questionId },
+      { question: prompt, questionId: item.questionId, recordId: item.recordId },
       {
         signal: abortController.signal,
-        sessionType: `student_wrong_book_${item.questionId}`,
+        sessionType: `student_wrong_book_${item.recordId}`,
         onMessage: (payload) => {
           aiState.value.content += payload.content;
         },
@@ -531,10 +531,10 @@ const startInitialAnalysis = async (item: AnswerRecordResponse) => {
   try {
     const question = buildInitialQuestion(item);
     await streamWrongQuestionAnalysis(
-      { question, questionId: item.questionId },
+      { question, questionId: item.questionId, recordId: item.recordId },
       {
         signal: abortController.signal,
-        sessionType: `student_wrong_book_${item.questionId}`,
+        sessionType: `student_wrong_book_${item.recordId}`,
         onMessage: (payload) => {
           aiState.value.content += payload.content;
         },

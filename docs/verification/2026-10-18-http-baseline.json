@@ -1,0 +1,35 @@
+{
+  "scope": "synthetic local MySQL HTTP reads; AI disabled; not production capacity",
+  "databaseVersion": "8.0.46",
+  "platform": "Darwin arm64",
+  "cpu": "arm",
+  "logicalCores": 8,
+  "javaVersion": "21",
+  "dataset": {
+    "students": 100,
+    "questions": 50,
+    "answers": 5000,
+    "snapshotImageBytesPerAnswer": 1024
+  },
+  "requests": 400,
+  "concurrency": 8,
+  "durationSeconds": 7.455,
+  "successfulRequests": 400,
+  "requestsPerSecond": 53.65,
+  "endpoints": {
+    "page": {
+      "samples": 200,
+      "p50Ms": 128.17,
+      "p95Ms": 185.38,
+      "p99Ms": 316.26,
+      "meanResponseBytes": 8818
+    },
+    "summary": {
+      "samples": 200,
+      "p50Ms": 157.96,
+      "p95Ms": 217.19,
+      "p99Ms": 265.17,
+      "meanResponseBytes": 381
+    }
+  }
+}

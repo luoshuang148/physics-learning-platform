@@ -148,7 +148,7 @@
               </div>
             </div>
             <div v-else class="q-submit-row q-submit-row-pending">
-              <button class="neon-btn primary" :disabled="isPersistingAnswer" @click="goNextQuestionAfterCommit">{{ currentIndex < questions.length - 1 ? '下一题' : '完成本题' }}</button>
+              <button class="neon-btn primary" :disabled="isPersistingAnswer" @click="goNextQuestionAfterCommit">重试保存作答</button>
             </div>
           </template>
 
@@ -600,11 +600,12 @@ const submitAnswer = async () => {
   errorReason.value = '';
   persistQuestionViewState();
 
+  if (localResult.correct) {
+    await submitPendingAnswer();
+    return;
+  }
   playQuestionVideo(currentQuestion.value, selectedOption.value);
-  show(localResult.correct
-    ? '已完成本地判题，可先查看讲解视频或直接提交本题，并可继续使用 AI 解惑'
-    : '已根据当前选项定位讲解视频，观看后请填写错因并提交记录'
-  );
+  show('请填写或放弃错因，再保存本题作答。');
 };
 </script>
 

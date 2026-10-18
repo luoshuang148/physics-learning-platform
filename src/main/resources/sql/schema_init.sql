@@ -93,6 +93,7 @@ CREATE TABLE IF NOT EXISTS answer_records (
     event_id BIGINT NULL COMMENT '教学任务ID，旧数据和自由练习可为空',
     INDEX idx_answer_records_event (event_id),
     INDEX idx_task_attempt (user_id,event_id,question_id,attempt_order),
+    INDEX idx_event_summary (event_id,practice,user_id,question_id,correct,attempt_order),
     id VARCHAR(36) PRIMARY KEY COMMENT '记录ID（UUID）',
     user_id BIGINT NOT NULL COMMENT '用户ID',
     question_id BIGINT NOT NULL COMMENT '题目ID',

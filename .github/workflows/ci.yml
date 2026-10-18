@@ -62,9 +62,78 @@ jobs:
         run: docker exec -i ${{ job.services.mysql.id }} mysql -uroot -ptest-root-password < src/main/resources/sql/schema_init.sql
       - name: Verify fresh schema against MySQL 8.4
         run: ./mvnw -B test -Dgroups=mysql -DexcludedGroups=external-api
-      - name: Restore legacy fixture and apply non-destructive upgrade
-        run: |
-          docker exec -i ${{ job.services.mysql.id }} mysql -uroot -ptest-root-password < src/test/resources/mysql/schema-v1.sql
-          docker exec -i ${{ job.services.mysql.id }} mysql -uroot -ptest-root-password zhixuewuli < src/main/resources/sql/upgrades/V2__archive_teaching_events.sql
+      - name: Verify preserved legacy fixture and upgrade through V3
+        env:
+          CONFIRM_ISOLATED_DATABASE: '1'
+          MYSQL_CONTAINER: ${{ job.services.mysql.id }}
+          MYSQL_PWD: test-root-password
+        run: python3 scripts/verification/mysql_delivery.py upgrade
       - name: Verify upgraded schema against MySQL 8.4
         run: ./mvnw -B test -Dgroups=mysql -DexcludedGroups=external-api
+
+  delivery:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: test-root-password
+          MYSQL_DATABASE: zhixuewuli
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost -ptest-root-password"
+          --health-interval=10s --health-timeout=5s --health-retries=10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Build deployable frontend/backend image
+        run: docker build -t physics-learning:e2e .
+      - name: Initialize isolated schema and boot real image with AI disabled
+        run: |
+          docker exec -i ${{ job.services.mysql.id }} mysql -uroot -ptest-root-password < src/main/resources/sql/schema_init.sql
+          docker run -d --name physics-e2e --network host -e SPRING_PROFILES_ACTIVE=prod -e SERVER_PORT=18080 -e DB_HOST=127.0.0.1 -e DB_PORT=3306 -e DB_USER=root -e DB_PASSWORD=test-root-password -e APP_JWT_SECRET=isolated-ci-fixture-secret-never-use-in-production-2026 -e AI_ENABLED=false -e ALIYUN_AI_API_KEY= -e ZHIPU_AI_API_KEY= -e BOOTSTRAP_TEACHER_ENABLED=true -e BOOTSTRAP_TEACHER_USERNAME=e2e_teacher -e BOOTSTRAP_TEACHER_PASSWORD=E2e-teacher-fixture-2026 physics-learning:e2e
+          for n in $(seq 1 60); do
+            if curl --silent --fail http://127.0.0.1:18080/api/v1/actuator/health; then exit 0; fi
+            sleep 2
+          done
+          docker logs physics-e2e
+          exit 1
+      - run: npm ci
+        working-directory: frontend
+      - run: npx playwright install --with-deps chromium
+        working-directory: frontend
+      - name: Browser learning lifecycle and security regression
+        run: npm run test:e2e
+        working-directory: frontend
+      - name: Synthetic MySQL HTTP benchmark
+        env:
+          CONFIRM_ISOLATED_DATABASE: '1'
+          MYSQL_CONTAINER: ${{ job.services.mysql.id }}
+          MYSQL_PWD: test-root-password
+        run: |
+          mkdir -p artifacts/verification
+          python3 scripts/verification/http_benchmark.py > artifacts/verification/benchmark-ci.json
+      - name: Backup and restore checksum verification
+        env:
+          CONFIRM_ISOLATED_DATABASE: '1'
+          MYSQL_CONTAINER: ${{ job.services.mysql.id }}
+          MYSQL_PWD: test-root-password
+        run: python3 scripts/verification/mysql_delivery.py backup > artifacts/verification/backup-restore.json
+      - name: Collect deployment logs
+        if: always()
+        run: |
+          mkdir -p artifacts/verification
+          docker logs physics-e2e > artifacts/verification/app.log 2>&1 || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: delivery-evidence
+          path: |
+            frontend/test-results
+            frontend/playwright-report
+            artifacts/verification

@@ -40,6 +40,7 @@ import java.util.UUID;
 @Entity
 @Table(name = "answer_records", uniqueConstraints=@UniqueConstraint(name="uk_user_request",columnNames={"user_id","request_id"}), indexes = {
         @Index(name = "idx_answer_records_event", columnList = "event_id"),
+        @Index(name = "idx_event_summary", columnList = "event_id,practice,user_id,question_id,correct,attempt_order"),
         @Index(name = "idx_question_answered", columnList = "question_id, answered_at"),
         @Index(name = "idx_user_answered", columnList = "user_id, answered_at"),
         @Index(name = "idx_session_answered", columnList = "session_id, answered_at"),

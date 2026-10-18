@@ -204,3 +204,9 @@ data/videos/
 
 !.dockerignore
 !src/main/resources/application-dev.yml
+
+frontend/playwright-report/
+frontend/test-results/
+artifacts/verification/
+
+__pycache__/

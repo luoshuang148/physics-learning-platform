@@ -46,3 +46,6 @@ ALTER TABLE student_reports ADD COLUMN evidence_json TEXT NULL;
 
 CREATE INDEX idx_task_attempt ON answer_records(user_id,event_id,question_id,attempt_order);
 CREATE INDEX idx_history_scope ON conversation_history(user_id,session_id,conversation_type,question_id,event_id,is_active,sequence_number);
+
+-- Cover task aggregates without reading large answer snapshot rows.
+CREATE INDEX idx_event_summary ON answer_records(event_id,practice,user_id,question_id,correct,attempt_order);
