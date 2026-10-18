@@ -5,19 +5,19 @@
         <div class="hero-stats">
           <div class="stat-card cyan">
             <span class="stat-num">{{ users.length }}</span>
-            <span class="stat-label">全部用户</span>
+            <span class="stat-label">学生总数</span>
           </div>
           <div class="stat-card amber">
-            <span class="stat-num">{{ studentCount }}</span>
-            <span class="stat-label">学生</span>
+            <span class="stat-num">{{ activeCount }}</span>
+            <span class="stat-label">正常</span>
           </div>
           <div class="stat-card rose">
-            <span class="stat-num">{{ teacherCount }}</span>
-            <span class="stat-label">教师</span>
+            <span class="stat-num">{{ inactiveCount }}</span>
+            <span class="stat-label">停用</span>
           </div>
           <div class="stat-card ghost">
-            <span class="stat-num">{{ inactiveCount }}</span>
-            <span class="stat-label">停用账户</span>
+            <span class="stat-num">{{ classCount }}</span>
+            <span class="stat-label">班级数</span>
           </div>
         </div>
       </section>
@@ -25,11 +25,6 @@
       <section class="toolbar">
         <div class="toolbar-left">
           <input v-model="searchText" class="toolbar-search" placeholder="搜索姓名 / 账号 / 班级…" />
-          <select v-model="roleFilter" class="toolbar-select">
-            <option value="">全部角色</option>
-            <option value="STUDENT">学生</option>
-            <option value="TEACHER">教师</option>
-          </select>
           <select v-model="statusFilter" class="toolbar-select">
             <option value="">全部状态</option>
             <option value="active">正常</option>
@@ -46,14 +41,14 @@
         <div class="user-list-panel">
           <div class="panel-head">
             <div>
-              <div class="panel-kicker">用户列表</div>
-              <div class="panel-title">用户列表</div>
+              <div class="panel-kicker">学生名册</div>
+              <div class="panel-title">学生列表</div>
             </div>
             <span class="panel-count">{{ filteredUsers.length }} / {{ users.length }}</span>
           </div>
 
-          <div v-if="loading" class="panel-empty">正在加载用户数据…</div>
-          <div v-else-if="filteredUsers.length === 0" class="panel-empty">暂无匹配用户</div>
+          <div v-if="loading" class="panel-empty">正在加载学生数据…</div>
+          <div v-else-if="filteredUsers.length === 0" class="panel-empty">暂无匹配学生</div>
           <div v-else class="user-list">
             <button
               v-for="user in filteredUsers"
@@ -67,9 +62,7 @@
                   <div class="user-name">{{ user.realName }}</div>
                   <div class="user-item-meta">@{{ user.username }} · {{ user.className || '未分班' }}</div>
                 </div>
-                <span class="user-role" :class="user.userType === 'TEACHER' ? 'teacher' : 'student'">
-                  {{ user.userType === 'TEACHER' ? '教师' : '学生' }}
-                </span>
+                <span class="user-role student">学生</span>
               </div>
               <div class="user-item-footer">
                 <span class="status-pack">
@@ -83,12 +76,12 @@
         </div>
 
         <div class="editor-panel">
-          <div v-if="!selectedUser" class="panel-empty large">从左侧选择一个用户开始管理</div>
+          <div v-if="!selectedUser" class="panel-empty large">从左侧选择一名学生</div>
           <template v-else>
             <div class="panel-head editor-head">
               <div>
-                <div class="panel-kicker">编辑用户</div>
-                <div class="editor-title">编辑用户 #{{ selectedUser.id }}</div>
+                <div class="panel-kicker">编辑学生</div>
+                <div class="editor-title">编辑学生 #{{ selectedUser.id }}</div>
 
               </div>
               <button class="ghost-btn" @click="reloadSelected">同步最新信息</button>
@@ -120,14 +113,6 @@
                 <input v-model="form.className" class="field-input"  />
               </label>
 
-              <label class="field-block">
-                <span class="field-label">角色</span>
-                <select v-model="form.userType" class="field-input">
-                  <option value="STUDENT">学生</option>
-                  <option value="TEACHER">教师</option>
-                </select>
-              </label>
-
               <label class="field-block toggle-field">
                 <span class="field-label">账号状态</span>
                 <button class="toggle-btn" :class="form.active ? 'on' : 'off'" @click="form.active = !form.active">
@@ -139,10 +124,10 @@
             <div class="editor-actions">
               <button class="ghost-btn" :disabled="saving" @click="resetForm">重置修改</button>
               <button class="primary-btn" :disabled="saving || !selectedUser" @click="saveUser">
-                {{ saving ? '保存中…' : '保存用户信息' }}
+                {{ saving ? '保存中…' : '保存学生信息' }}
               </button>
               <button class="danger-btn" :disabled="saving || deleting" @click="deleteUser">
-                {{ deleting ? '删除中…' : '删除该用户' }}
+                {{ deleting ? '删除中…' : '删除该学生' }}
               </button>
             </div>
           </template>
@@ -163,7 +148,6 @@ import { useAuthStore } from '@/stores/auth';
 import { teacherNavLinks } from '@/constants/navigation';
 import { deleteUserByAdminApi, getAllUsersApi, getUserByIdApi, updateUserByAdminApi } from '@/api/user';
 import type { UserAdminUpdateRequest, UserResponse } from '@/types/user';
-import type { UserType } from '@/types/common';
 
 const auth = useAuthStore();
 const { visible, type, message, show } = useToast();
@@ -174,7 +158,6 @@ const loading = ref(false);
 const saving = ref(false);
 const deleting = ref(false);
 const searchText = ref('');
-const roleFilter = ref('');
 const statusFilter = ref('');
 const users = ref<UserResponse[]>([]);
 const selectedUser = ref<UserResponse | null>(null);
@@ -182,13 +165,12 @@ const selectedUser = ref<UserResponse | null>(null);
 const form = reactive({
   realName: '',
   className: '',
-  userType: 'STUDENT' as UserType,
   active: true,
 });
 
-const studentCount = computed(() => users.value.filter(user => user.userType === 'STUDENT').length);
-const teacherCount = computed(() => users.value.filter(user => user.userType === 'TEACHER').length);
+const activeCount = computed(() => users.value.filter(user => user.active).length);
 const inactiveCount = computed(() => users.value.filter(user => !user.active).length);
+const classCount = computed(() => new Set(users.value.map(user => user.className).filter(Boolean)).size);
 
 const filteredUsers = computed(() => {
   const keyword = searchText.value.trim().toLowerCase();
@@ -197,18 +179,16 @@ const filteredUsers = computed(() => {
       || user.realName.toLowerCase().includes(keyword)
       || user.username.toLowerCase().includes(keyword)
       || (user.className ?? '').toLowerCase().includes(keyword);
-    const hitRole = !roleFilter.value || user.userType === roleFilter.value;
     const hitStatus = !statusFilter.value
       || (statusFilter.value === 'active' && user.active)
       || (statusFilter.value === 'inactive' && !user.active);
-    return hitKeyword && hitRole && hitStatus;
+    return hitKeyword && hitStatus;
   });
 });
 
 const syncForm = (user: UserResponse) => {
   form.realName = user.realName;
   form.className = user.className ?? '';
-  form.userType = user.userType;
   form.active = user.active;
 };
 
@@ -223,7 +203,7 @@ const formatDate = (date: string) => new Date(date).toLocaleString('zh-CN', {
 const loadUsers = async () => {
   loading.value = true;
   try {
-    users.value = await getAllUsersApi();
+    users.value = (await getAllUsersApi()).filter(user => user.userType === 'STUDENT');
     if (selectedUser.value) {
       const matched = users.value.find(user => user.id === selectedUser.value?.id);
       if (matched) {
@@ -234,7 +214,7 @@ const loadUsers = async () => {
       }
     }
   } catch (error: any) {
-    show(error?.response?.data?.message ?? '用户列表加载失败', 'error');
+    show(error?.response?.data?.message ?? '学生名册加载失败', 'error');
   } finally {
     loading.value = false;
   }
@@ -258,7 +238,7 @@ const reloadSelected = async () => {
     const latest = await getUserByIdApi(selectedUser.value.id);
     selectedUser.value = latest;
     syncForm(latest);
-    show('已同步最新用户信息', 'success');
+    show('已同步最新学生信息', 'success');
   } catch (error: any) {
     show(error?.response?.data?.message ?? '重新读取失败', 'error');
   }
@@ -282,16 +262,15 @@ const saveUser = async () => {
       userId: selectedUser.value.id,
       realName: form.realName.trim(),
       className: form.className.trim() || null,
-      userType: form.userType,
       active: form.active,
     };
     const updated = await updateUserByAdminApi(payload);
     selectedUser.value = updated;
     syncForm(updated);
     await loadUsers();
-    show('用户信息已更新', 'success');
+    show('学生信息已更新', 'success');
   } catch (error: any) {
-    show(error?.response?.data?.message ?? '更新用户失败', 'error');
+    show(error?.response?.data?.message ?? '更新学生失败', 'error');
   } finally {
     saving.value = false;
   }
@@ -299,10 +278,6 @@ const saveUser = async () => {
 
 const deleteUser = async () => {
   if (!selectedUser.value) return;
-  if (selectedUser.value.id === auth.user?.id) {
-    show('不能删除当前登录教师账号', 'info');
-    return;
-  }
 
   const currentId = selectedUser.value.id;
   deleting.value = true;
@@ -310,9 +285,9 @@ const deleteUser = async () => {
     await deleteUserByAdminApi(currentId);
     selectedUser.value = null;
     await loadUsers();
-    show(`用户 #${currentId} 已删除`, 'success');
+    show(`学生 #${currentId} 已删除`, 'success');
   } catch (error: any) {
-    show(error?.response?.data?.message ?? '删除用户失败', 'error');
+    show(error?.response?.data?.message ?? '删除学生失败', 'error');
   } finally {
     deleting.value = false;
   }
@@ -693,4 +668,31 @@ select.field-input option {
     width: 100%;
   }
 }
+
+/* Light workspace overrides for the roster page */
+.user-hero {
+  display: block !important;
+  padding: 0 !important;
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+.hero-stats { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; gap: 12px !important; }
+.editor-panel {
+  padding: 16px !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 12px !important;
+  background: #fff !important;
+  box-shadow: none !important;
+}
+.editor-title { color: #172033 !important; font-size: 18px !important; }
+.panel-kicker { color: #94a3b8 !important; }
+.overview-chip { background: #f8fafc !important; border: 1px solid #eef2f7 !important; }
+.overview-label { color: #64748b !important; }
+.overview-chip strong { color: #172033 !important; }
+.field-label { color: #334155 !important; }
+.field-input { color: #172033 !important; background: #fff !important; border: 1px solid #dbe3ec !important; }
+.toggle-btn.on { color: #0f766e !important; background: #ecfdf5 !important; border-color: #a7f3d0 !important; }
+.toggle-btn.off { color: #b91c1c !important; background: #fef2f2 !important; border-color: #fecaca !important; }
+@media (max-width: 900px) { .hero-stats { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; } }
 </style>
