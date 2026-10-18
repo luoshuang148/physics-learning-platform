@@ -1,5 +1,5 @@
 <template>
-  <AppShell :subtitle="`用户管理 · ${auth.user?.realName ?? ''}`" :links="links">
+  <AppShell :subtitle="`学生名册 · ${auth.user?.realName ?? ''}`" :links="links">
     <div class="user-page ops-typography">
       <section class="user-hero">
         <div class="hero-stats">

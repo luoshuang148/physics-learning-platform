@@ -11,7 +11,7 @@
         </div>
         <div class="summary-card">
           <span>应交学生</span>
-          <strong>{{ studentUsers.length }}</strong>
+          <strong>{{ totalStudents }}</strong>
           <small>当前启用</small>
         </div>
         <div class="summary-card">
@@ -59,23 +59,6 @@
         </div>
       </section>
 
-      <section class="roster-panel">
-        <div class="section-head">
-          <h2>学生名册</h2>
-          <input v-model="searchText" class="roster-search" placeholder="搜索姓名 / 账号 / 班级" />
-        </div>
-        <div class="roster-table">
-          <div class="roster-head"><span>姓名</span><span>账号</span><span>班级</span><span>最近登录</span><span>状态</span></div>
-          <div v-for="user in filteredUsers" :key="user.id" class="roster-row">
-            <span class="roster-name">{{ user.realName }}</span>
-            <span class="roster-username">{{ user.username }}</span>
-            <span class="roster-class">{{ user.className || '未分班' }}</span>
-            <span class="roster-login">{{ user.lastLogin ? formatDate(user.lastLogin) : '—' }}</span>
-            <span class="roster-status" :class="user.active ? 'active' : 'inactive'">{{ user.active ? '正常' : '停用' }}</span>
-          </div>
-          <div v-if="filteredUsers.length === 0" class="panel-empty">没有匹配学生</div>
-        </div>
-      </section>
     </div>
   </AppShell>
 </template>
@@ -84,10 +67,8 @@
 import { computed, onMounted, ref } from 'vue';
 import AppShell from '@/layouts/AppShell.vue';
 import { useAuthStore } from '@/stores/auth';
-import { getAllUsersApi } from '@/api/user';
 import { getTeacherTaskOverviewApi } from '@/api/teacher-event';
 import { teacherNavLinks } from '@/constants/navigation';
-import type { UserResponse } from '@/types/user';
 import type { TaskOverviewRow } from '@/types/teacher-event';
 
 const auth = useAuthStore();
@@ -95,26 +76,15 @@ const links = teacherNavLinks;
 const loading = ref(true);
 const dashboardError = ref('');
 const tasks = ref<TaskOverviewRow[]>([]);
-const users = ref<UserResponse[]>([]);
-const searchText = ref('');
 
-const studentUsers = computed(() => users.value.filter(user => user.userType === 'STUDENT' && user.active));
 const activeTasks = computed(() => tasks.value.filter(task => task.status === 'PUBLISHED' && task.availability === 'OPEN'));
 const draftCount = computed(() => tasks.value.filter(task => task.status === 'DRAFT').length);
 const closedCount = computed(() => tasks.value.filter(task => task.status === 'CLOSED' || task.availability === 'ENDED').length);
 const pendingCount = computed(() => tasks.value.filter(task => task.status === 'PUBLISHED').reduce((sum, task) => sum + task.notStartedStudents, 0));
+const totalStudents = computed(() => Math.max(0, ...tasks.value.map(task => task.totalStudents)));
 const totalAnswered = computed(() => tasks.value.reduce((sum, task) => sum + task.answeredQuestions, 0));
 const totalCorrect = computed(() => tasks.value.reduce((sum, task) => sum + task.correctQuestions, 0));
 const overallAccuracy = computed(() => totalAnswered.value ? Math.round(totalCorrect.value / totalAnswered.value * 1000) / 10 : 0);
-const filteredUsers = computed(() => {
-  const keyword = searchText.value.trim().toLowerCase();
-  if (!keyword) return studentUsers.value;
-  return studentUsers.value.filter(user =>
-    user.realName.toLowerCase().includes(keyword)
-    || user.username.toLowerCase().includes(keyword)
-    || (user.className ?? '').toLowerCase().includes(keyword));
-});
-
 const statusText = (task: TaskOverviewRow) => {
   if (task.status === 'DRAFT') return '草稿';
   if (task.availability === 'SCHEDULED') return '未开始';
@@ -132,8 +102,7 @@ const formatDate = (value: string) => new Date(value).toLocaleString('zh-CN', { 
 const loadDashboard = async () => {
   loading.value = true; dashboardError.value = '';
   try {
-    const [taskRows, allUsers] = await Promise.all([getTeacherTaskOverviewApi(), getAllUsersApi()]);
-    tasks.value = taskRows; users.value = allUsers;
+    tasks.value = await getTeacherTaskOverviewApi();
   } catch { dashboardError.value = '统计加载失败'; }
   finally { loading.value = false; }
 };
@@ -148,7 +117,7 @@ onMounted(loadDashboard);
 .summary-card span { color: #64748b; font-size: 11px; }
 .summary-card strong { color: #0f766e; font-size: 26px; line-height: 1.1; }
 .summary-card small { color: #94a3b8; font-size: 10px; }
-.task-section, .roster-panel { padding: 16px 18px; background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; }
+.task-section { padding: 16px 18px; background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; }
 .section-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
 .section-head h2 { margin: 0; color: #172033; font-size: 16px; }
 .task-list { display: grid; gap: 8px; }
@@ -170,14 +139,6 @@ onMounted(loadDashboard);
 .progress-fill { height: 100%; border-radius: inherit; background: #0f766e; }
 .task-numbers { display: flex; flex-wrap: wrap; gap: 4px 10px; color: #64748b; font-size: 10px; }
 .task-card > a { justify-self: end; white-space: nowrap; min-width: 88px; }
-.roster-search { width: min(260px, 100%); }
-.roster-table { display: grid; }
-.roster-head, .roster-row { display: grid; grid-template-columns: 1.2fr 1fr 1fr 1fr 80px; gap: 12px; align-items: center; padding: 9px 0; }
-.roster-head { color: #64748b; font-size: 11px; border-bottom: 1px solid #eef2f7; }
-.roster-row { border-bottom: 1px solid #f8fafc; color: #475569; font-size: 12px; }
-.roster-name { color: #172033; font-weight: 500; }
-.roster-status { width: fit-content; padding: 1px 6px; border-radius: 4px; background: #ecfdf5; color: #0f766e; font-size: 10px; }
-.roster-status.inactive { background: #f1f5f9; color: #64748b; }
 @media (max-width: 1100px) {
   .overview-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .task-card { grid-template-columns: 1fr 1fr; }
@@ -186,7 +147,5 @@ onMounted(loadDashboard);
 }
 @media (max-width: 640px) {
   .task-card { grid-template-columns: 1fr; }
-  .roster-head, .roster-row { grid-template-columns: 1.2fr 1fr 80px; }
-  .roster-head span:nth-child(2), .roster-row span:nth-child(2), .roster-head span:nth-child(4), .roster-row span:nth-child(4) { display: none; }
 }
 </style>
