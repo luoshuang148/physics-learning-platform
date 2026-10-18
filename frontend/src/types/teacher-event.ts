@@ -29,3 +29,45 @@ export interface TeacherEventResponse {
   createdAt: string;
   updatedAt: string;
 }
+export interface TaskStudentRow {
+  userId: number;
+  username: string;
+  realName: string;
+  className: string | null;
+  status: 'NOT_STARTED' | 'PARTIAL' | 'COMPLETED';
+  answeredQuestions: number;
+  correctQuestions: number;
+  missingQuestions: number;
+  lastAnsweredAt: string | null;
+}
+
+export interface TaskQuestionRow {
+  questionId: number;
+  contentPreview: string;
+  answeredStudents: number;
+  correctStudents: number;
+  unansweredStudents: number;
+  accuracy: number;
+}
+
+export interface TaskDetailResponse {
+  taskId: number;
+  title: string;
+  status: TeacherEventStatus;
+  availability: string;
+  startAt: string | null;
+  dueAt: string | null;
+  questionCount: number;
+  totalStudents: number;
+  participatedStudents: number;
+  completedStudents: number;
+  notStartedStudents: number;
+  partialStudents: number;
+  completionRate: number;
+  participationRate: number;
+  accuracy: number;
+  answeredQuestions: number;
+  correctQuestions: number;
+  students: TaskStudentRow[];
+  questions: TaskQuestionRow[];
+}

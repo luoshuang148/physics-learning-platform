@@ -198,6 +198,12 @@ public class TeacherEventController {
         return Result.success(teacherEventService.closeTask(id, (Long) request.getAttribute("userId")));
     }
 
+    @GetMapping("/{id}/stats")
+    @Operation(summary = "作业详情统计", description = "单次作业的参与/完成/未交、学生汇总和每题正确率")
+    public Result<com.zhixuewuli.dto.response.TaskDetailResponse> taskStats(@PathVariable Long id, HttpServletRequest request) {
+        return Result.success(teacherEventService.getTaskDetail(id, (Long) request.getAttribute("userId")));
+    }
+
     @GetMapping("/{id}")
     public Result<TeacherEventResponse> getEvent(@PathVariable Long id, HttpServletRequest request){
         return Result.success(teacherEventService.getEvent(id, (Long) request.getAttribute("userId")));

@@ -42,6 +42,31 @@ public interface AnswerRecordRepository extends JpaRepository<AnswerRecord, Stri
            "group by a.user_id having count(distinct a.question_id)>=:questionCount) completed",nativeQuery=true)
         long countCompletedStudents(@Param("eventId") Long eventId,
            @Param("questionCount") long questionCount);
+
+        interface TaskStudentStatsRow {
+            Long getUserId();
+            Long getAnsweredQuestions();
+            Long getCorrectQuestions();
+            java.time.LocalDateTime getLastAnsweredAt();
+        }
+
+        interface TaskQuestionStatsRow {
+            Long getQuestionId();
+            Long getAnsweredStudents();
+            Long getCorrectStudents();
+        }
+
+        @Query("select a.userId as userId, count(distinct a.questionId) as answeredQuestions, " +
+                "coalesce(sum(case when a.correct=true then 1 else 0 end),0) as correctQuestions, max(a.answeredAt) as lastAnsweredAt " +
+                "from AnswerRecord a join a.user u where a.eventId=:eventId and a.practice=false " +
+                "and u.active=true and u.userType=com.zhixuewuli.entity.User.UserType.STUDENT group by a.userId")
+        List<TaskStudentStatsRow> findTaskStudentStats(@Param("eventId") Long eventId);
+
+        @Query("select a.questionId as questionId, count(distinct a.userId) as answeredStudents, " +
+                "coalesce(sum(case when a.correct=true then 1 else 0 end),0) as correctStudents " +
+                "from AnswerRecord a join a.user u where a.eventId=:eventId and a.practice=false " +
+                "and u.active=true and u.userType=com.zhixuewuli.entity.User.UserType.STUDENT group by a.questionId")
+        List<TaskQuestionStatsRow> findTaskQuestionStats(@Param("eventId") Long eventId);
         @Query("select count(a) from AnswerRecord a where (:eventId is null or a.eventId=:eventId) and a.correct=true "+
           "and not exists(select b.id from AnswerRecord b where b.userId=a.userId and b.questionId=a.questionId "+
           "and (b.eventId=a.eventId or (b.eventId is null and a.eventId is null)) and b.attemptOrder>a.attemptOrder)")

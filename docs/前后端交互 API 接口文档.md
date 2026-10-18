@@ -794,6 +794,7 @@ Authorization: Bearer <token>
 | POST | `/teacher/events/{id}/close` | 截止任务 |
 | DELETE | `/teacher/events/{id}` | 归档任务 |
 | GET | `/teacher/events/{id}/questions` | 获取任务题目；未开始的任务不对学生开放 |
+| GET | `/teacher/events/{id}/stats` | 作业详情统计：参与/完成/未交、学生汇总、每题正确率 |
 
 任务创建/编辑请求新增 `questionIds`、`status`、`startAt`、`dueAt`。时间使用无时区 ISO-8601 字符串，服务端按 UTC 存储。
 

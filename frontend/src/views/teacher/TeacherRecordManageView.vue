@@ -300,7 +300,14 @@ const batchDelete = async () => {
 };
 
 watch(taskFilter,resetPage);
-onMounted(loadPage);
+onMounted(async () => {
+  const queryName = taskRoute.query.studentName;
+  if (typeof queryName === 'string' && queryName.trim()) {
+    studentFilter.value = queryName.trim();
+    studentNameInput.value = queryName.trim();
+  }
+  await loadPage();
+});
 
 </script>
 

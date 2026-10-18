@@ -60,6 +60,29 @@ class TaskLifecycleIntegrationTest extends BaseControllerIntegrationTest {
     }
 
     @Test
+    void taskDetailAggregatesFirstAttemptsAndMissingStudents() {
+        Question q = question("detail stats");
+        var published = tasks.publishEvent(request("Detail task", TeacherEvent.Status.PUBLISHED, q), 2001L);
+        var submit = new AnswerRecordSubmitRequest();
+        submit.setQuestionId(q.getId());
+        submit.setUserAnswer("A");
+        submit.setIntent("ASSIGNMENT");
+        submit.setEventId(published.getId());
+        submit.setRequestId("detail-stats");
+        answers.submitAnswerRecord(submit, 1001L, "detail-stats-session");
+
+        var detail = tasks.getTaskDetail(published.getId(), 2001L);
+        assertThat(detail.getQuestionCount()).isEqualTo(1);
+        assertThat(detail.getTotalStudents()).isEqualTo(1);
+        assertThat(detail.getParticipatedStudents()).isEqualTo(1);
+        assertThat(detail.getCompletedStudents()).isEqualTo(1);
+        assertThat(detail.getNotStartedStudents()).isZero();
+        assertThat(detail.getAccuracy()).isEqualTo(100.0);
+        assertThat(detail.getStudents().getFirst().getStatus()).isEqualTo("COMPLETED");
+        assertThat(detail.getQuestions().getFirst().getCorrectStudents()).isEqualTo(1);
+    }
+
+    @Test
     void multiplePublishedTasksCoexistAndCloseRemovesStudentVisibility() {
         Question q1 = question("parallel one");
         Question q2 = question("parallel two");

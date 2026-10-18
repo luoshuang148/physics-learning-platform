@@ -57,6 +57,11 @@ export const getTaskQuestionsApi = async (eventId: number) => {
   return data.data;
 };
 
+export const getTaskDetailApi = async (eventId: number): Promise<import('@/types/teacher-event').TaskDetailResponse> => {
+  const { data } = await request.get<ApiResponse<import('@/types/teacher-event').TaskDetailResponse>>('/teacher/events/' + eventId + '/stats');
+  return data.data;
+};
+
 export const getTaskApi = async (eventId: number) => {
   const { data } = await request.get<ApiResponse<TeacherEventResponse>>('/teacher/events/' + eventId);
   return data.data;

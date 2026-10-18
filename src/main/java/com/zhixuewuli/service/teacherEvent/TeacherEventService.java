@@ -31,6 +31,8 @@ public interface TeacherEventService {
 
     List<TeacherEventResponse> listStudentTasks(Long userId);
 
+    com.zhixuewuli.dto.response.TaskDetailResponse getTaskDetail(Long id, Long userId);
+
     TeacherEventResponse updateDraft(Long id, TeacherEventCreateRequest request, Long userId);
 
     TeacherEventResponse publishTask(Long id, Long userId);

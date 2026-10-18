@@ -43,7 +43,7 @@
               <button v-if="task.status === 'DRAFT'" class="ghost-btn" @click="editDraft(task)">编辑</button>
               <button v-if="task.status === 'DRAFT'" class="ghost-btn primary-text" @click="publishExisting(task)">发布</button>
               <button v-if="task.status === 'PUBLISHED'" class="ghost-btn" @click="closeExisting(task)">截止</button>
-              <RouterLink :to="{ path: '/teacher/records', query: { eventId: task.id } }" class="ghost-btn">查看记录</RouterLink>
+              <RouterLink :to="'/teacher/assignments/' + task.id" class="ghost-btn">作业详情</RouterLink>
               <button class="ghost-btn danger-text" @click="archiveTask(task)">归档</button>
             </div>
           </article>

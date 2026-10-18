@@ -8,8 +8,10 @@ import com.zhixuewuli.common.util.UserPermissionUtil;
 import com.zhixuewuli.dto.request.TeacherEventCreateRequest;
 import com.zhixuewuli.dto.response.QuestionResponse;
 import com.zhixuewuli.dto.response.TeacherEventResponse;
+import com.zhixuewuli.dto.response.TaskDetailResponse;
 import com.zhixuewuli.entity.TeacherEvent;
 import com.zhixuewuli.entity.User;
+import com.zhixuewuli.repository.AnswerRecordRepository;
 import com.zhixuewuli.repository.TeacherEventRepository;
 import com.zhixuewuli.repository.UserRepository;
 import com.zhixuewuli.service.question.AnswerAccessPolicy;
@@ -22,7 +24,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -30,6 +35,7 @@ import java.util.List;
 public class TeacherEventServiceImpl implements TeacherEventService {
 
     private final TeacherEventRepository teacherEventRepository;
+    private final AnswerRecordRepository answerRecordRepository;
     private final UserRepository userRepository;
     private final UserPermissionUtil userPermissionUtil;
     private final TaskQuestionService taskQuestions;
@@ -202,6 +208,116 @@ public class TeacherEventServiceImpl implements TeacherEventService {
         if (userId == null) throw new IllegalArgumentException("用户未登录");
         return teacherEventRepository.findByStatusOrderByStartAtAscCreatedAtDesc(TeacherEvent.Status.PUBLISHED)
                 .stream().map(this::convertToResponse).toList();
+    }
+
+
+    @Override
+    @Transactional(readOnly = true)
+    public TaskDetailResponse getTaskDetail(Long id, Long userId) {
+        userPermissionUtil.checkTeacherPermission(userId);
+        TeacherEvent event = teacherEventRepository.findById(id).orElseThrow(EventNotFoundException::new);
+        List<Long> questionIds = taskQuestions.ids(id);
+        List<QuestionResponse> questionResponses = taskQuestions.responses(id);
+        Map<Long, String> previews = new HashMap<>();
+        for (QuestionResponse question : questionResponses) {
+            String content = question.getContent() == null ? "" : question.getContent().trim();
+            previews.put(question.getId(), content.length() > 80 ? content.substring(0, 80) + "…" : content);
+        }
+
+        List<User> activeStudents = userRepository.findActiveStudents();
+        Map<Long, AnswerRecordRepository.TaskStudentStatsRow> studentStats = new HashMap<>();
+        for (var row : answerRecordRepository.findTaskStudentStats(id)) {
+            studentStats.put(row.getUserId(), row);
+        }
+
+        List<TaskDetailResponse.StudentRow> students = new ArrayList<>();
+        long participated = 0;
+        long completed = 0;
+        long answeredTotal = 0;
+        long correctTotal = 0;
+        for (User student : activeStudents) {
+            var stat = studentStats.get(student.getId());
+            long answered = stat == null || stat.getAnsweredQuestions() == null ? 0 : stat.getAnsweredQuestions();
+            long correct = stat == null || stat.getCorrectQuestions() == null ? 0 : stat.getCorrectQuestions();
+            String status;
+            if (answered == 0) status = "NOT_STARTED";
+            else if (!questionIds.isEmpty() && answered >= questionIds.size()) status = "COMPLETED";
+            else status = "PARTIAL";
+            if (!"NOT_STARTED".equals(status)) participated++;
+            if ("COMPLETED".equals(status)) completed++;
+            answeredTotal += answered;
+            correctTotal += correct;
+            students.add(TaskDetailResponse.StudentRow.builder()
+                    .userId(student.getId())
+                    .username(student.getUsername())
+                    .realName(student.getRealName())
+                    .className(student.getClassName())
+                    .status(status)
+                    .answeredQuestions(answered)
+                    .correctQuestions(correct)
+                    .missingQuestions(Math.max(questionIds.size() - answered, 0))
+                    .lastAnsweredAt(stat == null || stat.getLastAnsweredAt() == null ? null
+                            : com.zhixuewuli.common.util.LearningTimeWire.format(stat.getLastAnsweredAt(), true))
+                    .build());
+        }
+        students.sort((a, b) -> {
+            int rank = Integer.compare(statusRank(a.getStatus()), statusRank(b.getStatus()));
+            return rank != 0 ? rank : a.getRealName().compareTo(b.getRealName());
+        });
+
+        Map<Long, AnswerRecordRepository.TaskQuestionStatsRow> questionStats = new HashMap<>();
+        for (var row : answerRecordRepository.findTaskQuestionStats(id)) {
+            questionStats.put(row.getQuestionId(), row);
+        }
+        List<TaskDetailResponse.QuestionRow> questions = new ArrayList<>();
+        long totalStudents = activeStudents.size();
+        for (Long questionId : questionIds) {
+            var stat = questionStats.get(questionId);
+            long answered = stat == null || stat.getAnsweredStudents() == null ? 0 : stat.getAnsweredStudents();
+            long correct = stat == null || stat.getCorrectStudents() == null ? 0 : stat.getCorrectStudents();
+            questions.add(TaskDetailResponse.QuestionRow.builder()
+                    .questionId(questionId)
+                    .contentPreview(previews.getOrDefault(questionId, "题目 #" + questionId))
+                    .answeredStudents(answered)
+                    .correctStudents(correct)
+                    .unansweredStudents(Math.max(totalStudents - answered, 0))
+                    .accuracy(percent(correct, answered))
+                    .build());
+        }
+
+        TeacherEventResponse meta = convertToResponse(event);
+        return TaskDetailResponse.builder()
+                .taskId(event.getId())
+                .title(event.getEventTitle())
+                .status(event.getStatus().name())
+                .availability(meta.getAvailability())
+                .startAt(event.getStartAt() == null ? null : com.zhixuewuli.common.util.LearningTimeWire.format(event.getStartAt(), event.isTimestampUtc()))
+                .dueAt(event.getDueAt() == null ? null : com.zhixuewuli.common.util.LearningTimeWire.format(event.getDueAt(), event.isTimestampUtc()))
+                .questionCount(questionIds.size())
+                .totalStudents(totalStudents)
+                .participatedStudents(participated)
+                .completedStudents(completed)
+                .notStartedStudents(totalStudents - participated)
+                .partialStudents(participated - completed)
+                .completionRate(percent(completed, totalStudents))
+                .participationRate(percent(participated, totalStudents))
+                .accuracy(percent(correctTotal, answeredTotal))
+                .answeredQuestions(answeredTotal)
+                .correctQuestions(correctTotal)
+                .students(students)
+                .questions(questions)
+                .build();
+    }
+
+    private int statusRank(String status) {
+        if ("NOT_STARTED".equals(status)) return 0;
+        if ("PARTIAL".equals(status)) return 1;
+        return 2;
+    }
+
+    private double percent(long numerator, long denominator) {
+        if (denominator <= 0) return 0;
+        return Math.round((double) numerator / denominator * 1000) / 10.0;
     }
 
     @Override
