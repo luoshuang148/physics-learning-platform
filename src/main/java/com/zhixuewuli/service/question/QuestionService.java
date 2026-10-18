@@ -2,7 +2,6 @@ package com.zhixuewuli.service.question;
 
 import com.zhixuewuli.common.exception.question.QuestionContentDuplicateException;
 import com.zhixuewuli.common.exception.question.QuestionNotFoundException;
-import com.zhixuewuli.common.exception.question.QuestionVideoNotFoundException;
 import com.zhixuewuli.dto.request.QuestionCreateRequest;
 import com.zhixuewuli.dto.request.QuestionUpdateRequest;
 import com.zhixuewuli.entity.Question;
@@ -42,7 +41,6 @@ import java.util.List;
  * <ul>
  * <li>{@link QuestionNotFoundException} - 题目不存在</li>
  * <li>{@link QuestionContentDuplicateException} - 题目内容重复</li>
- * <li>{@link QuestionVideoNotFoundException} - 关联视频不存在</li>
  * </ul>
  * 
  * @author 智学物理开发团队
@@ -63,7 +61,6 @@ public interface QuestionService {
      * @param request 题目创建请求
      * @return 创建的题目实体
      * @throws QuestionContentDuplicateException 当题目内容已存在时抛出
-     * @throws QuestionVideoNotFoundException    当关联视频不存在时抛出
      * 
      * @implSpec 验证题目内容的全局唯一性
      * @implSpec 验证关联视频的存在性
@@ -97,7 +94,6 @@ public interface QuestionService {
      * @return 更新后的题目实体
      * @throws QuestionNotFoundException         当题目不存在时抛出
      * @throws QuestionContentDuplicateException 当新题目内容已存在时抛出
-     * @throws QuestionVideoNotFoundException    当新的关联视频不存在时抛出
      * 
      * @implSpec 验证题目存在性
      * @implSpec 检查更新后题目内容的唯一性

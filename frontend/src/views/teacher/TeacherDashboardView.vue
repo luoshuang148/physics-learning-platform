@@ -4,15 +4,15 @@
       <p v-if="dashboardError" role="alert">{{ dashboardError }} <button @click="loadDashboard">重试</button></p>
       <section class="dashboard-hero">
         <div class="hero-copy">
-          <span class="hero-kicker">Teaching overview</span>
-          <h1 class="hero-title">教师总览</h1>
-          <p class="hero-summary">本平台用于单班共享教学。任务成绩按首次作答计算，补练单独统计掌握状态。</p>
+          <span class="hero-kicker">教学概览</span>
+          <h1 class="hero-title">教学运行概况</h1>
+          <p class="hero-summary">本平台用于单班共享教学。任务成绩按首次作答计算，补练单独统计掌握状态；进度人数按当前启用学生范围计算。</p>
         </div>
 
         <div class="hero-visuals">
           <div class="hero-donut-card">
             <div class="hero-donut-head">
-              <span class="hero-donut-label">当前任务完成情况</span>
+              <span class="hero-donut-label">当前启用学生完成率</span>
               <strong>{{ completionRateText }}</strong>
             </div>
             <div class="hero-donut-body">
@@ -25,13 +25,13 @@
               <div class="hero-donut-legend">
                 <div class="legend-row done">
                   <span class="legend-dot"></span>
-                  <span>已完成 {{ answerStats.answeredStudentCount }}</span>
+                  <span>已完成（当前启用）{{ answerStats.answeredStudentCount }}</span>
                 </div>
                 <div class="legend-row pending">
                   <span class="legend-dot"></span>
                   <span>未完成 {{ unAnsweredStudentCount }}</span>
                 </div>
-                <div class="legend-note">总学生人数 {{ answerStats.totalStudentCount }}</div>
+                <div class="legend-note">当前启用学生 {{ answerStats.totalStudentCount }} 人</div>
               </div>
             </div>
           </div>
@@ -66,11 +66,8 @@
 
       <section class="metric-grid">
         <div class="metric-card" v-for="m in metrics" :key="m.label">
-          <div class="metric-icon">{{ m.icon }}</div>
-          <div>
-            <div class="metric-value">{{ m.loading ? '…' : m.value }}</div>
-            <div class="metric-label">{{ m.label }}</div>
-          </div>
+          <div class="metric-value">{{ m.loading ? '…' : m.value }}</div>
+          <div class="metric-label">{{ m.label }}</div>
         </div>
       </section>
 
@@ -78,11 +75,15 @@
         <div class="panel-card event-panel" :class="event ? 'live' : 'idle'">
           <div class="panel-head">
             <h3>当前教学任务</h3>
-            <router-link to="/teacher/event-manage" class="panel-link">进入任务发布 →</router-link>
+            <router-link to="/teacher/event-manage" class="panel-link">任务管理 →</router-link>
           </div>
           <div v-if="event" class="event-body">
             <h4>{{ event.eventTitle }}</h4>
             <p>{{ eventQuestionCount }} 道题 · {{ formatTime(event.eventTimestamp) }}</p>
+          </div>
+          <div v-if="event" class="event-stats">
+            <span>已参与 {{ answerStats.answeredStudentCount }} / {{ answerStats.totalStudentCount }} 人</span>
+            <span>完成率 {{ completionRateText }}</span>
           </div>
           <div v-else class="empty-copy">
             <p>当前没有发布中的任务。</p>
@@ -95,7 +96,6 @@
           </div>
           <div class="action-list">
             <router-link v-for="s in shortcuts" :key="s.to" :to="s.to" class="action-item">
-              <span class="action-icon">{{ s.icon }}</span>
               <span class="action-label">{{ s.label }}</span>
             </router-link>
           </div>
@@ -159,12 +159,12 @@ const auth = useAuthStore();
 const links = teacherNavLinks;
 
 const shortcuts = [
-  { icon: '👥', label: '用户管理', to: '/teacher/users' },
-  { icon: '🧾', label: '答题记录', to: '/teacher/records' },
-  { icon: '📝', label: '题目分析', to: '/teacher/errors' },
-  { icon: '🧠', label: '学生学情', to: '/teacher/student-analysis' },
-  { icon: '📚', label: '题库管理', to: '/teacher/questions' },
-  { icon: '🎬', label: '视频管理', to: '/teacher/videos' },
+  { label: '用户管理', to: '/teacher/users' },
+  { label: '答题记录', to: '/teacher/records' },
+  { label: '题目分析', to: '/teacher/errors' },
+  { label: '学生学情', to: '/teacher/student-analysis' },
+  { label: '题库管理', to: '/teacher/questions' },
+  { label: '任务管理', to: '/teacher/event-manage' },
 ];
 
 const users = ref<UserResponse[]>([]);
@@ -211,12 +211,12 @@ const filteredUsers = computed(() => {
 });
 
 const metrics = computed(() => [
-  { icon: '📝', label: '累计答题次数', value: totalAnswers.value.toLocaleString(), loading: loading.value },
-  { icon: '👥', label: '学生人数', value: answerStats.value.totalStudentCount.toLocaleString(), loading: loading.value },
-  { icon: '🗂️', label: '题库题目数', value: totalQuestions.value.toLocaleString(), loading: loading.value },
-  { icon: '⚡', label: '当前任务题数', value: event.value ? `${eventQuestionCount.value}` : '0', loading: loading.value },
-  {icon:'✓',label:'当前任务首次正确率',value:currentSummary.value?.assignmentAnswers ? `${(100*currentSummary.value.assignmentCorrect/currentSummary.value.assignmentAnswers).toFixed(1)}%` : '—',loading:loading.value},
-  {icon:'↻',label:'当前任务补练次数',value:currentSummary.value?.practiceAttempts ?? 0,loading:loading.value},
+  { label: '累计答题次数', value: totalAnswers.value.toLocaleString(), loading: loading.value },
+  { label: '当前启用学生', value: answerStats.value.totalStudentCount.toLocaleString(), loading: loading.value },
+  { label: '题库题目数', value: totalQuestions.value.toLocaleString(), loading: loading.value },
+  { label: '当前任务题数', value: event.value ? `${eventQuestionCount.value}` : '0', loading: loading.value },
+  {label:'当前任务首次正确率',value:currentSummary.value?.assignmentAnswers ? `${(100*currentSummary.value.assignmentCorrect/currentSummary.value.assignmentAnswers).toFixed(1)}%` : '—',loading:loading.value},
+  {label:'当前任务补练次数',value:currentSummary.value?.practiceAttempts ?? 0,loading:loading.value},
 ]);
 
 const donutStyle = (percent: number) => ({

@@ -2,7 +2,6 @@ package com.zhixuewuli.repository;
 
 import com.zhixuewuli.common.base.BaseIntegrationTest;
 import com.zhixuewuli.entity.Question;
-import com.zhixuewuli.entity.Video;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,9 +22,6 @@ class QuestionRepositoryIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private QuestionRepository questionRepository;
-
-    @Autowired
-    private VideoRepository videoRepository;
 
     @Test
     @Rollback
@@ -48,24 +44,6 @@ class QuestionRepositoryIntegrationTest extends BaseIntegrationTest {
         assertThat(foundQuestion.get().getContent()).contains("牛顿第一定律");
         assertThat(foundQuestion.get().getCorrectOption()).isEqualTo("B");
         assertThat(foundQuestion.get().getDifficulty()).isEqualTo(2);
-    }
-
-    @Test
-    @Rollback
-    void testFindByVideoId_shouldReturnEmpty_whenNoQuestionsLinkedToVideo() {
-        // Given - 创建视频但不创建关联题目
-        cleanTable("QUESTIONS");
-        cleanTable("VIDEOS");
-
-        Video video = createVideo("测试视频_" + System.currentTimeMillis(), "力学");
-
-        // When - 题目实体已独立，不再通过 video_id 关联
-        // 此方法仅用于验证历史兼容性，实际应使用 video.getQuestionId() 方式查询
-        // 注意：QuestionRepository 已移除 findByVideoId 方法
-        List<Question> questions = new ArrayList<>();
-
-        // Then - 验证返回空列表
-        assertThat(questions).isEmpty();
     }
 
     @Test
@@ -183,12 +161,8 @@ class QuestionRepositoryIntegrationTest extends BaseIntegrationTest {
     void testUpdateQuestion() {
         // Given
         cleanTable("QUESTIONS");
-        cleanTable("VIDEOS");
 
-        Video video = createVideo("更新测试视频_" + System.currentTimeMillis(), "力学");
         Question question = createQuestion("原始题目_" + System.currentTimeMillis(), "A");
-        // 注意：题目实体已独立，不再直接关联视频对象
-        // 如需关联，应通过 Video.setQuestionId(question.getId()) 方式
         question.setDifficulty(5);
         question.setExplanation("这是更新后的解析");
 
@@ -205,9 +179,7 @@ class QuestionRepositoryIntegrationTest extends BaseIntegrationTest {
     void testDeleteQuestion() {
         // Given
         cleanTable("QUESTIONS");
-        cleanTable("VIDEOS");
 
-        Video video = createVideo("删除测试视频_" + System.currentTimeMillis(), "力学");
         Question question = createQuestion("待删除题目_" + System.currentTimeMillis(), "A");
         Long questionId = question.getId();
 
@@ -224,11 +196,9 @@ class QuestionRepositoryIntegrationTest extends BaseIntegrationTest {
     void testQuestionWithContentHash() {
         // Given
         cleanTable("QUESTIONS");
-        cleanTable("VIDEOS");
 
         String content = "用于测试 ContentHash 的题目内容_" + System.currentTimeMillis();
         Question question = new Question();
-        // 题目实体已独立，不再设置 video 关联
         question.setContent(content);
         question.setOptions("{\"A\": \"选项 A\", \"B\": \"选项 B\"}");
         question.setCorrectOption("A");
@@ -239,54 +209,6 @@ class QuestionRepositoryIntegrationTest extends BaseIntegrationTest {
         // Then - 验证 contentHash 自动生成
         assertThat(savedQuestion.getContentHash()).isNotNull();
         assertThat(savedQuestion.getContentHash()).hasSize(64); // SHA-256 哈希长度为 64
-    }
-
-    @Test
-    @Rollback
-    void testMultipleQuestionsWithSameVideo() {
-        // Given - 一个视频可关联多道题目（通过 Video.questionId 字段）
-        cleanTable("QUESTIONS");
-        cleanTable("VIDEOS");
-
-        Video video = createVideo("多题目视频_" + System.currentTimeMillis(), "综合测试");
-        
-        // 创建多道题目
-        List<Question> questions = new ArrayList<>();
-        for (int i = 0; i < 5; i++) {
-            Question question = new Question();
-            // 题目实体独立，不设置 video 关联
-            question.setContent("题目_" + i + "_" + System.currentTimeMillis());
-            question.setOptions("{\"A\": \"选项 A\", \"B\": \"选项 B\", \"C\": \"选项 C\", \"D\": \"选项 D\"}");
-            question.setCorrectOption("A");
-            question.setDifficulty((i % 5) + 1); // 难度 1-5 循环
-            questions.add(questionRepository.save(question));
-        }
-        
-        // 将第一道题目关联到视频（模拟一对多关系）
-        video.setQuestionId(questions.get(0).getId());
-        videoRepository.save(video);
-
-        // When - 查询所有题目（不再按 video_id 筛选）
-        List<Question> allQuestions = questionRepository.findAll();
-
-        // Then - 验证所有题目都已保存
-        assertThat(allQuestions).hasSize(5);
-        // 验证视频关联了第一道题目
-        assertThat(video.getQuestionId()).isEqualTo(questions.get(0).getId());
-    }
-
-    /**
-     * 辅助方法：创建视频
-     */
-    private Video createVideo(String title, String knowledgePoint) {
-        Video video = new Video();
-        video.setTitle(title);
-        video.setUrl("https://example.com/video_" + System.currentTimeMillis() + ".mp4");
-        video.setKnowledgePoint(knowledgePoint);
-        video.setCoverUrl("https://example.com/cover.jpg");
-        video.setDuration(300);
-        video.setDescription("测试视频描述");
-        return videoRepository.save(video);
     }
 
     /**

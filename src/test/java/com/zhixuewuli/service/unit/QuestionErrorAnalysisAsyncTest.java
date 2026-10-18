@@ -104,13 +104,8 @@ class QuestionErrorAnalysisAsyncTest extends AIAsyncTestBase {
                                         + (mockSessionContext.getLock() == null ? "null" : "not null"));
                 }
 
-                try (MockedStatic<com.zhixuewuli.common.util.HanLPWordCloudUtil> mocked = Mockito
-                                .mockStatic(com.zhixuewuli.common.util.HanLPWordCloudUtil.class)) {
-                        mocked.when(() -> com.zhixuewuli.common.util.HanLPWordCloudUtil.analyzeErrorReasons(anyList()))
-                                        .thenReturn(new java.util.HashMap<>());
-
-                        // Given
-                        doNothing().when(userPermissionUtil).checkTeacherPermission(teacherId);
+                // Given
+                doNothing().when(userPermissionUtil).checkTeacherPermission(teacherId);
 
                         // 模拟 sessionManager 调用 - 使用简单的返回，确保不为null
                         System.out.println("DEBUG Test: Setting up sessionManager.getOrCreateSession mock");
@@ -240,7 +235,7 @@ class QuestionErrorAnalysisAsyncTest extends AIAsyncTestBase {
                         verify(aliyunAIClient).streamGenerate(any(), any(), any(AIStreamCallback.class));
 
                         // 验证 SSE 事件被发送（2 次：ai-content、complete）
-                        // 注：首次交互不再发送 student-list 和 word-cloud 初始化数据
+                        // 注：首次交互不再发送 student-list 初始化数据
                         try {
                                 verify(mockEmitter, times(2))
                                                 .send(any(
@@ -248,8 +243,6 @@ class QuestionErrorAnalysisAsyncTest extends AIAsyncTestBase {
                         } catch (IOException e) {
                                 // Mock 方法不会真正抛出 IOException
                         }
-                }
-
         }
 
         @Test

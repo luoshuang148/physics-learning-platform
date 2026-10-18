@@ -147,7 +147,6 @@ class QuestionServiceUnitTest extends BaseUnitTest {
         request.setCorrectOption("B");
         request.setExplanation("可选解析");
         request.setDifficulty(2);
-        request.setExplanationVideoMapping("{\"B\":1001}");
         request.setImageBase64("base64-image");
 
         when(questionRepository.existsByContent("包含可选字段的题目")).thenReturn(false);
@@ -161,7 +160,6 @@ class QuestionServiceUnitTest extends BaseUnitTest {
         Question result = questionService.createQuestion(request, teacherId);
 
         // Then
-        assertThat(result.getExplanationVideoMapping()).isEqualTo("{\"B\":1001}");
         assertThat(result.getImageBase64()).isEqualTo("base64-image");
     }
 
@@ -297,7 +295,6 @@ class QuestionServiceUnitTest extends BaseUnitTest {
         request.setCorrectOption(null);
         request.setExplanation(null);
         request.setDifficulty(null);
-        request.setExplanationVideoMapping(null);
         request.setImageBase64(null);
 
         Question existingQuestion = TestDataFactory.createQuestion();
@@ -317,12 +314,11 @@ class QuestionServiceUnitTest extends BaseUnitTest {
         assertThat(result.getCorrectOption()).isNull();
         assertThat(result.getExplanation()).isNull();
         assertThat(result.getDifficulty()).isNull();
-        assertThat(result.getExplanationVideoMapping()).isNull();
         assertThat(result.getImageBase64()).isNull();
     }
 
     @Test
-    void updateQuestion_shouldOverwriteImageAndVideoMapping_whenProvided() {
+    void updateQuestion_shouldOverwriteImage_whenProvided() {
         // Given
         QuestionUpdateRequest request = new QuestionUpdateRequest();
         request.setId(1000L);
@@ -331,12 +327,10 @@ class QuestionServiceUnitTest extends BaseUnitTest {
         request.setCorrectOption("A");
         request.setExplanation("更新解析");
         request.setDifficulty(5);
-        request.setExplanationVideoMapping("{\"A\":2002}");
         request.setImageBase64("new-image-base64");
 
         Question existingQuestion = TestDataFactory.createQuestion();
         existingQuestion.setId(1000L);
-        existingQuestion.setExplanationVideoMapping("{\"A\":1001}");
         existingQuestion.setImageBase64("old-image");
 
         when(questionRepository.findById(1000L)).thenReturn(Optional.of(existingQuestion));
@@ -346,7 +340,6 @@ class QuestionServiceUnitTest extends BaseUnitTest {
         Question result = questionService.updateQuestion(request, teacherId);
 
         // Then
-        assertThat(result.getExplanationVideoMapping()).isEqualTo("{\"A\":2002}");
         assertThat(result.getImageBase64()).isEqualTo("new-image-base64");
     }
 

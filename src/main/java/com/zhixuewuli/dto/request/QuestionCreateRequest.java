@@ -22,7 +22,6 @@ import lombok.Data;
  * <li><strong>correctOption</strong>: 必填项，正确答案选项标识</li>
  * <li><strong>explanation</strong>: 可选项，题目解析说明（LaTeX 格式）</li>
  * <li><strong>difficulty</strong>: 可选项，题目难度等级（1-5）</li>
- * <li><strong>explanationVideoMapping</strong>: 可选项，讲解视频映射（JSON 格式）</li>
  * </ul>
  * 
  * <p>
@@ -112,17 +111,6 @@ public class QuestionCreateRequest {
      */
     @Schema(description = "题目难度等级（1-5）", example = "3")
     private Integer difficulty;
-
-    /**
-     * 讲解视频映射
-     * 
-     * 可选参数，用于指定各选项对应的讲解视频。
-     * 使用JSON格式的Map结构存储，key为选项标识，value为视频ID。
-     * 示例：{"A": 123, "B": 456, "C": 789, "D": 101}
-     * 其中正确答案的视频ID也包含在此映射中。
-     */
-    @Schema(description = "讲解视频映射（JSON格式）", example = "{\"A\": 123, \"B\": 456, \"C\": 789, \"D\": 101}")
-    private String explanationVideoMapping;
 
     /**
      * 题目图片Base64编码数据（仅支持PNG格式）

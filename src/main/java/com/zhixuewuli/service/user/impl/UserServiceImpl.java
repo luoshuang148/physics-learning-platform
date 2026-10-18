@@ -62,9 +62,6 @@ public class UserServiceImpl implements UserService {
                 if (userRepository.existsByUsername(newUsername)) {
                     throw new UserNameDuplicateException(newUsername);
                 }
-                if (userRepository.existsByRealName(newUsername)) {
-                    throw new UserNameDuplicateException(newUsername);
-                }
                 user.setUsername(newUsername);
             }
         }
@@ -83,7 +80,13 @@ public class UserServiceImpl implements UserService {
         }
 
 
-        User saved=userRepository.save(user);
+        User saved;
+        try {
+            saved=userRepository.saveAndFlush(user);
+        } catch (org.springframework.dao.DataIntegrityViolationException conflict) {
+            com.zhixuewuli.common.util.DatabaseExceptionParserUtil.throwAppropriateBusinessException(conflict);
+            throw conflict;
+        }
         if(request.getPassword()!=null&&!request.getPassword().isEmpty()) userRepository.incrementTokenVersion(currentUserId);
         return saved;
     }

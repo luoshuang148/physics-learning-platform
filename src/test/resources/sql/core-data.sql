@@ -8,10 +8,7 @@ DELETE FROM conversation_history;
 DELETE FROM teacher_events;
 DELETE FROM users;
 DELETE FROM questions;
-DELETE FROM videos;
-
 -- 重置自增序列
-ALTER TABLE videos ALTER COLUMN id RESTART WITH 1;
 ALTER TABLE questions ALTER COLUMN id RESTART WITH 1;
 ALTER TABLE users ALTER COLUMN id RESTART WITH 100;
 ALTER TABLE conversation_history ALTER COLUMN id RESTART WITH 1;
@@ -32,5 +29,4 @@ INSERT INTO users (id, username, password_hash, user_type, real_name, class_name
 SELECT '核心基础数据初始化完成' as message;
 SELECT 
     (SELECT COUNT(*) FROM users) as user_count,
-    (SELECT COUNT(*) FROM videos) as video_count,
-    (SELECT COUNT(*) FROM questions) as question_count;
+(SELECT COUNT(*) FROM questions) as question_count;

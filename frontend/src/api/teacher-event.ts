@@ -7,15 +7,39 @@ export const getTeacherEventApi = async (): Promise<TeacherEventResponse | null>
   return data.data;
 };
 
+export const getTeacherTasksApi = async (): Promise<TeacherEventResponse[]> => {
+  const { data } = await request.get<ApiResponse<TeacherEventResponse[]>>('/teacher/events/all');
+  return data.data;
+};
+
+export const getStudentTasksApi = async (): Promise<TeacherEventResponse[]> => {
+  const { data } = await request.get<ApiResponse<TeacherEventResponse[]>>('/teacher/events/available');
+  return data.data;
+};
+
 export const createTeacherEventApi = async (payload: TeacherEventCreatePayload): Promise<TeacherEventResponse> => {
   const { data } = await request.post<ApiResponse<TeacherEventResponse>>('/teacher/events', payload);
   return data.data;
 };
 
-export const deleteTeacherEventApi = async (eventId: number): Promise<void> => {
-  await request.delete<ApiResponse<void>>(`/teacher/events/${eventId}`);
+export const updateDraftTaskApi = async (eventId: number, payload: TeacherEventCreatePayload): Promise<TeacherEventResponse> => {
+  const { data } = await request.put<ApiResponse<TeacherEventResponse>>('/teacher/events/' + eventId + '/draft', payload);
+  return data.data;
 };
 
+export const publishDraftTaskApi = async (eventId: number): Promise<TeacherEventResponse> => {
+  const { data } = await request.post<ApiResponse<TeacherEventResponse>>('/teacher/events/' + eventId + '/publish');
+  return data.data;
+};
+
+export const closeTaskApi = async (eventId: number): Promise<TeacherEventResponse> => {
+  const { data } = await request.post<ApiResponse<TeacherEventResponse>>('/teacher/events/' + eventId + '/close');
+  return data.data;
+};
+
+export const deleteTeacherEventApi = async (eventId: number): Promise<void> => {
+  await request.delete<ApiResponse<void>>('/teacher/events/' + eventId);
+};
 
 export const getTeacherEventHistoryApi = async (page = 1) => {
   const { data } = await request.get<ApiResponse<import('@/types/common').PageResult<TeacherEventResponse>>>(
@@ -23,12 +47,17 @@ export const getTeacherEventHistoryApi = async (page = 1) => {
   return data.data;
 };
 
-export const replaceTeacherEventApi = async (eventId: number,payload: TeacherEventCreatePayload): Promise<TeacherEventResponse> => {
-  const {data}=await request.put<ApiResponse<TeacherEventResponse>>(`/teacher/events/${eventId}/replace`,payload);return data.data;
+export const replaceTeacherEventApi = async (eventId: number, payload: TeacherEventCreatePayload): Promise<TeacherEventResponse> => {
+  const { data } = await request.put<ApiResponse<TeacherEventResponse>>('/teacher/events/' + eventId + '/replace', payload);
+  return data.data;
 };
+
 export const getTaskQuestionsApi = async (eventId: number) => {
-  const {data}=await request.get<ApiResponse<import('@/types/question').QuestionResponse[]>>(`/teacher/events/${eventId}/questions`);return data.data;
+  const { data } = await request.get<ApiResponse<import('@/types/question').QuestionResponse[]>>('/teacher/events/' + eventId + '/questions');
+  return data.data;
 };
+
 export const getTaskApi = async (eventId: number) => {
-  const {data}=await request.get<ApiResponse<TeacherEventResponse>>(`/teacher/events/${eventId}`);return data.data;
+  const { data } = await request.get<ApiResponse<TeacherEventResponse>>('/teacher/events/' + eventId);
+  return data.data;
 };

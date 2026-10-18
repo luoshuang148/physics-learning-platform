@@ -1,44 +1,21 @@
 <template>
-  <AppShell :subtitle="`实验 · ${auth.user?.realName ?? ''}`" :links="links">
+  <AppShell :subtitle="`3D 实验 · ${auth.user?.realName ?? ''}`" :links="links">
     <div class="exp-page">
-
-      <transition name="exp-intro-fade">
-        <div
-          v-if="showIntroOverlay && activeIntroVideo"
-          class="exp-intro-overlay"
-          @click.self="closeIntroOverlay"
-        >
-          <div class="exp-intro-dialog">
-            <button class="exp-intro-close" type="button" @click="closeIntroOverlay">×</button>
-            <div class="exp-intro-copy">
-              <span class="exp-intro-kicker">{{ introVideoKicker }}</span>
-              <h3>{{ activeExperiment?.title }}</h3>
-            </div>
-
-            <video
-              v-if="activeIntroVideo"
-              :key="activeIntroVideo"
-              ref="introVideoRef"
-              class="exp-intro-video"
-              :src="encodedIntroVideo"
-              controls
-              preload="metadata"
-              playsinline
-            />
-
-            <div class="exp-intro-actions">
-              <button class="neon-btn secondary" type="button" @click="skipIntroVideo">跳过视频</button>
-              <button class="neon-btn primary" type="button" @click="closeIntroOverlay">关闭</button>
-            </div>
-          </div>
-        </div>
-      </transition>
 
       <!-- 左：实验选择栏 -->
       <div class="exp-sidebar">
+        <div class="exp-series-switch">
+          <button
+            v-for="series in validSeries"
+            :key="series"
+            class="series-switch-btn"
+            :class="{ active: currentSeries === series }"
+            @click="switchSeries(series)"
+          >{{ series.includes('原子') ? '原子物理' : '宇宙航天' }}</button>
+        </div>
         <div class="exp-sidebar-head">
           <span class="exp-series-badge" v-if="currentSeries">{{ currentSeries }}</span>
-          <span class="exp-count">{{ completedCount }}/{{ experiments.length }}</span>
+          <span class="exp-count">{{ experiments.length }} 个实验</span>
         </div>
 
         <div class="exp-list">
@@ -59,17 +36,11 @@
 
         <div class="exp-sidebar-actions">
           <button
-            v-if="activeIntroVideo"
-            class="neon-btn secondary"
-            type="button"
-            @click="showIntroOverlay = true"
-          >▶ 查看导引视频</button>
-          <button
             v-if="activeExperiment"
             class="neon-btn secondary"
             type="button"
             @click="enterFullscreen"
-          >⛶ 全屏</button>
+          >全屏</button>
           <button
             v-if="activeExperiment"
             class="mark-btn"
@@ -78,15 +49,13 @@
           >
             {{ doneMap[activeExperiment.id] ? '已标记完成' : '标记当前实验完成' }}
           </button>
-          <button class="neon-btn primary" :disabled="!allDone" @click="goQuestion">完成 → 答题</button>
-          <p v-if="!allDone" class="action-hint">请先将本系列全部实验标记完成后再进入答题</p>
         </div>
       </div>
 
       <!-- 右：实验 iframe -->
       <div class="exp-main" ref="fullscreenContainerRef">
         <div v-if="!activeExperiment" class="exp-placeholder">
-          <p class="muted">{{ experiments.length ? '请从左侧选择实验' : '正在读取教师任务…' }}</p>
+          <p class="muted">{{ experiments.length ? '请从左侧选择实验' : '正在加载 3D 实验…' }}</p>
         </div>
         <iframe
           v-else
@@ -111,25 +80,23 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
-import { useRouter } from 'vue-router';
+import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import AppShell from '@/layouts/AppShell.vue';
 import AppToast from '@/components/AppToast.vue';
 import { useToast } from '@/composables/useToast';
 import { useAuthStore } from '@/stores/auth';
-import { getTeacherEventApi } from '@/api/teacher-event';
 
 const EXPERIMENT_STATE_KEY_PREFIX = 'student_experiment_view_state';
 const EXPERIMENT_STATE_LEGACY_KEY = 'student_experiment_view_state';
 
 const auth = useAuthStore();
-const router = useRouter();
 const { visible, type, message, show } = useToast();
 
 const getExperimentStateKey = () => `${EXPERIMENT_STATE_KEY_PREFIX}_${auth.user?.id ?? 'anonymous'}`;
 
 const links = [
   { label: '首页', to: '/student/home' },
+  { label: '作业', to: '/student/task' },
   { label: '错题本', to: '/student/wrong-book' },
   { label: '学习报告', to: '/student/report' },
 ];
@@ -138,20 +105,6 @@ const resolveStaticAssetUrl = (path: string) => {
   const base = (import.meta.env.BASE_URL || '/').replace(/\/+$/, '/');
   const normalizedPath = path.replace(/^\/+/, '');
   return `${base}${normalizedPath}`;
-};
-
-const ATOMIC_INTRO_VIDEOS: Record<string, string> = {
-  alpha: resolveStaticAssetUrl('yuanziwuli/part1(split-video.com).mp4'),
-  bohr: resolveStaticAssetUrl('yuanziwuli/part2(split-video.com).mp4'),
-  cloud: resolveStaticAssetUrl('yuanziwuli/part3(split-video.com).mp4'),
-  photoelectric: resolveStaticAssetUrl('yuanziwuli/part4(split-video.com).mp4'),
-};
-
-const SPACE_INTRO_VIDEOS: Record<string, string> = {
-  kepler: resolveStaticAssetUrl('yuzhouhangtian/开普勒三大定律实验修正.mp4'),
-  cosmic: resolveStaticAssetUrl('yuzhouhangtian/三大宇宙速度修正.mp4'),
-  hohmann: resolveStaticAssetUrl('yuzhouhangtian/卫星变轨实验修正.mp4'),
-  lightspeed: resolveStaticAssetUrl('yuzhouhangtian/光速飞船.mp4'),
 };
 
 const SERIES_EXPERIMENTS = {
@@ -169,7 +122,7 @@ const SERIES_EXPERIMENTS = {
   ],
 } as const;
 
-const VALID_SERIES = Object.keys(SERIES_EXPERIMENTS) as Array<keyof typeof SERIES_EXPERIMENTS>;
+const validSeries = Object.keys(SERIES_EXPERIMENTS) as Array<keyof typeof SERIES_EXPERIMENTS>;
 
 type ExperimentItem = (typeof SERIES_EXPERIMENTS)[keyof typeof SERIES_EXPERIMENTS][number];
 type DisposableExperimentWindow = Window & {
@@ -190,16 +143,12 @@ const secondaryPanelIdPattern = /(log|chart|result|ai|guide|note|matrix|energy-d
 const secondaryPanelSummaryPattern = /(记录|日志|图|矩阵|说明|助教|提示|结果|观测)/;
 const keepOpenSummaryPattern = /(控制|参数|发射|模式|控制台|调节|系统控制|量子控制台)/;
 
-const currentSeries = ref('');
-const experiments = ref<ExperimentItem[]>([]);
+const currentSeries = ref<keyof typeof SERIES_EXPERIMENTS>(validSeries[0]);
+const experiments = ref<ExperimentItem[]>([...SERIES_EXPERIMENTS[validSeries[0]]]);
 const activeExperiment = ref<ExperimentItem | null>(null);
 const doneMap = ref<Record<string, boolean>>({});
 const experimentFrameRef = ref<HTMLIFrameElement | null>(null);
 const fullscreenContainerRef = ref<HTMLElement | null>(null);
-const introVideoRef = ref<HTMLVideoElement | null>(null);
-const showIntroOverlay = ref(false);
-const dismissedIntroIds = ref<Record<string, boolean>>({});
-const currentTaskEventId = ref('');
 const isFullscreen = ref(false);
 const expMainWidth = ref(0);
 const layoutMode = ref<ExperimentLayoutMode>('normal');
@@ -207,27 +156,12 @@ const layoutMode = ref<ExperimentLayoutMode>('normal');
 let expMainResizeObserver: ResizeObserver | null = null;
 let expMainFallbackResizeHandler: (() => void) | null = null;
 
-const completedCount = computed(() => Object.values(doneMap.value).filter(Boolean).length);
-const allDone = computed(() => experiments.value.length > 0 && completedCount.value === experiments.value.length);
-const activeIntroVideo = computed(() => {
-  const experimentId = activeExperiment.value?.id;
-  if (!experimentId) return '';
-  if (currentSeries.value === '原子物理系列实验') return ATOMIC_INTRO_VIDEOS[experimentId] ?? '';
-  if (currentSeries.value === '万有引力与宇宙航天系列实验') return SPACE_INTRO_VIDEOS[experimentId] ?? '';
-  return '';
-});
-const encodedIntroVideo = computed(() => encodeURI(activeIntroVideo.value));
-const introVideoKicker = computed(() => (
-  currentSeries.value === '万有引力与宇宙航天系列实验' ? '宇宙航天实验导引' : '原子物理实验导引'
-));
 
 const persistExperimentState = () => {
   sessionStorage.setItem(getExperimentStateKey(), JSON.stringify({
-    taskEventId: currentTaskEventId.value,
     currentSeries: currentSeries.value,
     activeExperimentId: activeExperiment.value?.id ?? null,
     doneMap: doneMap.value,
-    dismissedIntroIds: dismissedIntroIds.value,
   }));
 };
 
@@ -240,11 +174,9 @@ const restoreExperimentState = () => {
   }
   try {
     return JSON.parse(raw) as {
-      taskEventId?: string;
       currentSeries?: string;
       activeExperimentId?: string | null;
       doneMap?: Record<string, boolean>;
-      dismissedIntroIds?: Record<string, boolean>;
     };
   } catch {
     sessionStorage.removeItem(stateKey);
@@ -393,156 +325,50 @@ const exitFullscreen = async () => {
   }
 };
 
-const maybeShowIntroVideo = (item: ExperimentItem) => {
-  const introVideos = currentSeries.value === '原子物理系列实验'
-    ? ATOMIC_INTRO_VIDEOS
-    : currentSeries.value === '万有引力与宇宙航天系列实验'
-      ? SPACE_INTRO_VIDEOS
-      : null;
-
-  if (!introVideos) {
-    showIntroOverlay.value = false;
-    return;
-  }
-
-  if (!introVideos[item.id] || dismissedIntroIds.value[item.id]) {
-    showIntroOverlay.value = false;
-    return;
-  }
-
-  showIntroOverlay.value = true;
-};
-
 const switchExperiment = (item: ExperimentItem) => {
   if (activeExperiment.value?.id === item.id) return;
   disposeCurrentExperiment();
   activeExperiment.value = item;
-  maybeShowIntroVideo(item);
   persistExperimentState();
 };
 
-const closeIntroOverlay = () => {
-  const experimentId = activeExperiment.value?.id;
-  if (experimentId) {
-    dismissedIntroIds.value[experimentId] = true;
-    persistExperimentState();
-  }
-  showIntroOverlay.value = false;
+const switchSeries = (series: keyof typeof SERIES_EXPERIMENTS) => {
+  if (currentSeries.value === series) return;
+  disposeCurrentExperiment();
+  currentSeries.value = series;
+  experiments.value = [...SERIES_EXPERIMENTS[series]];
+  activeExperiment.value = experiments.value[0] ?? null;
+  persistExperimentState();
 };
-
-const skipIntroVideo = () => {
-  closeIntroOverlay();
-  show('已跳过导引视频', 'info');
-};
-
-watch(showIntroOverlay, async (visible) => {
-  if (!visible) {
-    introVideoRef.value?.pause();
-    return;
-  }
-
-  await nextTick();
-  introVideoRef.value?.load();
-});
 
 watch(() => activeExperiment.value?.id, async () => {
   await nextTick();
   syncLayoutState();
 });
 
-const loadSeries = async () => {
-  try {
-    const task = await getTeacherEventApi();
-    const title = task?.eventTitle ?? '';
-    const taskEventId = String(task?.id ?? '');
-    const storedState = restoreExperimentState();
-    currentTaskEventId.value = taskEventId;
-    currentSeries.value = title;
-    if (!VALID_SERIES.includes(title as keyof typeof SERIES_EXPERIMENTS)) {
-      disposeCurrentExperiment();
-      experiments.value = [];
-      activeExperiment.value = null;
-      showIntroOverlay.value = false;
-      show('当前任务不是已配置的实验系列，请先返回首页确认', 'info');
-      return;
-    }
-    disposeCurrentExperiment();
-    experiments.value = [...SERIES_EXPERIMENTS[title as keyof typeof SERIES_EXPERIMENTS]];
-
-    const canReuseStoredState = Boolean(
-      storedState
-      && storedState.taskEventId
-      && storedState.taskEventId === taskEventId
-      && storedState.currentSeries === title
-    );
-
-    doneMap.value = canReuseStoredState ? (storedState?.doneMap ?? {}) : {};
-    dismissedIntroIds.value = canReuseStoredState ? (storedState?.dismissedIntroIds ?? {}) : {};
-
-    const restoredExperimentId = canReuseStoredState ? storedState?.activeExperimentId ?? null : null;
-    activeExperiment.value = experiments.value.find((item) => item.id === restoredExperimentId) ?? experiments.value[0] ?? null;
-
-    if (activeExperiment.value) {
-      if (doneMap.value[activeExperiment.value.id]) {
-        showIntroOverlay.value = false;
-      } else {
-        maybeShowIntroVideo(activeExperiment.value);
-      }
-    }
-
-    persistExperimentState();
-  } catch {
-    show('读取教师任务失败，请稍后重试', 'error');
-  }
+const loadFreeExperiments = () => {
+  const storedState = restoreExperimentState();
+  const series = validSeries.includes(storedState?.currentSeries as keyof typeof SERIES_EXPERIMENTS)
+    ? storedState?.currentSeries as keyof typeof SERIES_EXPERIMENTS
+    : validSeries[0];
+  currentSeries.value = series;
+  experiments.value = [...SERIES_EXPERIMENTS[series]];
+  doneMap.value = storedState?.doneMap ?? {};
+  activeExperiment.value = experiments.value.find(item => item.id === storedState?.activeExperimentId)
+    ?? experiments.value[0] ?? null;
+  persistExperimentState();
 };
 
 const toggleDone = (id: string) => {
   doneMap.value[id] = !doneMap.value[id];
-  if (doneMap.value[id]) {
-    dismissedIntroIds.value[id] = true;
-    if (activeExperiment.value?.id === id) {
-      showIntroOverlay.value = false;
-    }
-  }
   persistExperimentState();
-};
-
-const goQuestion = async () => {
-  if (!allDone.value) {
-    show('请先将本系列全部实验标记完成后再开始答题', 'info');
-    return;
-  }
-
-  try {
-    const task = await getTeacherEventApi();
-    const questionIds = task?.questionIds ?? String(task?.eventDescription ?? '')
-      .replace(/^QIDS:/, '')
-      .split(',')
-      .map((item) => Number(item.trim()))
-      .filter((id) => Number.isInteger(id) && id > 0);
-
-    if (!task) {
-      show('教师暂未发布任务，无法进入答题', 'info');
-      return;
-    }
-
-    if (!questionIds.length) {
-      show('当前任务未配置题目，请联系教师重新发布', 'error');
-      return;
-    }
-
-    disposeCurrentExperiment();
-    await router.push('/student/question');
-  } catch {
-    show('读取任务失败，暂时无法进入答题', 'error');
-  }
 };
 
 onMounted(() => {
   document.addEventListener('fullscreenchange', syncFullscreenState);
   observeExperimentContainer();
   syncLayoutState();
-  loadSeries();
+  loadFreeExperiments();
 });
 onBeforeUnmount(() => {
   document.removeEventListener('fullscreenchange', syncFullscreenState);
@@ -571,84 +397,6 @@ onBeforeUnmount(() => {
   background: rgba(10, 13, 28, 0.6);
 }
 
-.exp-intro-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 80;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 28px;
-  background: rgba(3, 8, 20, 0.74);
-  backdrop-filter: blur(10px);
-}
-
-.exp-intro-dialog {
-  position: relative;
-  width: min(860px, 100%);
-  display: grid;
-  gap: 18px;
-  padding: 22px;
-  border-radius: 24px;
-  border: 1px solid rgba(151, 172, 249, 0.18);
-  background: linear-gradient(145deg, rgba(10, 13, 31, 0.98), rgba(7, 10, 22, 0.98));
-  box-shadow: 0 28px 80px rgba(0, 0, 0, 0.42);
-}
-
-.exp-intro-close {
-  position: absolute;
-  top: 14px;
-  right: 14px;
-  width: 38px;
-  height: 38px;
-  border: none;
-  border-radius: 999px;
-  background: rgba(255,255,255,0.08);
-  color: #f3f6ff;
-  font-size: 24px;
-  cursor: pointer;
-}
-
-.exp-intro-copy {
-  display: grid;
-  gap: 8px;
-  padding-right: 44px;
-}
-
-.exp-intro-kicker {
-  font-size: var(--font-size-sm);
-  font-weight: 800;
-  letter-spacing: 0.12em;
-  color: rgba(90, 243, 211, 0.88);
-}
-
-.exp-intro-copy h3 {
-  margin: 0;
-  font-size: 28px;
-  color: #f7fbff;
-}
-
-.exp-intro-copy p {
-  margin: 0;
-  line-height: 1.8;
-  color: #b9c7ea;
-  font-size: var(--font-size-sm);
-}
-
-.exp-intro-video {
-  width: 100%;
-  max-height: 56vh;
-  border-radius: 18px;
-  background: #000;
-  border: 1px solid rgba(151, 172, 249, 0.12);
-}
-
-.exp-intro-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-}
-
 /* 左侧栏 */
 .exp-sidebar {
   width: 240px;
@@ -657,6 +405,31 @@ onBeforeUnmount(() => {
   flex-direction: column;
   border-right: 1px solid var(--line);
   background: rgba(14, 18, 36, 0.9);
+}
+
+.exp-series-switch {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  padding: 12px;
+  border-bottom: 1px solid rgba(151, 172, 249, 0.1);
+}
+
+.series-switch-btn {
+  border: 1px solid rgba(151, 172, 249, 0.18);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text-muted);
+  padding: 8px 6px;
+  font-size: var(--font-size-xs);
+  cursor: pointer;
+}
+
+.series-switch-btn.active {
+  border-color: rgba(90, 243, 211, 0.45);
+  background: rgba(90, 243, 211, 0.1);
+  color: var(--brand);
+  font-weight: 700;
 }
 
 .exp-sidebar-head {
@@ -832,16 +605,6 @@ onBeforeUnmount(() => {
   font-size: 14px;
 }
 
-.exp-intro-fade-enter-active,
-.exp-intro-fade-leave-active {
-  transition: opacity 0.2s ease;
-}
-
-.exp-intro-fade-enter-from,
-.exp-intro-fade-leave-to {
-  opacity: 0;
-}
-
 @media (max-width: 960px) {
   .exp-page {
     flex-direction: column;
@@ -857,12 +620,5 @@ onBeforeUnmount(() => {
     min-height: 55vh;
   }
 
-  .exp-intro-dialog {
-    padding: 18px;
-  }
-
-  .exp-intro-copy h3 {
-    font-size: 22px;
-  }
 }
 </style>

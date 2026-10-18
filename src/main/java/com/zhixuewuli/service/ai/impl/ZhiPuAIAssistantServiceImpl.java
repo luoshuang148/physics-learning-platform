@@ -291,9 +291,6 @@ public class ZhiPuAIAssistantServiceImpl implements ZhiPuAIAssistantService {
             contextBuilder.append("\n【学生答题情况】\n");
             if (answerRecord != null) {
                 contextBuilder.append("学生选择的答案是：").append(answerRecord.getUserAnswer()).append("\n");
-                if (answerRecord.getErrorReason() != null) {
-                    contextBuilder.append("学生自述自己错误原因：").append(answerRecord.getErrorReason()).append("\n");
-                }
             } else {
                 contextBuilder.append("用户答案：暂无答题记录\n");
             }
@@ -387,7 +384,7 @@ public class ZhiPuAIAssistantServiceImpl implements ZhiPuAIAssistantService {
             context.getLock().readLock().unlock();
         }
 
-        textContent.append("\n【你的任务】\n下面是用户的具体问题，必须尽可能结合学生实际选项情况与学生自述错因做出针对性回答：\n").append(request.getQuestion());
+        textContent.append("\n【你的任务】\n下面是用户的具体问题，必须结合题目和学生实际选项情况做出针对性回答：\n").append(request.getQuestion());
         
         // 添加文本部分
         Map<String, Object> textPart = new HashMap<>();

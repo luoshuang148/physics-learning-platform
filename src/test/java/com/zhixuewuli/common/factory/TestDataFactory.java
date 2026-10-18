@@ -1,7 +1,6 @@
 package com.zhixuewuli.common.factory;
 
 import com.zhixuewuli.entity.User;
-import com.zhixuewuli.entity.Video;
 import com.zhixuewuli.entity.Question;
 import com.zhixuewuli.entity.AnswerRecord;
 import com.zhixuewuli.entity.ConversationHistory;
@@ -35,22 +34,6 @@ public class TestDataFactory {
     }
 
     /**
-     * 创建测试视频
-     */
-    public static Video createVideo() {
-        Video video = new Video();
-        video.setTitle("测试视频_" + System.currentTimeMillis());
-        video.setUrl("https://example.com/video_" + System.currentTimeMillis() + ".mp4");
-        video.setKnowledgePoint("力学基础");
-        video.setCoverUrl("https://example.com/cover.jpg");
-        video.setDuration(300);
-        video.setDescription("这是一个测试视频");
-        video.setCreatedAt(LocalDateTime.now());
-        video.setUpdatedAt(LocalDateTime.now());
-        return video;
-    }
-
-    /**
      * 创建测试题目
      */
     public static Question createQuestion() {
@@ -77,7 +60,6 @@ public class TestDataFactory {
         record.setSessionId("test-session-" + System.currentTimeMillis());
         record.setUserAnswer("A");
         record.setCorrect(true);
-        record.setErrorReason(null);
         record.setAnsweredAt(LocalDateTime.now());
         record.setCreatedAt(LocalDateTime.now());
         record.setUpdatedAt(LocalDateTime.now());

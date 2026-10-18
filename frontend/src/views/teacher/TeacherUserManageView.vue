@@ -3,7 +3,7 @@
     <div class="user-page ops-typography">
       <section class="user-hero">
         <div class="hero-copy">
-          <span class="hero-kicker">Roster Console</span>
+          <span class="hero-kicker">用户管理</span>
           <h2 class="hero-title">用户管理</h2>
           <p class="hero-desc">把筛选、编辑与状态维护收敛在同一工作台里，减少重复跳转，方便教师快速完成账号治理。</p>
         </div>
@@ -51,7 +51,7 @@
         <div class="user-list-panel">
           <div class="panel-head">
             <div>
-              <div class="panel-kicker">Directory</div>
+              <div class="panel-kicker">用户列表</div>
               <div class="panel-title">用户列表</div>
             </div>
             <span class="panel-count">{{ filteredUsers.length }} / {{ users.length }}</span>
@@ -92,7 +92,7 @@
           <template v-else>
             <div class="panel-head editor-head">
               <div>
-                <div class="panel-kicker">Workbench</div>
+                <div class="panel-kicker">编辑用户</div>
                 <div class="editor-title">编辑用户 #{{ selectedUser.id }}</div>
                 <div class="editor-sub">集中维护姓名、班级、身份与启停状态</div>
               </div>

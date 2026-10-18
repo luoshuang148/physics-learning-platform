@@ -133,8 +133,7 @@ class UserServiceUnitTest extends BaseUnitTest {
 
         when(userRepository.findById(userId)).thenReturn(Optional.of(mockStudent));
         when(userRepository.existsByUsername("new_username")).thenReturn(false);
-        when(userRepository.existsByRealName("new_username")).thenReturn(false);
-        when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(userRepository.saveAndFlush(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         // When
         User result = userService.updateCurrentUser(userId, request);
@@ -142,8 +141,8 @@ class UserServiceUnitTest extends BaseUnitTest {
         // Then
         assertThat(result.getUsername()).isEqualTo("new_username");
         verify(userRepository).existsByUsername("new_username");
-        verify(userRepository).existsByRealName("new_username");
-        verify(userRepository).save(mockStudent);
+        verify(userRepository, never()).existsByRealName("new_username");
+        verify(userRepository).saveAndFlush(mockStudent);
     }
 
     @Test
@@ -166,24 +165,21 @@ class UserServiceUnitTest extends BaseUnitTest {
     }
 
     @Test
-    void updateCurrentUser_shouldThrowUserNameDuplicateException_whenUsernameMatchesExistingRealName() {
-        // Given
+    void updateCurrentUser_shouldAllowUsernameThatMatchesAnotherUsersRealName() {
         Long userId = 100L;
         UserSelfUpdateRequest request = new UserSelfUpdateRequest();
         request.setUsername("shared_name");
 
         when(userRepository.findById(userId)).thenReturn(Optional.of(mockStudent));
         when(userRepository.existsByUsername("shared_name")).thenReturn(false);
-        when(userRepository.existsByRealName("shared_name")).thenReturn(true);
+        when(userRepository.saveAndFlush(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        // When & Then
-        assertThatThrownBy(() -> userService.updateCurrentUser(userId, request))
-                .isInstanceOf(UserNameDuplicateException.class)
-                .hasMessage("用户名 'shared_name' 已存在");
+        User result = userService.updateCurrentUser(userId, request);
 
+        assertThat(result.getUsername()).isEqualTo("shared_name");
         verify(userRepository).existsByUsername("shared_name");
-        verify(userRepository).existsByRealName("shared_name");
-        verify(userRepository, never()).save(any(User.class));
+        verify(userRepository, never()).existsByRealName(anyString());
+        verify(userRepository).saveAndFlush(mockStudent);
     }
 
     @Test
@@ -195,7 +191,7 @@ class UserServiceUnitTest extends BaseUnitTest {
 
         when(userRepository.findById(userId)).thenReturn(Optional.of(mockStudent));
         when(passwordEncoder.encode("new_password123")).thenReturn("encoded_password");
-        when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(userRepository.saveAndFlush(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         // When
         User result = userService.updateCurrentUser(userId, request);
@@ -203,7 +199,7 @@ class UserServiceUnitTest extends BaseUnitTest {
         // Then
         assertThat(result.getPasswordHash()).isEqualTo("encoded_password");
         verify(passwordEncoder).encode("new_password123");
-        verify(userRepository).save(mockStudent);
+        verify(userRepository).saveAndFlush(mockStudent);
     }
 
     @Test
@@ -215,7 +211,7 @@ class UserServiceUnitTest extends BaseUnitTest {
 
         when(userRepository.findById(userId)).thenReturn(Optional.of(mockStudent));
         when(userRepository.existsByRealName("新姓名")).thenReturn(false);
-        when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(userRepository.saveAndFlush(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         // When
         User result = userService.updateCurrentUser(userId, request);
@@ -223,7 +219,7 @@ class UserServiceUnitTest extends BaseUnitTest {
         // Then
         assertThat(result.getRealName()).isEqualTo("新姓名");
         verify(userRepository).existsByRealName("新姓名");
-        verify(userRepository).save(mockStudent);
+        verify(userRepository).saveAndFlush(mockStudent);
     }
 
     @Test
@@ -252,14 +248,14 @@ class UserServiceUnitTest extends BaseUnitTest {
         request.setClassName("高三(2)班");
 
         when(userRepository.findById(userId)).thenReturn(Optional.of(mockStudent));
-        when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(userRepository.saveAndFlush(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         // When
         User result = userService.updateCurrentUser(userId, request);
 
         // Then
         assertThat(result.getClassName()).isEqualTo("高三(2)班");
-        verify(userRepository).save(mockStudent);
+        verify(userRepository).saveAndFlush(mockStudent);
     }
 
     @Test
@@ -287,7 +283,7 @@ class UserServiceUnitTest extends BaseUnitTest {
         request.setUsername("student001");
 
         when(userRepository.findById(userId)).thenReturn(Optional.of(mockStudent));
-        when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(userRepository.saveAndFlush(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         // When
         User result = userService.updateCurrentUser(userId, request);
@@ -296,7 +292,7 @@ class UserServiceUnitTest extends BaseUnitTest {
         assertThat(result.getUsername()).isEqualTo("student001");
         verify(userRepository, never()).existsByUsername(anyString());
         verify(userRepository, never()).existsByRealName(anyString());
-        verify(userRepository).save(mockStudent);
+        verify(userRepository).saveAndFlush(mockStudent);
     }
 
     @Test
@@ -308,7 +304,7 @@ class UserServiceUnitTest extends BaseUnitTest {
 
         when(userRepository.findById(userId)).thenReturn(Optional.of(mockStudent));
         when(userRepository.existsByRealName("学生一号")).thenReturn(true);
-        when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(userRepository.saveAndFlush(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         // When
         User result = userService.updateCurrentUser(userId, request);
@@ -316,7 +312,7 @@ class UserServiceUnitTest extends BaseUnitTest {
         // Then
         assertThat(result.getRealName()).isEqualTo("学生一号");
         verify(userRepository).existsByRealName("学生一号");
-        verify(userRepository).save(mockStudent);
+        verify(userRepository).saveAndFlush(mockStudent);
     }
 
     @Test
@@ -334,7 +330,7 @@ class UserServiceUnitTest extends BaseUnitTest {
         request.setClassName("高三(5)班");
 
         when(userRepository.findById(userId)).thenReturn(Optional.of(mockStudent));
-        when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(userRepository.saveAndFlush(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         // When
         User result = userService.updateCurrentUser(userId, request);

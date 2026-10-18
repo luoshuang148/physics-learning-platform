@@ -42,24 +42,6 @@ CREATE TABLE IF NOT EXISTS users (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户信息表';
 
 -- ====================================================================
--- 2. 视频表 (videos) - 存储教学视频信息
--- ====================================================================
-CREATE TABLE IF NOT EXISTS videos (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '视频ID',
-    title VARCHAR(255) NOT NULL UNIQUE COMMENT '视频标题',
-    url VARCHAR(255) NOT NULL UNIQUE COMMENT '视频地址',
-    knowledge_point VARCHAR(255) COMMENT '知识点',
-    cover_url VARCHAR(255) COMMENT '封面图片URL',
-    duration INT COMMENT '视频时长（秒）',
-    description TEXT COMMENT '视频描述',
-    question_id BIGINT COMMENT '关联的题目ID，一对一关系',
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    
-    INDEX idx_created_at (created_at)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='视频信息表';
-
--- ====================================================================
 -- 3. 题目表 (questions) - 存储练习题目
 -- ====================================================================
 CREATE TABLE IF NOT EXISTS questions (
@@ -70,7 +52,6 @@ CREATE TABLE IF NOT EXISTS questions (
     correct_option VARCHAR(50) NOT NULL COMMENT '正确答案',
     explanation LONGTEXT COMMENT '解析说明（LaTeX格式）',
     difficulty INT DEFAULT 1 COMMENT '难度等级（1-5）',
-    explanation_video_mapping LONGTEXT COMMENT '讲解视频映射（JSON格式）',
     image_base64 LONGTEXT COMMENT '题目图片Base64编码',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
@@ -88,6 +69,7 @@ CREATE TABLE IF NOT EXISTS answer_records (
     request_id VARCHAR(64) NULL,
     practice BOOLEAN NOT NULL DEFAULT FALSE,
     question_snapshot LONGTEXT NULL,
+    image_ref VARCHAR(64) NULL COMMENT '内容寻址题目图片哈希；旧快照可为空',
     content_snapshot LONGTEXT NULL, options_snapshot LONGTEXT NULL, correct_snapshot VARCHAR(1) NULL, analysis_snapshot LONGTEXT NULL,difficulty_snapshot INT NULL,
     attempt_order BIGINT NOT NULL AUTO_INCREMENT UNIQUE,
     UNIQUE KEY uk_user_request(user_id,request_id),
@@ -101,7 +83,6 @@ CREATE TABLE IF NOT EXISTS answer_records (
     session_id VARCHAR(255) NOT NULL COMMENT '会话ID',
     selected_option VARCHAR(255) NOT NULL COMMENT '用户选择的答案',
     correct BOOLEAN COMMENT '是否正确',
-    error_reason VARCHAR(255) COMMENT '错误原因',
     answered_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '答题时间',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
@@ -117,6 +98,14 @@ CREATE TABLE IF NOT EXISTS answer_records (
     INDEX idx_user_question_answered (user_id, question_id, answered_at),
     INDEX idx_user_correct_answered (user_id, correct, answered_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='答题记录表';
+
+-- 4.1 题目图片内容寻址表 - 同一图片只保存一次
+CREATE TABLE IF NOT EXISTS question_images (
+    content_hash CHAR(64) PRIMARY KEY COMMENT '图片内容的 SHA-256',
+    content LONGTEXT NOT NULL COMMENT '图片 Base64 内容',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='不可变题目图片内容';
 
 -- ====================================================================
 -- 5. AI对话历史表 (conversation_history) - 存储AI对话记录
@@ -158,15 +147,16 @@ CREATE TABLE IF NOT EXISTS teacher_events (
     event_title VARCHAR(20) NOT NULL COMMENT '事件标题',
     event_description VARCHAR(100) COMMENT '事件描述',
     event_timestamp DATETIME NOT NULL COMMENT '事件时间戳',
-    active_slot INT GENERATED ALWAYS AS (CASE WHEN is_global = TRUE THEN 1 ELSE NULL END),
-    UNIQUE KEY uk_active_event (active_slot),
-    is_global BOOLEAN DEFAULT TRUE COMMENT '是否为全局事件',
+    status VARCHAR(20) NOT NULL DEFAULT 'PUBLISHED' COMMENT 'DRAFT/PUBLISHED/CLOSED/ARCHIVED',
+    start_at DATETIME NULL COMMENT '允许开始作答时间',
+    due_at DATETIME NULL COMMENT '截止时间',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
     
     FOREIGN KEY (teacher_id) REFERENCES users(id) ON DELETE CASCADE,
-    INDEX idx_is_global (is_global)  -- 全局事件查询索引
-    -- 实体类没有定义其他索引，故不添加额外索引
+    INDEX idx_teacher_events_status (status),
+    INDEX idx_teacher_events_status_start (status, start_at),
+    INDEX idx_teacher_events_status_due (status, due_at)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='教师事件表';
 
 -- ====================================================================
@@ -191,23 +181,6 @@ CREATE TABLE IF NOT EXISTS student_reports (
     INDEX idx_user_created (user_id, created_at),
     INDEX idx_user_session (user_id, session_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='学生报告表';
-
--- ====================================================================
--- 8. 实验表 (experiments) - 存储实验配置信息
--- ====================================================================
-CREATE TABLE IF NOT EXISTS experiments (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '实验ID',
-    name VARCHAR(255) NOT NULL UNIQUE COMMENT '实验名称（全局唯一）',
-    question_ids LONGTEXT COMMENT '有序题目ID列表（JSON 数组格式，如 [1,2,3]）',
-    description TEXT COMMENT '实验描述',
-    order_number INT DEFAULT 0 NOT NULL COMMENT '排序序号（正整数，全局唯一）',
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    
-    UNIQUE KEY uk_experiment_name (name),
-    UNIQUE KEY uk_order_number (order_number),
-    INDEX idx_created_at (created_at)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='实验配置表';
 
 -- ====================================================================
 CREATE TABLE teacher_event_questions (

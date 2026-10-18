@@ -36,7 +36,7 @@ import java.util.List;
  * <ul>
  * <li>GET /api/question-error-analysis/statistics - 获取题目错误统计</li>
  * <li>GET /api/question-error-analysis/{questionId}/details -
- * 获取题目学生错误详情（含词云）</li>
+ * 获取题目学生错误详情</li>
  * <li>POST /api/question-error-analysis/stream - 教师题目分析流式生成（纯 AI 分析）</li>
  * </ul>
  * 
@@ -123,7 +123,7 @@ public class QuestionErrorAnalysisController {
         @GetMapping("/{questionId}/details")
         @Operation(
             summary = "获取题目错误详情",
-            description = "返回指定题目的学生错误列表和词云数据（单次查询优化）",
+            description = "返回指定题目的学生错误列表（单次查询优化）",
             responses = {
                 @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "查询成功"),
                 @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "未认证"),

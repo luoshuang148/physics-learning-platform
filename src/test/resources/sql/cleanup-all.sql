@@ -14,12 +14,10 @@ DELETE FROM teacher_events;
 DELETE FROM conversation_history;
 DELETE FROM answer_records;
 DELETE FROM questions;
-DELETE FROM videos;
 DELETE FROM users;
 
 -- 重置所有表的自增序列
 ALTER TABLE users ALTER COLUMN id RESTART WITH 1;
-ALTER TABLE videos ALTER COLUMN id RESTART WITH 1;
 ALTER TABLE questions ALTER COLUMN id RESTART WITH 1;
 ALTER TABLE conversation_history ALTER COLUMN id RESTART WITH 1;
 ALTER TABLE teacher_events ALTER COLUMN id RESTART WITH 1;

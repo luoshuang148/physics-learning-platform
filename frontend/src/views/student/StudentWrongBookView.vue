@@ -3,13 +3,13 @@
     <div class="wb-page student-font">
       <section class="wb-hero">
         <div>
-          <span class="wb-kicker">Wrong answer book</span>
+          <span class="wb-kicker">错题复习</span>
           <h1 class="wb-title">错题本</h1>
-          <p class="wb-summary">定位错因，针对性补练，并查看最新掌握状态。</p>
+          <p class="wb-summary">定位错题，针对性补练，并查看最新掌握状态。</p>
         </div>
         <div class="wb-tools">
           <input v-model="searchText" class="wb-search" placeholder="搜索题目内容…" />
-          <span v-if="!loading" class="wb-count">{{ filteredRecords.length }} 道错题</span>
+          <span v-if="!loading" class="wb-count">已显示 {{ records.length }} / {{ total }} 道</span>
         </div>
       </section>
 
@@ -19,31 +19,29 @@
       </div>
 
       <div v-else-if="records.length === 0" class="wb-empty">
-        <div class="wb-empty-icon">🎉</div>
         <p class="wb-empty-title">暂无错题记录</p>
       </div>
 
-      <div v-else-if="filteredRecords.length === 0" class="wb-empty">
-        <div class="wb-empty-icon">🔍</div>
+      <div v-else-if="records.length === 0" class="wb-empty">
         <p class="wb-empty-title">无匹配题目</p>
       </div>
 
       <div v-else class="wb-list">
         <div
-          v-for="(item, idx) in filteredRecords"
+          v-for="(item, idx) in records"
           :key="item.recordId"
           class="wb-card"
           :class="{ expanded: expandedId === item.recordId }"
         >
-          <div class="wb-card-head" @click="toggleExpand(item.recordId)">
+          <div class="wb-card-head" @click="toggleExpand(item)">
             <span class="wb-idx">{{ idx + 1 }}</span>
             <div class="wb-card-preview">
-              <LatexText :content="item.questionContent?.slice(0, 80) ?? ''" />
-              <span v-if="item.questionContent?.length > 80">…</span>
+              <LatexText :content="item.questionPreview?.slice(0, 80) ?? ''" />
+              <span v-if="item.questionPreview?.length > 80">…</span>
             </div>
             <div class="wb-card-chips">
               <span class="wb-chip wrong">我选 {{ item.userAnswer }}</span>
-              <span class="wb-chip correct">✓ {{ item.correctAnswer }}</span>
+              <span class="wb-chip correct">{{ item.correct ? '已掌握' : '待复习' }}</span>
             </div>
             <span class="wb-time">{{ formatTime(item.answeredAt) }}</span>
             <span class="wb-expand-icon">{{ expandedId === item.recordId ? '▲' : '▼' }}</span>
@@ -51,11 +49,12 @@
 
           <div v-if="expandedId === item.recordId" class="wb-card-detail">
             <section class="wb-detail-block">
-              <h3 class="wb-section-title">题目内容 · {{ item.correct ? '已通过补练' : '待掌握' }}</h3>
+              <h3 class="wb-section-title">题目内容 · {{ (detailOf(item)?.correct ?? item.correct) ? '已通过补练' : '待掌握' }}</h3>
               <button class="wb-ai-clear-btn" @click="practice(item)">针对性补练</button>
-              <div class="wb-detail-q"><LatexText :content="item.questionContent" /></div>
-              <div v-if="item.imageBase64" class="wb-question-image-wrap">
-                <img :src="item.imageBase64" alt="题目配图" class="wb-question-image" />
+              <div v-if="detailOf(item)" class="wb-detail-q"><LatexText :content="detailOf(item)!.questionContent" /></div>
+              <div v-else class="muted">{{ detailLoading[item.recordId] ? '正在加载详情…' : '详情加载失败' }}</div>
+              <div v-if="detailOf(item)?.imageBase64" class="wb-question-image-wrap">
+                <img :src="detailOf(item)!.imageBase64!" alt="题目配图" class="wb-question-image" />
               </div>
             </section>
 
@@ -63,12 +62,12 @@
               <h3 class="wb-section-title">选项与答案</h3>
               <div class="wb-detail-opts">
                 <div
-                  v-for="(text, key) in item.questionOptions"
+                  v-for="(text, key) in (detailOf(item)?.questionOptions ?? {})"
                   :key="key"
                   class="wb-opt"
                   :class="{
-                    'wb-opt-correct': key === item.correctAnswer,
-                    'wb-opt-wrong': key === item.userAnswer && key !== item.correctAnswer
+                    'wb-opt-correct': key === detailOf(item)?.correctAnswer,
+                    'wb-opt-wrong': key === item.userAnswer && key !== detailOf(item)?.correctAnswer
                   }"
                 >
                   <span class="wb-opt-key">{{ key }}</span>
@@ -77,14 +76,10 @@
               </div>
             </section>
 
-            <section v-if="item.questionAnalysis || item.errorReason" class="wb-detail-block wb-analysis-grid">
-              <div v-if="item.questionAnalysis" class="wb-analysis">
+            <section v-if="detailOf(item)?.questionAnalysis" class="wb-detail-block">
+              <div class="wb-analysis">
                 <span class="wb-analysis-label">解析</span>
-                <LatexText :content="item.questionAnalysis" />
-              </div>
-              <div v-if="item.errorReason" class="wb-reason">
-                <span class="wb-reason-label">错误原因</span>
-                <span>{{ item.errorReason }}</span>
+                <LatexText :content="detailOf(item)!.questionAnalysis!" />
               </div>
             </section>
 
@@ -159,7 +154,7 @@
                       @click="toggleSpeechInput(item.recordId)"
                       aria-label="语音输入"
                     >
-                      <span aria-hidden="true">🎤</span>
+                      <span>语音</span>
                     </button>
                     <button class="wb-ai-clear-btn" :disabled="aiState.loading" @click="clearMessages(item.recordId)">清空</button>
                   </div>
@@ -192,22 +187,27 @@
           </div>
         </div>
       </div>
+
+      <div v-if="page < pages" class="wb-pager">
+        <button class="neon-btn ghost" :disabled="loadingMore" @click="loadPage(page + 1, true)">
+          {{ loadingMore ? '加载中…' : '加载更多' }}
+        </button>
+      </div>
     </div>
   </AppShell>
 </template>
 
 <script setup lang="ts">
 import { useRouter } from 'vue-router';
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import AppShell from '@/layouts/AppShell.vue';
 import LatexText from '@/components/LatexText.vue';
 import StreamOutput from '@/components/StreamOutput.vue';
 import { useAuthStore } from '@/stores/auth';
-import { scopedPracticeRows } from '@/utils/practiceReview';
-import { getPracticeReviewApi } from '@/api/answer-record';
+import { getAnswerRecordDetailApi, getPracticeReviewPageApi } from '@/api/answer-record';
 import { streamWrongQuestionAnalysis } from '@/api/ai';
 import { useAIStreamState } from '@/composables/useAIStreamState';
-import type { AnswerRecordResponse } from '@/types/answer-record';
+import type { AnswerRecordResponse, AnswerRecordSummary } from '@/types/answer-record';
 
 interface WrongBookChatMessage {
   id: string;
@@ -262,7 +262,7 @@ interface SpeechRecognitionAlternative {
 }
 
 const practiceRouter = useRouter();
-const practice = (item: AnswerRecordResponse) => {
+const practice = (item: Pick<AnswerRecordSummary, 'eventId' | 'questionId'>) => {
  practiceRouter.push({path:'/student/practice',query:{eventId:item.eventId ?? undefined,questionId:item.questionId}});
 };
 const auth = useAuthStore();
@@ -270,14 +270,24 @@ const { state: aiState, reset: resetAIState } = useAIStreamState();
 
 const links = [
   { label: '首页', to: '/student/home' },
+  { label: '作业', to: '/student/task' },
   { label: '错题本', to: '/student/wrong-book' },
   { label: '学习报告', to: '/student/report' },
 ];
 
 const loading = ref(false);
-const records = ref<AnswerRecordResponse[]>([]);
+const loadingMore = ref(false);
+const records = ref<AnswerRecordSummary[]>([]);
+const details = ref<Record<string, AnswerRecordResponse>>({});
+const detailLoading = ref<Record<string, boolean>>({});
+const page = ref(1);
+const pages = ref(0);
+const total = ref(0);
+const pageSize = 20;
 const searchText = ref('');
 const expandedId = ref<string | null>(null);
+const detailOf = (item: AnswerRecordSummary) => details.value[item.recordId];
+let searchTimer: ReturnType<typeof setTimeout> | undefined;
 const currentRecordId = ref<string | null>(null);
 const activeAbortController = ref<AbortController | null>(null);
 const aiQuestions = ref<Record<string, string>>({});
@@ -349,15 +359,25 @@ const setQuestionInputRef = (recordId: string, el: Element | null) => {
   questionInputRefs.delete(recordId);
 };
 
-const toggleExpand = (id: string) => {
-  expandedId.value = expandedId.value === id ? null : id;
+const toggleExpand = async (item: AnswerRecordSummary) => {
+  if (expandedId.value === item.recordId) {
+    expandedId.value = null;
+    return;
+  }
+  expandedId.value = item.recordId;
+  if (details.value[item.recordId] || detailLoading.value[item.recordId]) return;
+  detailLoading.value[item.recordId] = true;
+  try {
+    details.value[item.recordId] = await getAnswerRecordDetailApi(item.recordId);
+  } catch {
+    // Keep the row usable; the retry follows when it is collapsed and opened again.
+    delete details.value[item.recordId];
+  } finally {
+    detailLoading.value[item.recordId] = false;
+  }
 };
 
-const filteredRecords = computed(() => {
-  const s = searchText.value.trim().toLowerCase();
-  if (!s) return records.value;
-  return records.value.filter(r => r.questionContent?.toLowerCase().includes(s));
-});
+
 
 const formatTime = (time: string) =>
   new Date(time).toLocaleString('zh-CN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
@@ -388,17 +408,12 @@ const isAbortError = (error: unknown) => {
     || (typeof error === 'object' && (error as { name?: string }).name === 'AbortError');
 };
 
-const fillSuggestedQuestion = (item: AnswerRecordResponse) => {
-  aiQuestions.value[item.recordId] = '请结合正确答案、题目解析和我的错误原因，分析我为什么会做错，并告诉我以后如何避免类似错误。';
+const fillSuggestedQuestion = (item: AnswerRecordSummary) => {
+  aiQuestions.value[item.recordId] = '请结合正确答案和题目解析，分析我为什么会做错，并告诉我以后如何避免类似错误。';
 };
 
-const buildInitialQuestion = (item: AnswerRecordResponse) => {
-  const reason = item.errorReason?.trim();
-  if (reason) {
-    return `我这道题做错了，我的自我分析是：${reason}。请结合正确答案、题目解析和我的错误原因，分析我为什么会做错，并告诉我以后如何避免类似错误。`;
-  }
-  return '请结合正确答案、题目解析和我的错误原因，分析我为什么会做错，并告诉我以后如何避免类似错误。';
-};
+const buildInitialQuestion = (_item: AnswerRecordSummary) =>
+  '请结合正确答案和题目解析，分析我为什么会做错，并告诉我以后如何避免类似错误。';
 
 const clearMessages = (recordId: string) => {
   aiMessages.value[recordId] = [];
@@ -415,7 +430,7 @@ const stopCurrentAnalysis = (recordId: string) => {
   activeAbortController.value?.abort();
 };
 
-const submitQuestionAsk = async (item: AnswerRecordResponse) => {
+const submitQuestionAsk = async (item: AnswerRecordSummary) => {
   const prompt = aiQuestions.value[item.recordId]?.trim() ?? '';
   if (!prompt || aiState.value.loading) return;
 
@@ -517,7 +532,7 @@ const submitQuestionAsk = async (item: AnswerRecordResponse) => {
   }
 };
 
-const startInitialAnalysis = async (item: AnswerRecordResponse) => {
+const startInitialAnalysis = async (item: AnswerRecordSummary) => {
   if (aiState.value.loading) return;
 
   currentRecordId.value = item.recordId;
@@ -612,17 +627,31 @@ const startInitialAnalysis = async (item: AnswerRecordResponse) => {
   }
 };
 
-onMounted(async () => {
-  loading.value = true;
+const loadPage = async (targetPage = 1, append = false) => {
+  if (targetPage === 1) loading.value = true;
+  else loadingMore.value = true;
   try {
-    const res = await getPracticeReviewApi();
-    records.value = scopedPracticeRows(res.records);
+    const res = await getPracticeReviewPageApi({ page: targetPage, size: pageSize, keyword: searchText.value.trim() });
+    const incoming = (res.records ?? []).filter(row => !records.value.some(existing => existing.recordId === row.recordId));
+    records.value = append ? [...records.value, ...incoming] : incoming;
+    page.value = res.currentPage;
+    pages.value = res.pages;
+    total.value = res.total;
   } finally {
     loading.value = false;
+    loadingMore.value = false;
   }
+};
+
+watch(searchText, () => {
+  if (searchTimer) clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => void loadPage(1, false), 300);
 });
 
+onMounted(() => void loadPage(1, false));
+
 onBeforeUnmount(() => {
+  if (searchTimer) clearTimeout(searchTimer);
   activeAbortController.value?.abort();
   speechRecognition?.stop();
 });
@@ -840,14 +869,12 @@ onBeforeUnmount(() => {
   border: 1px solid rgba(255, 107, 145, 0.3);
 }
 
-.wb-analysis,
-.wb-reason {
+.wb-analysis {
   display: grid;
   gap: 8px;
 }
 
-.wb-analysis-label,
-.wb-reason-label {
+.wb-analysis-label {
   font-size: 12px;
   color: var(--text-muted);
 }

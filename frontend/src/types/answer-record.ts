@@ -4,7 +4,6 @@ export interface AnswerRecordSubmitPayload {
   intent?: 'ASSIGNMENT' | 'PRACTICE';
   questionId: number;
   userAnswer: string;
-  errorReason?: string;
   answeredAt?: string;
 }
 
@@ -25,7 +24,6 @@ export interface AnswerRecordResponse {
   userAnswer: string;
   correct: boolean;
   answeredAt: string;
-  errorReason: string | null;
   questionContent: string;
   questionOptions: Record<string, string>;
   correctAnswer: string;
@@ -33,6 +31,26 @@ export interface AnswerRecordResponse {
   difficulty: string | null;
   imageBase64: string | null;
   sessionId: string;
+}
+
+export interface AnswerRecordSummary {
+  recordId: string;
+  eventId: number | null;
+  practice: boolean;
+  attemptOrder: number | null;
+  userId: number;
+  questionId: number;
+  sessionId: string;
+  userAnswer: string;
+  correct: boolean;
+  questionPreview: string;
+  answeredAt: string;
+}
+
+export interface StudentAnswerSummary {
+  totalAttempts: number;
+  correctAttempts: number;
+  wrongQuestions: number;
 }
 
 export interface AnswerRecordBatchResponse {

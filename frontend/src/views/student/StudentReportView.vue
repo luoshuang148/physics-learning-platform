@@ -3,9 +3,9 @@
     <div class="report-page student-font">
       <section class="report-hero">
         <div class="report-hero-main">
-          <span class="report-kicker">Learning report</span>
+          <span class="report-kicker">学习报告</span>
           <h1 class="report-title">学习报告</h1>
-          <p class="report-summary">查看当前任务的原始作答与补练情况。AI 建议需核实，请勿在自述错因中填写个人敏感信息。</p>
+          <p class="report-summary">查看当前任务的原始作答与补练情况。AI 建议需教师核实。</p>
         </div>
         <div class="report-actions">
           <button
@@ -34,12 +34,12 @@
         </div>
         <div class="stat-card">
           <span class="stat-label">报告来源</span>
-          <strong class="stat-value">题目信息+本轮答题记录+自述错因</strong>
+          <strong class="stat-value">题目信息+本轮答题记录</strong>
         </div>
       </section>
 
       <div v-if="state.error" class="report-error">
-        <span>⚠️ {{ state.error }}</span>
+        <span>{{ state.error }}</span>
       </div>
 
       <section v-if="state.content || state.loading" class="report-output">
@@ -59,7 +59,6 @@
       </section>
 
       <section v-else class="report-empty">
-        <div class="empty-icon">📄</div>
         <div>
           <h3>还没有生成学习报告</h3>
           <p>点击上方按钮后，系统会基于当前学习数据生成总结。</p>
@@ -77,7 +76,7 @@ import { useAuthStore } from '@/stores/auth';
 import { useStudentReportStore } from '@/stores/studentReport';
 import { streamStudentReport } from '@/api/ai';
 import { useRoute } from 'vue-router';
-import { getTeacherEventApi } from '@/api/teacher-event';
+import { getStudentTasksApi } from '@/api/teacher-event';
 import { getAICapabilitiesApi } from '@/api/ai';
 import { useAIStreamState } from '@/composables/useAIStreamState';
 
@@ -93,6 +92,7 @@ const activeAbortController = ref<AbortController | null>(null);
 
 const links = [
   { label: '首页', to: '/student/home' },
+  { label: '作业', to: '/student/task' },
   { label: '错题本', to: '/student/wrong-book' },
   { label: '学习报告', to: '/student/report' },
 ];
@@ -177,7 +177,8 @@ const stopCurrentReport = () => {
 onMounted(async () => {
   try {
     const capability=await getAICapabilitiesApi();reportsAvailable.value=capability.reports;
-    eventId.value=route.query.eventId ? Number(route.query.eventId) : (await getTeacherEventApi())?.id;
+    const available = route.query.eventId ? [] : await getStudentTasksApi();
+    eventId.value = route.query.eventId ? Number(route.query.eventId) : (available.find(task => task.canAnswer) ?? available[0])?.id;
     if (!eventId.value) { state.value.error='暂无学习任务，请完成任务后再生成报告。';return; }
     scopeReady.value=true;restoreCachedReport();
   } catch { state.value.error='任务信息加载失败，请刷新重试。'; }

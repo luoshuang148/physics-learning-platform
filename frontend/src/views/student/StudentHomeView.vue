@@ -8,22 +8,25 @@
     <template v-else>
       <section class="overview-card" :class="{ idle: !task }">
         <div class="overview-main">
-          <div class="overview-kicker">学生首页</div>
-          <h1 class="overview-title">{{ greeting }}，{{ auth.user?.realName ?? auth.user?.username }}</h1>
+          <div class="overview-kicker">学习概览</div>
+          <h1 class="overview-title">当前学习</h1>
 
           <div v-if="task" class="overview-task-meta">
-            <span class="task-live-badge">⚡ 当前任务</span>
-            <span class="task-meta">{{ task.teacherName }} · {{ formatTime(task.eventTimestamp) }}</span>
+            <span class="task-live-badge">当前任务</span>
+            <span class="task-meta">{{ task.teacherName }} · {{ task.dueAt ? '截止 ' + formatTime(task.dueAt) : '不限截止' }}</span>
+            <span v-if="openTasks.length > 1" class="task-meta">另有 {{ openTasks.length - 1 }} 个进行中任务</span>
           </div>
 
           <h2 class="overview-task-title">{{ task ? task.eventTitle : '当前暂无教师任务' }}</h2>
 
           <div class="overview-actions">
-            <button v-if="task" class="primary-action" @click="enterExperiment">
-              <span>进入实验</span>
+            <button v-if="task?.canAnswer" class="primary-action" @click="enterTask">
+              <span>开始答题</span>
               <span class="start-arrow">→</span>
             </button>
+            <span v-else-if="task" class="task-unavailable">{{ task.availability === 'SCHEDULED' ? '任务未开始' : '任务已截止' }}</span>
             <button v-else class="secondary-action" @click="loadAll">刷新任务</button>
+            <router-link to="/student/task" class="secondary-action task-list-link">全部作业（{{ openTasks.length }}）</router-link>
           </div>
         </div>
 
@@ -62,14 +65,12 @@
             <div class="wp-list">
               <div v-for="r in recentWrong" :key="r.recordId" class="wp-item">
                 <span class="wp-ans wrong">{{ r.userAnswer }}</span>
-                <span class="wp-correct">→ {{ r.correctAnswer }}</span>
-                <div class="wp-content"><LatexText :content="r.questionContent?.slice(0, 80) ?? ''" /></div>
+                <div class="wp-content"><LatexText :content="r.questionPreview?.slice(0, 80) ?? ''" /></div>
               </div>
             </div>
           </div>
 
           <div v-else class="panel-card empty-card">
-            <div class="empty-icon">🎉</div>
             <div>
               <h3 class="panel-title">暂无错题</h3>
               <p class="panel-subtitle">继续保持，完成任务后可再查看学习报告。</p>
@@ -84,16 +85,21 @@
             </div>
 
             <div class="step-list">
-              <router-link v-if="task" to="/student/experiment" class="step-item step-item-disabled" @click.prevent="enterExperiment">
-                <span class="step-icon">🧪</span>
+              <router-link v-if="task" to="/student/question" class="step-item step-item-disabled" @click.prevent="enterTask">
                 <div class="step-body">
-                  <span class="step-title">开始当前实验</span>
-                  <span class="step-desc">继续本次教师发布任务</span>
+                  <span class="step-title">开始当前任务</span>
+                  <span class="step-desc">直接完成教师发布的题目</span>
+                </div>
+              </router-link>
+
+              <router-link to="/student/experiments" class="step-item">
+                <div class="step-body">
+                  <span class="step-title">自由探索 3D 实验</span>
+                  <span class="step-desc">不绑定任务，自由切换实验操作</span>
                 </div>
               </router-link>
 
               <router-link to="/student/wrong-book" class="step-item">
-                <span class="step-icon">📖</span>
                 <div class="step-body">
                   <span class="step-title">复习错题</span>
                   <span class="step-desc">查看历史错误与解析</span>
@@ -101,7 +107,6 @@
               </router-link>
 
               <router-link to="/student/report" class="step-item">
-                <span class="step-icon">📊</span>
                 <div class="step-body">
                   <span class="step-title">查看学习报告</span>
                   <span class="step-desc">生成本阶段学习总结</span>
@@ -125,10 +130,10 @@ import AppToast from '@/components/AppToast.vue';
 import LatexText from '@/components/LatexText.vue';
 import { useToast } from '@/composables/useToast';
 import { useAuthStore } from '@/stores/auth';
-import { getTeacherEventApi } from '@/api/teacher-event';
-import { getMyAnswersApi, getMyWrongAnswersApi } from '@/api/answer-record';
+import { getStudentTasksApi } from '@/api/teacher-event';
+import { getStudentAnswerSummaryApi, getPracticeReviewPageApi } from '@/api/answer-record';
 import type { TeacherEventResponse } from '@/types/teacher-event';
-import type { AnswerRecordResponse } from '@/types/answer-record';
+import type { AnswerRecordSummary, StudentAnswerSummary } from '@/types/answer-record';
 
 const TASK_ENTRY_EVENT_ID_KEY_PREFIX = 'student_task_entry_event_id';
 
@@ -140,14 +145,18 @@ const getTaskEntryEventIdKey = () => `${TASK_ENTRY_EVENT_ID_KEY_PREFIX}_${auth.u
 
 const links = [
   { label: '首页', to: '/student/home' },
+  { label: '作业', to: '/student/task' },
+  { label: '3D 实验', to: '/student/experiments' },
   { label: '错题本', to: '/student/wrong-book' },
   { label: '学习报告', to: '/student/report' },
 ];
 
 const loading = ref(true);
-const task = ref<TeacherEventResponse | null>(null);
-const allRecords = ref<AnswerRecordResponse[]>([]);
-const wrongRecords = ref<AnswerRecordResponse[]>([]);
+const tasks = ref<TeacherEventResponse[]>([]);
+const openTasks = computed(() => tasks.value.filter(item => item.canAnswer));
+const task = computed<TeacherEventResponse | null>(() => openTasks.value[0] ?? tasks.value[0] ?? null);
+const mySummary = ref<StudentAnswerSummary>({ totalAttempts: 0, correctAttempts: 0, wrongQuestions: 0 });
+const wrongRecords = ref<AnswerRecordSummary[]>([]);
 
 const greeting = computed(() => {
   const h = new Date().getHours();
@@ -159,9 +168,7 @@ const greeting = computed(() => {
 });
 
 const myStats = computed(() => {
-  const total = allRecords.value.length;
-  const correct = allRecords.value.filter(r => r.correct).length;
-  const wrong = wrongRecords.value.length;
+  const { totalAttempts: total, correctAttempts: correct, wrongQuestions: wrong } = mySummary.value;
   const accuracy = total > 0 ? Math.round((correct / total) * 100) : 0;
   return { total, correct, wrong, accuracy };
 });
@@ -182,33 +189,28 @@ const formatTime = (time: string) =>
 const loadAll = async () => {
   loading.value = true;
   try {
-    const [taskData, myData, wrongData] = await Promise.allSettled([
-      getTeacherEventApi(),
-      getMyAnswersApi(),
-      getMyWrongAnswersApi(),
+    const [taskData, summaryData, wrongData] = await Promise.allSettled([
+      getStudentTasksApi(),
+      getStudentAnswerSummaryApi(),
+      getPracticeReviewPageApi({ page: 1, size: 3 }),
     ]);
-    if (taskData.status === 'fulfilled') task.value = taskData.value;
-    if (myData.status === 'fulfilled') allRecords.value = myData.value.records ?? [];
+    if (taskData.status === 'fulfilled') tasks.value = taskData.value;
+    if (summaryData.status === 'fulfilled') mySummary.value = summaryData.value;
     if (wrongData.status === 'fulfilled') {
-      const seen = new Set<string>();
-      wrongRecords.value = (wrongData.value.records ?? []).filter(r => {
-        if (seen.has(r.questionContent)) return false;
-        seen.add(r.questionContent);
-        return true;
-      });
+      wrongRecords.value = (wrongData.value.records ?? []).filter(r => r.correct === false).slice(0, 3);
     }
   } finally {
     loading.value = false;
   }
 };
 
-const enterExperiment = () => {
-  if (!task.value) {
-    show('当前无可进入的教师任务', 'info');
+const enterTask = () => {
+  if (!task.value?.canAnswer) {
+    show('当前没有可作答的教师任务', 'info');
     return;
   }
   sessionStorage.setItem(getTaskEntryEventIdKey(), String(task.value.id));
-  router.push('/student/experiment');
+  router.push('/student/question');
 };
 
 onMounted(loadAll);

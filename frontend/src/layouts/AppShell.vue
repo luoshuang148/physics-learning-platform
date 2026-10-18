@@ -1,6 +1,6 @@
 <template>
   <div class="shell">
-    <div class="shell-backdrop" />
+    <div class="shell-backdrop" :class="{ visible: !sidebarCollapsed }" @click="sidebarCollapsed = true" />
     <aside
       class="sidebar"
       :class="{ collapsed: sidebarCollapsed, 'sidebar-auto-transition': autoSidebarTransition }"
@@ -14,7 +14,7 @@
         </div>
         <div class="brand-text">
           <span class="brand-name">智学物理</span>
-          <span class="brand-sub">Quantum Teaching Console</span>
+          <span class="brand-sub">物理教学工作台</span>
         </div>
         <button
           class="sidebar-toggle"
@@ -42,9 +42,8 @@
       </nav>
 
       <div class="sidebar-footer sidebar-footer-anchor">
-        <button class="guide-entry-btn" @click="openGuideModal">使用指南</button>
         <div class="status-card">
-          <span class="status-kicker">Workspace</span>
+          <span class="status-kicker">当前空间</span>
           <strong class="status-title">{{ auth.user?.userType === 'TEACHER' ? '教师控制台' : '学生学习台' }}</strong>
           <span class="status-meta">{{ subtitle }}</span>
         </div>
@@ -65,18 +64,21 @@
     <main class="shell-main">
       <div class="main-header">
         <div class="main-header-left">
+          <button class="mobile-menu-btn" type="button" aria-label="打开导航" @click="sidebarCollapsed = !sidebarCollapsed">菜单</button>
           <button v-if="showBackButton" class="back-btn" @click="goBack">
             <span class="back-btn-arrow">←</span>
             <span>返回上一步</span>
           </button>
           <div class="main-header-copy">
-            <div class="main-kicker">Teaching Interface</div>
+            <div class="main-kicker">{{ auth.user?.userType === 'TEACHER' ? '教师工作台' : '学生工作台' }}</div>
             <div class="shell-subtitle">{{ subtitle }}</div>
           </div>
         </div>
-        <div class="main-badge">{{ auth.user?.userType === 'TEACHER' ? 'Instructor Mode' : 'Learner Mode' }}</div>
+        <div class="main-header-right">
+          <span v-if="aiNotice" class="ai-status-chip" :title="aiNotice">{{ aiNotice.includes('暂不可用') ? 'AI 暂不可用' : 'AI 使用提示' }}</span>
+          <div class="main-badge">{{ auth.user?.userType === 'TEACHER' ? '教师端' : '学生端' }}</div>
+        </div>
       </div>
-      <p v-if="aiNotice" role="status" class="ai-capability-notice">{{ aiNotice }}</p>
       <slot />
     </main>
   </div>
@@ -165,34 +167,6 @@
     </div>
   </teleport>
 
-  <teleport to="body">
-    <div v-if="guideModalOpen" class="profile-modal-mask" @click.self="closeGuideModal">
-      <div class="profile-modal guide-modal" :class="{ 'is-teacher-guide': auth.user?.userType === 'TEACHER' }">
-        <div class="profile-modal-head guide-modal-head">
-          <div>
-            <h3>{{ guideTitle }}</h3>
-            <p>可随时从左下角「使用指南」入口再次查看。</p>
-          </div>
-          <button class="profile-close" @click="closeGuideModal">×</button>
-        </div>
-        <div class="guide-modal-body">
-          <div class="guide-markdown" v-html="guideHtml" />
-        </div>
-      </div>
-    </div>
-  </teleport>
-
-  <teleport to="body">
-    <div v-if="guidePromptOpen" class="profile-modal-mask" @click.self="acknowledgeGuidePrompt">
-      <div class="profile-modal guide-prompt-modal">
-        <div class="guide-prompt-content">
-          <h3>温馨提示</h3>
-          <p>使用本平台前，建议先阅读左下角的使用指南哦~</p>
-          <button type="button" class="primary-btn" @click="acknowledgeGuidePrompt">我已知晓</button>
-        </div>
-      </div>
-    </div>
-  </teleport>
 </template>
 
 <script setup lang="ts">
@@ -200,29 +174,21 @@ import { computed, reactive, ref, onMounted, onBeforeUnmount, nextTick, watch } 
 import { useAuthStore } from '@/stores/auth';
 import { useRoute, useRouter } from 'vue-router';
 import { updateCurrentUserApi } from '@/api/user';
-import { marked } from 'marked';
 import { getAICapabilitiesApi } from '@/api/ai';
 const aiNotice=ref('');
 onMounted(async () => {
   try { const capability=await getAICapabilitiesApi();aiNotice.value=(!capability.reports && !capability.tutoring ? 'AI 暂不可用。' : '') + capability.notice; }
   catch { aiNotice.value='AI 功能状态暂时无法确认，请稍后重试。'; }
 });
-import studentGuideMarkdown from '../../../docs/学生使用指南.md?raw';
-import teacherGuideMarkdown from '../../../docs/教师使用指南.md?raw';
-
-marked.setOptions({ gfm: true, breaks: true });
-
 interface Link {
   label: string;
   to: string;
 }
 
-const FONT_SIZE_STORAGE_KEY = 'zxwl-font-scale';
-const GUIDE_PROMPT_STORAGE_KEY = 'zxwl-guide-prompt-seen';
-const SIDEBAR_STATE_STORAGE_KEY = 'zxwl-sidebar-collapsed';
-const FONT_SIZE_MIN = 16;
-const FONT_SIZE_MAX = 20;
-const DEFAULT_FONT_SIZE = 18;
+const FONT_SIZE_STORAGE_KEY = 'zxwl-font-scale-v2';
+const FONT_SIZE_MIN = 13;
+const FONT_SIZE_MAX = 18;
+const DEFAULT_FONT_SIZE = 15;
 
 const props = defineProps<{
   subtitle: string;
@@ -240,8 +206,6 @@ const userMenuStyle = ref<Record<string, string>>({});
 const fontSize = ref(DEFAULT_FONT_SIZE);
 const profileModalOpen = ref(false);
 const profileSaving = ref(false);
-const guideModalOpen = ref(false);
-const guidePromptOpen = ref(false);
 const sidebarCollapsed = ref(false);
 const autoSidebarTransition = ref(false);
 const profileForm = reactive({
@@ -258,13 +222,8 @@ const avatarLetter = computed(() => {
 
 const fontSizeLabel = computed(() => `${fontSize.value}px`);
 
-const guideTitle = computed(() => (auth.user?.userType === 'TEACHER' ? '教师使用指南' : '学生使用指南'));
 
-const guideMarkdownSource = computed(() => {
-  return auth.user?.userType === 'TEACHER' ? teacherGuideMarkdown : studentGuideMarkdown;
-});
 
-const guideHtml = computed(() => renderGuideMarkdown(guideMarkdownSource.value));
 
 const showBackButton = computed(() => {
   const path = route.path;
@@ -292,17 +251,6 @@ const goBack = () => {
   }
 };
 
-type SidebarDefaultMode = 'expanded' | 'collapsed';
-
-const getRouteSidebarDefault = (): SidebarDefaultMode => {
-  return route.meta?.sidebarDefault === 'collapsed' ? 'collapsed' : 'expanded';
-};
-
-const getSidebarStateStorageKey = () => {
-  const role = auth.user?.userType?.toLowerCase() ?? 'guest';
-  return `${SIDEBAR_STATE_STORAGE_KEY}-${role}`;
-};
-
 const syncViewportAfterLayoutChange = () => {
   if (typeof window === 'undefined') {
     return;
@@ -313,16 +261,17 @@ const syncViewportAfterLayoutChange = () => {
   });
 };
 
+let lastMobileViewport = typeof window !== 'undefined' && window.innerWidth <= 1100;
 const initializeSidebarState = () => {
   autoSidebarTransition.value = false;
-
-  const savedState = window.localStorage.getItem(getSidebarStateStorageKey());
-  if (savedState == 'true' || savedState == 'false') {
-    sidebarCollapsed.value = savedState == 'true';
-    return;
-  }
-
-  sidebarCollapsed.value = getRouteSidebarDefault() === 'collapsed';
+  lastMobileViewport = window.innerWidth <= 1100;
+  sidebarCollapsed.value = lastMobileViewport;
+};
+const handleViewportResize = () => {
+  const mobile = window.innerWidth <= 1100;
+  if (mobile === lastMobileViewport) return;
+  lastMobileViewport = mobile;
+  sidebarCollapsed.value = mobile;
 };
 
 const toggleSidebar = () => {
@@ -354,39 +303,6 @@ const openProfileEditor = () => {
   settingsOpen.value = false;
   menuOpen.value = false;
   profileModalOpen.value = true;
-};
-
-const openGuideModal = () => {
-  guideModalOpen.value = true;
-};
-
-const closeGuideModal = () => {
-  guideModalOpen.value = false;
-};
-
-const acknowledgeGuidePrompt = () => {
-  guidePromptOpen.value = false;
-  window.sessionStorage.setItem(GUIDE_PROMPT_STORAGE_KEY, '1');
-};
-
-const escapeHtml = (value: string) => {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
-};
-
-const renderGuideMarkdown = (content: string) => {
-  const trimmed = content.trim();
-  if (!trimmed) {
-    return '<p>暂无指南内容</p>';
-  }
-
-  try {
-    return marked.parse(trimmed) as string;
-  } catch {
-    return `<p>${escapeHtml(trimmed)}</p>`;
-  }
 };
 
 const openSettingsPanel = () => {
@@ -485,8 +401,6 @@ const submitProfileEditor = async () => {
 
 const onLogout = async () => {
   menuOpen.value = false;
-  guidePromptOpen.value = false;
-  window.sessionStorage.removeItem(GUIDE_PROMPT_STORAGE_KEY);
   await auth.logout();
   await router.push('/auth/login');
 };
@@ -512,11 +426,11 @@ watch(
   () => {
     menuOpen.value = false;
     settingsOpen.value = false;
+    if (window.innerWidth <= 1100) sidebarCollapsed.value = true;
   },
 );
 
 watch(sidebarCollapsed, () => {
-  window.localStorage.setItem(getSidebarStateStorageKey(), String(sidebarCollapsed.value));
   nextTick(() => {
     updateUserMenuPosition();
     syncViewportAfterLayoutChange();
@@ -536,18 +450,17 @@ onMounted(() => {
   fontSize.value = Number.isFinite(savedFontSize)
     ? Math.min(FONT_SIZE_MAX, Math.max(FONT_SIZE_MIN, savedFontSize))
     : DEFAULT_FONT_SIZE;
-  if (!window.sessionStorage.getItem(GUIDE_PROMPT_STORAGE_KEY)) {
-    guidePromptOpen.value = true;
-  }
   document.documentElement.style.setProperty('--app-font-size', `${fontSize.value}px`);
   document.addEventListener('click', handleClickOutside);
   window.addEventListener('resize', handleWindowChange);
+  window.addEventListener('resize', handleViewportResize);
   window.addEventListener('scroll', handleWindowChange, true);
 });
 
 onBeforeUnmount(() => {
   document.removeEventListener('click', handleClickOutside);
   window.removeEventListener('resize', handleWindowChange);
+  window.removeEventListener('resize', handleViewportResize);
   window.removeEventListener('scroll', handleWindowChange, true);
 });
 </script>
@@ -1439,34 +1352,6 @@ onBeforeUnmount(() => {
   border-bottom: none !important;
 }
 
-.guide-prompt-modal {
-  width: min(100%, 460px);
-}
-
-.guide-prompt-content {
-  padding: 24px 22px;
-  display: grid;
-  gap: 14px;
-  text-align: center;
-}
-
-.guide-prompt-content h3 {
-  margin: 0;
-  font-size: 22px;
-  color: #f4f8ff;
-}
-
-.guide-prompt-content p {
-  margin: 0;
-  color: #a9badf;
-  line-height: 1.7;
-}
-
-.guide-prompt-content .primary-btn {
-  width: 100%;
-  margin-top: 4px;
-}
-
 .profile-modal-head {
   display: flex;
   align-items: flex-start;
@@ -1599,5 +1484,224 @@ onBeforeUnmount(() => {
     width: 100%;
   }
 }
-</style>
+/* --- Light teaching-workspace theme --- */
+.sidebar {
+  width: 236px !important;
+  padding: 18px 12px 14px !important;
+  background: #ffffff !important;
+  border-right: 1px solid #e2e8f0 !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+}
+.sidebar::before { display: none !important; }
+.sidebar-brand {
+  height: 54px !important;
+  min-height: 54px !important;
+  padding: 0 6px 12px !important;
+  margin-bottom: 10px !important;
+  border-bottom: 1px solid #eef2f7 !important;
+  gap: 10px !important;
+}
+.brand-orbit { width: 32px !important; height: 32px !important; }
+.brand-core {
+  inset: 13px !important;
+  background: #0f766e !important;
+  box-shadow: none !important;
+}
+.brand-ring { display: none !important; }
+.brand-name { color: #172033 !important; font-size: 15px !important; font-weight: 700 !important; letter-spacing: 0 !important; }
+.brand-sub { color: #94a3b8 !important; font-size: 10px !important; letter-spacing: 0.04em !important; text-transform: none !important; }
+.sidebar-toggle {
+  display: none !important;
+  width: 32px !important;
+  height: 32px !important;
+  border-radius: 8px !important;
+  border: 1px solid #e2e8f0 !important;
+  background: #ffffff !important;
+  color: #475569 !important;
+  font-size: 18px !important;
+}
+.sidebar-nav { gap: 3px !important; }
+.nav-item {
+  min-height: 40px !important;
+  padding: 0 10px !important;
+  border-radius: 8px !important;
+  border: 1px solid transparent !important;
+  color: #475569 !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  background: transparent !important;
+}
+.nav-item:hover { background: #f8fafc !important; color: #172033 !important; }
+.nav-item.is-active {
+  background: #ecfdf5 !important;
+  border-color: #d1fae5 !important;
+  color: #0f766e !important;
+  font-weight: 600 !important;
+}
+.nav-glow { width: 6px !important; height: 6px !important; border-radius: 50% !important; background: #cbd5e1 !important; box-shadow: none !important; opacity: 1 !important; }
+.nav-item.is-active .nav-glow { background: #0f766e !important; }
+.nav-short { color: inherit !important; }
+.sidebar-footer { gap: 10px !important; }
+.guide-entry-btn {
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  color: #475569 !important;
+  border-radius: 8px !important;
+  min-height: 34px !important;
+  font-size: 12px !important;
+  box-shadow: none !important;
+}
+.guide-entry-btn:hover { background: #f8fafc !important; border-color: #cbd5e1 !important; }
+.status-card {
+  background: #f8fafc !important;
+  border: 1px solid #eef2f7 !important;
+  border-radius: 10px !important;
+  padding: 10px 12px !important;
+  box-shadow: none !important;
+}
+.status-kicker { color: #94a3b8 !important; font-size: 9px !important; letter-spacing: 0.08em !important; }
+.status-title { color: #334155 !important; font-size: 12px !important; }
+.status-meta { color: #94a3b8 !important; font-size: 10px !important; }
+.avatar-btn {
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  border-radius: 10px !important;
+  padding: 7px 8px !important;
+  box-shadow: none !important;
+}
+.avatar-letter { background: #ecfdf5 !important; color: #0f766e !important; box-shadow: none !important; }
+.avatar-name { color: #172033 !important; font-size: 12px !important; }
+.avatar-role { color: #94a3b8 !important; font-size: 10px !important; }
+.avatar-chevron { color: #94a3b8 !important; }
+.shell-main {
+  background: #f5f7fa !important;
+  padding: 20px 28px 32px !important;
+  gap: 14px !important;
+}
+.main-header {
+  padding-bottom: 14px !important;
+  border-bottom: 1px solid #e2e8f0 !important;
+  margin-bottom: 0 !important;
+}
+.main-kicker { color: #94a3b8 !important; font-size: 10px !important; letter-spacing: 0.08em !important; }
+.shell-subtitle { color: #172033 !important; font-size: 22px !important; font-weight: 700 !important; font-family: inherit !important; letter-spacing: -0.02em !important; }
+.main-badge {
+  background: #f1f5f9 !important;
+  border: 1px solid #e2e8f0 !important;
+  color: #475569 !important;
+  border-radius: 6px !important;
+  padding: 4px 9px !important;
+  font-size: 11px !important;
+  font-weight: 500 !important;
+  letter-spacing: 0 !important;
+}
+.ai-capability-notice {
+  background: #fffbeb !important;
+  border: 1px solid #fde68a !important;
+  color: #92400e !important;
+  border-radius: 8px !important;
+  padding: 7px 10px !important;
+  font-size: 12px !important;
+  line-height: 1.5 !important;
+}
+.back-btn {
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  color: #475569 !important;
+  border-radius: 8px !important;
+  box-shadow: none !important;
+}
+.back-btn:hover { background: #f8fafc !important; border-color: #cbd5e1 !important; }
+.mobile-menu-btn {
+  display: none;
+  width: 34px;
+  height: 34px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #334155;
+  font-size: 17px;
+  cursor: pointer;
+}
+.user-menu, .profile-modal, .guide-modal {
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.12) !important;
+  color: #172033 !important;
+}
+.user-menu-action, .secondary-btn {
+  background: #ffffff !important;
+  border: 1px solid #e2e8f0 !important;
+  color: #475569 !important;
+}
+.primary-btn {
+  background: #0f766e !important;
+  border: 1px solid #0f766e !important;
+  color: #ffffff !important;
+}
+.guide-modal-body { color: #334155 !important; }
 
+@media (max-width: 1100px) {
+  .mobile-menu-btn { display: inline-flex; }
+  .sidebar {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    bottom: 0 !important;
+    z-index: 300 !important;
+    width: min(82vw, 280px) !important;
+    height: 100dvh !important;
+    max-height: none !important;
+    padding: 18px 14px !important;
+    transform: translateX(-100%);
+    transition: transform 0.2s ease !important;
+    border-right: 1px solid #e2e8f0 !important;
+    border-bottom: none !important;
+    box-shadow: 12px 0 32px rgba(15, 23, 42, 0.12) !important;
+    overflow-y: auto !important;
+  }
+  .sidebar:not(.collapsed) { transform: translateX(0); }
+  .sidebar.collapsed {
+    width: min(82vw, 280px) !important;
+    max-height: none !important;
+    padding: 18px 14px !important;
+  }
+  .sidebar .sidebar-brand,
+  .sidebar.collapsed .sidebar-brand {
+    display: flex !important;
+    justify-content: space-between !important;
+    margin-bottom: 10px !important;
+    padding: 0 4px 12px !important;
+  }
+  .sidebar .brand-text,
+  .sidebar.collapsed .brand-text { display: flex !important; }
+  .sidebar .sidebar-nav,
+  .sidebar .sidebar-footer,
+  .sidebar.collapsed .sidebar-nav,
+  .sidebar.collapsed .sidebar-footer { display: flex !important; }
+  .sidebar-toggle { display: inline-flex !important; }
+  .shell-backdrop {
+    display: block !important;
+    position: fixed !important;
+    inset: 0 !important;
+    z-index: 250 !important;
+    background: rgba(15, 23, 42, 0.28) !important;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+  }
+  .shell-backdrop.visible { opacity: 1; pointer-events: auto; }
+  .shell-main { padding: 16px 14px 28px !important; }
+  .main-header, .main-header-left {
+    flex-direction: row !important;
+    align-items: center !important;
+  }
+  .main-header-left { gap: 8px !important; min-width: 0; }
+  .main-kicker { display: none !important; }
+  .shell-subtitle { font-size: 18px !important; }
+  .main-badge { align-self: center !important; flex-shrink: 0; }
+}
+</style>

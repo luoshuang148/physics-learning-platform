@@ -6,11 +6,10 @@ const teacherPassword = process.env.E2E_TEACHER_PASSWORD ?? 'E2e-teacher-fixture
 const url = (path: string) => new URL(path, base).toString();
 async function login(page: Page, username: string, password: string) {
   await page.goto(url('auth/login'));
-  await page.getByPlaceholder('请输入用户名或真实姓名').fill(username);
+  await page.getByPlaceholder('请输入用户名').fill(username);
   await page.getByPlaceholder('请输入密码', { exact: true }).fill(password);
   await page.getByRole('button', { name: '登录', exact: true }).click();
   await expect(page).toHaveURL(/\/(teacher\/dashboard|student\/home)$/);
-  await page.getByRole('button', { name: '我已知晓', exact: true }).click();
 }
 async function headers(page: Page) {
   const token = await page.evaluate(() => localStorage.getItem('zhixue_token'));
@@ -25,8 +24,10 @@ test('publish → answer → archive → reuse → archived practice, and safe A
   expect(registration.ok()).toBeTruthy();
   await login(tp, teacherName, teacherPassword);
   const teacherHeaders = await headers(tp);
-  const previous = (await (await request.get(url('teacher/events'), { headers: teacherHeaders })).json()).data;
-  if (previous) expect((await request.delete(url(`teacher/events/${previous.id}`), { headers: teacherHeaders })).ok()).toBeTruthy();
+  const existing = (await (await request.get(url('teacher/events/all'), { headers: teacherHeaders })).json()).data;
+  for (const task of existing) {
+    expect((await request.delete(url(`teacher/events/${task.id}`), { headers: teacherHeaders })).ok()).toBeTruthy();
+  }
   const content = `E2E immutable force fixture ${tag}`;
   const created = await request.post(url('questions/teacher/create'), { headers: teacherHeaders, data: {
     content, options: JSON.stringify({ A: '3m/s²', B: '12m/s²', C: '6m/s²', D: '0m/s²' }), correctOption: 'A', explanation: 'a=F/m', difficulty: 1,
@@ -34,6 +35,7 @@ test('publish → answer → archive → reuse → archived practice, and safe A
   expect(created.ok()).toBeTruthy(); const question = (await created.json()).data;
   // Select and publish from the actual teacher page.
   await tp.goto(url('teacher/event-manage'));
+  await tp.locator('#task-title').fill('E2E task');
   await tp.getByPlaceholder('搜索题目 ID 或内容…').fill(content);
   await tp.locator('.bank-item').filter({ hasText: content }).getByRole('button', { name: '加入', exact: true }).click();
   await tp.locator('.publish-btn').click();
@@ -44,13 +46,12 @@ test('publish → answer → archive → reuse → archived practice, and safe A
 
   await login(sp, studentName, password);
   await sp.goto(url('student/task')); await sp.getByRole('button', { name: '开始本次任务' }).click();
-  await expect(sp).toHaveURL(/student\/experiment/); await sp.goto(url('student/question'));
+  await expect(sp).toHaveURL(/student\/question$/);
   await expect(sp.locator('.question-text')).toContainText(content);
   await sp.locator('label.option-row').filter({ hasText: '12m/s²' }).click();
   await sp.getByRole('button', { name: '提交答案', exact: true }).click();
-  await sp.getByPlaceholder('例如：我把受力方向看反了、把位移和路程混了、忽略了题目里的限制条件……').fill('误把F与m相乘');
-  await sp.getByRole('button', { name: '提交并保存', exact: true }).click();
-  await expect(sp.locator('.q-save-feedback')).toContainText('保存成功');
+  await expect(sp.getByText('✗ 回答错误')).toBeVisible();
+  await expect(sp.locator('.q-save-feedback')).toContainText('本题答案已提交成功');
   await sp.reload(); await expect(sp.locator('.q-dot.wrong')).toHaveCount(1);
   const studentHeaders = await headers(sp);
   let summary = await request.get(url(`answer-records/teacher/summary?eventId=${originalTask.id}`), { headers: teacherHeaders });
@@ -63,13 +64,16 @@ test('publish → answer → archive → reuse → archived practice, and safe A
     id: question.id, content: `${content} EDITED`, options: JSON.stringify({ A: '3m/s²', B: '12m/s²', C: '6m/s²', D: '0m/s²' }), correctOption: 'B', difficulty: 1,
   } });
   expect(changed.ok()).toBeTruthy();
+  await tp.locator('#task-title').fill('E2E reused task');
+  await tp.getByPlaceholder('搜索题目 ID 或内容…').fill(content);
+  await tp.locator('.bank-item').filter({ hasText: content }).getByRole('button', { name: '加入', exact: true }).click();
   await tp.locator('.publish-btn').click();
   await expect(tp.locator('.event-status-card')).toContainText('已发布');
   current = await request.get(url('teacher/events'), { headers: teacherHeaders });
   const reusedTask = (await current.json()).data;
   expect(reusedTask.id).not.toEqual(originalTask.id);
   await sp.goto(url('student/task')); await sp.getByRole('button', { name: '开始本次任务' }).click();
-  await expect(sp).toHaveURL(/student\/experiment/); await sp.goto(url('student/question'));
+  await expect(sp).toHaveURL(/student\/question$/);
   await expect(sp.locator('label.option-row')).toHaveCount(4);
   await expect(sp.locator('.q-dot.wrong')).toHaveCount(0);
   await expect(sp.locator('.q-dot.correct')).toHaveCount(0);

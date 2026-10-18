@@ -1,5 +1,5 @@
 <template>
-  <div class="ai-float-root" :class="{ compact: isCompactMode }" :style="{ right: posRight + 'px', bottom: posBottom + 'px' }">
+  <div class="ai-float-root" :style="{ right: posRight + 'px', bottom: posBottom + 'px' }">
     <button
       class="ai-fab"
       :class="{ active: drawerOpen, dragging: isDragging }"
@@ -7,7 +7,7 @@
       @touchstart.passive="onTouchStart"
       @click="onFabClick"
     >
-      <span class="ai-fab-icon">{{ drawerOpen ? '✕' : '✦' }}</span>
+      <span class="ai-fab-icon">{{ drawerOpen ? '×' : 'AI' }}</span>
       <span class="ai-fab-label">{{ drawerOpen ? '关闭' : 'AI' }}</span>
     </button>
 
@@ -51,7 +51,7 @@
               ></div>
 
               <div v-if="item.error" class="ai-error">
-                <p>⚠ {{ item.error }}</p>
+                <p>{{ item.error }}</p>
               </div>
             </div>
 
@@ -80,7 +80,7 @@
               </div>
 
               <div v-if="currentAssistantMessage.error" class="ai-error">
-                <p>⚠ {{ currentAssistantMessage.error }}</p>
+                <p>{{ currentAssistantMessage.error }}</p>
               </div>
             </div>
           </div>
@@ -117,10 +117,10 @@
                     @click="toggleSpeechInput"
                     aria-label="语音输入"
                   >
-                    <span aria-hidden="true">🎤</span>
+                    <span>语音</span>
                   </button>
                   <label class="ai-icon-btn upload" :class="{ disabled: state.loading }" title="上传图片" aria-label="上传图片">
-                    <span aria-hidden="true">🖼️</span>
+                    <span>图片</span>
                     <input
                       class="ai-file-input"
                       type="file"
@@ -150,8 +150,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch, onUnmounted, nextTick, onMounted } from 'vue';
-import { useRoute } from 'vue-router';
+import { ref, watch, onUnmounted, nextTick, onMounted } from 'vue';
 import { streamRealtimeQA, clearSessionApi, getSessionHistoryApi } from '@/api/ai';
 import { useAIStreamState } from '@/composables/useAIStreamState';
 import { useToast } from '@/composables/useToast';
@@ -216,19 +215,8 @@ interface SpeechRecognitionAlternative {
   transcript: string;
 }
 
-type ExperimentLayoutMode = 'full' | 'normal' | 'compact';
-type ExperimentLayoutPayload = {
-  type: 'zxwl-experiment-layout';
-  mode: ExperimentLayoutMode;
-  availableWidth: number;
-  threshold: number;
-};
-
-const EXPERIMENT_LAYOUT_EVENT = 'zxwl-experiment-layout-change';
-
 const { state, reset } = useAIStreamState();
 const { show } = useToast();
-const route = useRoute();
 const drawerOpen = ref(false);
 const question = ref('');
 const messages = ref<ChatMessage[]>([]);
@@ -242,12 +230,7 @@ const questionInputRef = ref<HTMLTextAreaElement | null>(null);
 const isSecureContext = typeof window !== 'undefined' && window.isSecureContext;
 const speechSupported = typeof window !== 'undefined' && Boolean(window.SpeechRecognition || window.webkitSpeechRecognition) && isSecureContext;
 const speechListening = ref(false);
-const experimentLayoutMode = ref<ExperimentLayoutMode>('normal');
-const experimentAvailableWidth = ref(window.innerWidth);
 let speechRecognition: SpeechRecognition | null = null;
-const isStudentExperimentRoute = computed(() => route.path.startsWith('/student/experiment'));
-const isCompactMode = computed(() => isStudentExperimentRoute.value && experimentLayoutMode.value !== 'full');
-const isStrictCompactMode = computed(() => isStudentExperimentRoute.value && experimentLayoutMode.value === 'compact');
 
 const appendRecognizedText = (text: string) => {
   const normalized = text.trim();
@@ -367,17 +350,13 @@ let startRight = 0, startBottom = 0;
 let dragMoved = false;
 
 const clampPosition = (nextRight: number, nextBottom: number) => {
-  const fabSize = isCompactMode.value ? 52 : 58;
-  const minEdge = isCompactMode.value ? 12 : 8;
+  const fabSize = 58;
+  const minEdge = 8;
   const minRight = minEdge;
   const maxBottom = Math.max(minEdge, window.innerHeight - (fabSize + minEdge));
   const maxRightDefault = Math.max(minRight, window.innerWidth - (fabSize + minEdge));
 
-  let maxRight = maxRightDefault;
-  if (isCompactMode.value) {
-    const rightSafeBand = Math.max(96, Math.floor(experimentAvailableWidth.value * 0.14));
-    maxRight = Math.min(maxRightDefault, rightSafeBand);
-  }
+  const maxRight = maxRightDefault;
 
   return {
     right: Math.max(minRight, Math.min(maxRight, nextRight)),
@@ -389,19 +368,6 @@ const normalizeFloatingPosition = () => {
   const next = clampPosition(posRight.value, posBottom.value);
   posRight.value = next.right;
   posBottom.value = next.bottom;
-};
-
-const handleExperimentLayoutChange = (event: Event) => {
-  const detail = (event as CustomEvent<ExperimentLayoutPayload>).detail;
-  if (!detail || detail.type !== 'zxwl-experiment-layout') return;
-
-  experimentLayoutMode.value = detail.mode;
-  experimentAvailableWidth.value = detail.availableWidth;
-
-  if (detail.mode === 'compact') {
-    drawerOpen.value = false;
-  }
-  normalizeFloatingPosition();
 };
 
 const handleWindowResize = () => {
@@ -477,32 +443,15 @@ onUnmounted(() => {
   window.removeEventListener('mousemove', onDragMove);
   window.removeEventListener('mouseup', onDragEnd);
   window.removeEventListener('resize', handleWindowResize);
-  window.removeEventListener(EXPERIMENT_LAYOUT_EVENT, handleExperimentLayoutChange as EventListener);
   speechRecognition?.stop();
 });
 
 onMounted(() => {
   window.addEventListener('resize', handleWindowResize);
-  window.addEventListener(EXPERIMENT_LAYOUT_EVENT, handleExperimentLayoutChange as EventListener);
   normalizeFloatingPosition();
   if (drawerOpen.value) loadHistory();
 });
 
-watch(isCompactMode, () => {
-  normalizeFloatingPosition();
-}, { immediate: true });
-
-watch(isStrictCompactMode, (compact) => {
-  if (compact) drawerOpen.value = false;
-}, { immediate: true });
-
-watch(() => route.path, (path) => {
-  if (!path.startsWith('/student/experiment')) {
-    experimentLayoutMode.value = 'normal';
-    experimentAvailableWidth.value = window.innerWidth;
-    normalizeFloatingPosition();
-  }
-}, { immediate: true });
 
 const renderUserText = (content: string) => content
   .replace(/&/g, '&amp;')

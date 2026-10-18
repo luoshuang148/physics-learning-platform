@@ -2,48 +2,28 @@ package com.zhixuewuli.service.teacherEvent.impl;
 
 import com.zhixuewuli.common.exception.BusinessException;
 import com.zhixuewuli.common.exception.auth.UserNotFoundException;
-import com.zhixuewuli.common.exception.teacherevent.*;
+import com.zhixuewuli.common.exception.teacherevent.EventNotFoundException;
+import com.zhixuewuli.common.exception.teacherevent.TeacherEventBusinessException;
 import com.zhixuewuli.common.util.UserPermissionUtil;
 import com.zhixuewuli.dto.request.TeacherEventCreateRequest;
+import com.zhixuewuli.dto.response.QuestionResponse;
 import com.zhixuewuli.dto.response.TeacherEventResponse;
 import com.zhixuewuli.entity.TeacherEvent;
 import com.zhixuewuli.entity.User;
-import com.zhixuewuli.repository.AnswerRecordRepository;
-import com.zhixuewuli.repository.ConversationHistoryRepository;
-import com.zhixuewuli.repository.StudentReportRepository;
 import com.zhixuewuli.repository.TeacherEventRepository;
 import com.zhixuewuli.repository.UserRepository;
+import com.zhixuewuli.service.question.AnswerAccessPolicy;
+import com.zhixuewuli.service.teacherEvent.TaskQuestionService;
 import com.zhixuewuli.service.teacherEvent.TeacherEventService;
-
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Optional;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
+import java.util.List;
 
-/**
- * 教师事件服务实现类
- * 
- * 实现教师全局事件管理的核心业务逻辑，包括事件发布、删除和查询功能。
- * 全局事件在整个系统中唯一，所有用户共享同一个教师事件。
- * 
- * <p>
- * 核心实现要点：
- * </p>
- * <ul>
- * <li>全局事件唯一性控制</li>
- * <li>完整的事务管理支持</li>
- * <li>详细的日志记录</li>
- * <li>规范的异常处理</li>
- * <li>删除时手动清理关联数据</li>
- * </ul>
- * 
- * @author 智学物理开发团队
- * @version 1.0.0
- * @since 2026
- * @see TeacherEventService 教师事件服务接口
- */
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -52,143 +32,176 @@ public class TeacherEventServiceImpl implements TeacherEventService {
     private final TeacherEventRepository teacherEventRepository;
     private final UserRepository userRepository;
     private final UserPermissionUtil userPermissionUtil;
-    private final com.zhixuewuli.service.teacherEvent.TaskQuestionService taskQuestions;
-    
-    // 关联数据 Repository（用于删除时手动清理）
+    private final TaskQuestionService taskQuestions;
+    private final AnswerAccessPolicy answerAccess;
+
+    private LocalDateTime now() { return LocalDateTime.now(ZoneOffset.UTC).withNano(0); }
 
     @Override
-    @Transactional(rollbackFor = { Exception.class })
+    @Transactional(rollbackFor = Exception.class)
     public TeacherEventResponse publishEvent(TeacherEventCreateRequest request, Long currentUserId) {
-        log.info("发布全局事件 - UserId: {}", currentUserId);
-    
-        try {
-            // 1. 权限验证：检查用户是否为教师
-            userPermissionUtil.checkTeacherPermission(currentUserId);
-    
-            // 2. 检查全局事件是否已存在
-            if (teacherEventRepository.existsByIsGlobalTrue()) {
-                log.warn("全局事件已存在 - UserId: {}", currentUserId);
-                throw new EventAlreadyExistsException("全局事件已存在");
-            }
-    
-            var orderedQuestions = taskQuestions.prepare(request);
-            // 3. 获取教师信息
-            User teacher = userRepository.findById(currentUserId)
-                    .orElseThrow(() -> new UserNotFoundException("用户不存在"));
-    
-            // 4. 创建新事件
-            TeacherEvent event = new TeacherEvent();
-            event.setTeacherId(currentUserId);
-            event.setTeacherName(teacher.getRealName());
-            event.setEventTitle(request.getEventTitle());
-            event.setEventDescription(request.getEventDescription());
-            event.setEventTimestamp(java.time.LocalDateTime.now(java.time.ZoneOffset.UTC));
-            event.setIsGlobal(true);  // 设置为全局事件
-    
-            // 5. 保存事件
-            TeacherEvent savedEvent = teacherEventRepository.saveAndFlush(event);
-            taskQuestions.capture(savedEvent.getId(), orderedQuestions);
-            log.info("全局事件发布成功 - EventId: {}, UserId: {}", savedEvent.getId(), currentUserId);
-    
-            // 6. 转换为响应 DTO
-            return convertToResponse(savedEvent);
-    
-        } catch (org.springframework.dao.DataIntegrityViolationException e) {
-            throw new EventAlreadyExistsException("已有活动中的教学任务，请先归档");
-        } catch (IllegalArgumentException e) {
-            throw e;
-        } catch (BusinessException e) {
-            // 重新抛出业务异常，触发事务回滚
-            throw e;
-        } catch (Exception e) {
-            log.error("发布全局事件失败 - UserId: {}", currentUserId, e);
-            throw new RuntimeException("发布事件失败：" + e.getMessage(), e);
+        return createTask(request, currentUserId);
+    }
+
+    private TeacherEventResponse createTask(TeacherEventCreateRequest request, Long userId) {
+        userPermissionUtil.checkTeacherPermission(userId);
+        TeacherEvent.Status status = request.getStatus() == null ? TeacherEvent.Status.PUBLISHED : request.getStatus();
+        if (status != TeacherEvent.Status.DRAFT && status != TeacherEvent.Status.PUBLISHED) {
+            throw new IllegalArgumentException("新建任务只能保存为草稿或直接发布");
         }
+        validateWindow(request.getStartAt(), request.getDueAt());
+        // Legacy callers omitted status and questionIds; keep them working while the new UI enforces non-empty published tasks.
+        boolean legacyImplicitPublish = request.getStatus() == null;
+        var orderedQuestions = taskQuestions.prepare(request, status == TeacherEvent.Status.DRAFT || legacyImplicitPublish);
+        User teacher = userRepository.findById(userId)
+                .orElseThrow(() -> new UserNotFoundException("用户不存在"));
+
+        LocalDateTime now = now();
+        TeacherEvent event = new TeacherEvent();
+        event.setTeacherId(userId);
+        event.setTeacherName(teacher.getRealName());
+        event.setEventTitle(request.getEventTitle().trim());
+        event.setEventDescription(request.getEventDescription());
+        event.setEventTimestamp(now);
+        event.setStatus(status);
+        event.setStartAt(status == TeacherEvent.Status.PUBLISHED ? fallback(request.getStartAt(), now) : request.getStartAt());
+        event.setDueAt(request.getDueAt());
+        TeacherEvent saved = teacherEventRepository.saveAndFlush(event);
+        taskQuestions.capture(saved.getId(), orderedQuestions);
+        log.info("教学任务已创建 - EventId: {}, Status: {}, UserId: {}", saved.getId(), status, userId);
+        return convertToResponse(saved);
     }
 
     @Override
-    @Transactional(rollbackFor = { Exception.class })
+    @Transactional(rollbackFor = Exception.class)
+    public TeacherEventResponse updateDraft(Long id, TeacherEventCreateRequest request, Long userId) {
+        userPermissionUtil.checkTeacherPermission(userId);
+        TeacherEvent event = teacherEventRepository.lockById(id).orElseThrow(EventNotFoundException::new);
+        if (event.getStatus() != TeacherEvent.Status.DRAFT) {
+            throw new TeacherEventBusinessException("只有草稿任务可以编辑");
+        }
+        validateWindow(request.getStartAt(), request.getDueAt());
+        var orderedQuestions = taskQuestions.prepare(request, true);
+        event.setEventTitle(request.getEventTitle().trim());
+        event.setEventDescription(request.getEventDescription());
+        event.setStartAt(request.getStartAt());
+        event.setDueAt(request.getDueAt());
+        teacherEventRepository.saveAndFlush(event);
+        taskQuestions.replace(event.getId(), orderedQuestions);
+        return convertToResponse(event);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public TeacherEventResponse publishTask(Long id, Long userId) {
+        userPermissionUtil.checkTeacherPermission(userId);
+        TeacherEvent event = teacherEventRepository.lockById(id).orElseThrow(EventNotFoundException::new);
+        if (event.getStatus() != TeacherEvent.Status.DRAFT) {
+            throw new TeacherEventBusinessException("只有草稿任务可以发布");
+        }
+        if (taskQuestions.count(event.getId()) == 0) {
+            throw new IllegalArgumentException("任务至少需要一道题目才能发布");
+        }
+        validateWindow(event.getStartAt(), event.getDueAt());
+        event.setStatus(TeacherEvent.Status.PUBLISHED);
+        if (event.getStartAt() == null) event.setStartAt(now());
+        teacherEventRepository.saveAndFlush(event);
+        return convertToResponse(event);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public TeacherEventResponse closeTask(Long id, Long userId) {
+        userPermissionUtil.checkTeacherPermission(userId);
+        TeacherEvent event = teacherEventRepository.lockById(id).orElseThrow(EventNotFoundException::new);
+        if (event.getStatus() != TeacherEvent.Status.PUBLISHED) {
+            throw new TeacherEventBusinessException("只有已发布任务可以截止");
+        }
+        event.setStatus(TeacherEvent.Status.CLOSED);
+        teacherEventRepository.saveAndFlush(event);
+        return convertToResponse(event);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
     public void deleteCurrentEvent(Long currentUserId) {
-        log.info("删除全局事件 - UserId: {}", currentUserId);
-    
-        try {
-            // 1. 权限验证：检查用户是否为教师
-            userPermissionUtil.checkTeacherPermission(currentUserId);
-    
-            // 2. 检查全局事件是否存在
-            if (!teacherEventRepository.existsByIsGlobalTrue()) {
-                log.warn("全局事件不存在 - UserId: {}", currentUserId);
-                // 删除操作幂等：事件不存在也视为成功
-                return;
-            }
-    
-            // Ending a task preserves its learning records and frees the unique active slot.
-            teacherEventRepository.findByIsGlobalTrue().ifPresent(event -> {
-                event.setIsGlobal(false);
-                teacherEventRepository.saveAndFlush(event);
-            });
-
-        } catch (IllegalArgumentException e) {
-            throw e;
-        } catch (BusinessException e) {
-            // 重新抛出业务异常，触发事务回滚
-            throw e;
-        } catch (Exception e) {
-            log.error("删除全局事件失败 - UserId: {}", currentUserId, e);
-            throw new RuntimeException("删除事件失败：" + e.getMessage(), e);
-        }
+        userPermissionUtil.checkTeacherPermission(currentUserId);
+        teacherEventRepository.findByIsGlobalTrue().ifPresent(event -> {
+            event.setStatus(TeacherEvent.Status.ARCHIVED);
+            teacherEventRepository.saveAndFlush(event);
+        });
     }
 
-    @Override @Transactional
-    public void archiveEvent(Long expectedId,Long userId) {
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void archiveEvent(Long expectedId, Long userId) {
         userPermissionUtil.checkTeacherPermission(userId);
-        TeacherEvent event=teacherEventRepository.lockById(expectedId).orElse(null);
-        if(event == null || !Boolean.TRUE.equals(event.getIsGlobal())) {
-            if(teacherEventRepository.existsByIsGlobalTrue()) throw new EventAlreadyExistsException("任务已切换，请刷新后操作");
-            return;
-        }
-        event.setIsGlobal(false);teacherEventRepository.saveAndFlush(event);
+        TeacherEvent event = teacherEventRepository.lockById(expectedId).orElse(null);
+        if (event == null || event.getStatus() == TeacherEvent.Status.ARCHIVED) return;
+        event.setStatus(TeacherEvent.Status.ARCHIVED);
+        teacherEventRepository.saveAndFlush(event);
     }
 
-    @Override @Transactional
-    public TeacherEventResponse replaceEvent(Long expectedId,TeacherEventCreateRequest request,Long userId) {
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public TeacherEventResponse replaceEvent(Long expectedId, TeacherEventCreateRequest request, Long userId) {
         userPermissionUtil.checkTeacherPermission(userId);
-        var event=teacherEventRepository.lockById(expectedId).orElseThrow(EventNotFoundException::new);
-        if(!Boolean.TRUE.equals(event.getIsGlobal())) throw new EventAlreadyExistsException("任务已切换，请刷新后操作");
-        taskQuestions.prepare(request); // Fail before freeing the current slot; remaining errors roll back both writes.
-        event.setIsGlobal(false);teacherEventRepository.saveAndFlush(event);
-        return publishEvent(request,userId);
+        TeacherEvent event = teacherEventRepository.lockById(expectedId).orElseThrow(EventNotFoundException::new);
+        taskQuestions.prepare(request);
+        event.setStatus(TeacherEvent.Status.ARCHIVED);
+        teacherEventRepository.saveAndFlush(event);
+        return createTask(request, userId);
     }
 
-    @Override @Transactional(readOnly=true)
-    public TeacherEventResponse getEvent(Long id){return convertToResponse(teacherEventRepository.findById(id).orElseThrow(EventNotFoundException::new));}
-    @Override @Transactional(readOnly=true)
-    public java.util.List<com.zhixuewuli.dto.response.QuestionResponse> getEventQuestions(Long id){
-        getEvent(id);return taskQuestions.responses(id);
+    @Override
+    @Transactional(readOnly = true)
+    public TeacherEventResponse getEvent(Long id) {
+        return convertToResponse(teacherEventRepository.findById(id).orElseThrow(EventNotFoundException::new));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public TeacherEventResponse getEvent(Long id, Long viewerId) {
+        TeacherEvent event = teacherEventRepository.findById(id).orElseThrow(EventNotFoundException::new);
+        if (event.getStatus() == TeacherEvent.Status.DRAFT && !answerAccess.isTeacher(viewerId)) {
+            throw new EventNotFoundException();
+        }
+        return convertToResponse(event);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<QuestionResponse> getEventQuestions(Long id, Long viewerId) {
+        TeacherEvent event = teacherEventRepository.findById(id).orElseThrow(EventNotFoundException::new);
+        if (event.getStatus() == TeacherEvent.Status.DRAFT && !answerAccess.isTeacher(viewerId)) {
+            throw new EventNotFoundException();
+        }
+        if (event.isScheduledAt(now()) && !answerAccess.isTeacher(viewerId)) {
+            throw new TeacherEventBusinessException("任务尚未开始，暂不能查看题目");
+        }
+        return answerAccess.forTask(viewerId, id, taskQuestions.responses(id));
     }
 
     @Override
     @Transactional(readOnly = true)
     public TeacherEventResponse getGlobalEvent() {
-        log.info("查询全局事件");
+        return teacherEventRepository.findByIsGlobalTrue().map(this::convertToResponse).orElse(null);
+    }
 
-        try {
-            // 1. 查询全局事件（不再需要权限验证）
-            Optional<TeacherEvent> eventOpt = teacherEventRepository.findByIsGlobalTrue();
+    @Override
+    @Transactional(readOnly = true)
+    public List<TeacherEventResponse> listTeacherTasks(Long userId) {
+        userPermissionUtil.checkTeacherPermission(userId);
+        return teacherEventRepository.findByStatusNotOrderByCreatedAtDesc(TeacherEvent.Status.ARCHIVED)
+                .stream().map(this::convertToResponse).toList();
+    }
 
-            if (eventOpt.isPresent()) {
-                TeacherEvent event = eventOpt.get();
-                log.info("找到全局事件 - EventId: {}", event.getId());
-                return convertToResponse(event);
-            } else {
-                log.info("全局事件不存在");
-                return null;
-            }
-
-        } catch (Exception e) {
-            log.error("查询全局事件失败", e);
-            throw new RuntimeException("查询事件失败：" + e.getMessage(), e);
-        }
+    @Override
+    @Transactional(readOnly = true)
+    public List<TeacherEventResponse> listStudentTasks(Long userId) {
+        if (userId == null) throw new IllegalArgumentException("用户未登录");
+        return teacherEventRepository.findByStatusOrderByStartAtAscCreatedAtDesc(TeacherEvent.Status.PUBLISHED)
+                .stream().map(this::convertToResponse).toList();
     }
 
     @Override
@@ -206,22 +219,42 @@ public class TeacherEventServiceImpl implements TeacherEventService {
                 .pages(result.getTotalPages()).currentPage(page).pageSize(size).build();
     }
 
-    /**
-     * 将 TeacherEvent 实体转换为 TeacherEventResponse DTO
-     * 
-     * @param event 教师事件实体
-     * @return TeacherEventResponse 响应 DTO
-     */
+    private void validateWindow(LocalDateTime startAt, LocalDateTime dueAt) {
+        if (startAt != null && dueAt != null && !dueAt.isAfter(startAt)) {
+            throw new IllegalArgumentException("截止时间必须晚于开始时间");
+        }
+    }
+
+    private LocalDateTime fallback(LocalDateTime value, LocalDateTime defaultValue) {
+        return value == null ? defaultValue : value;
+    }
+
     private TeacherEventResponse convertToResponse(TeacherEvent event) {
+        LocalDateTime now = now();
+        String availability;
+        if (event.getStatus() == TeacherEvent.Status.DRAFT) availability = "DRAFT";
+        else if (event.getStatus() == TeacherEvent.Status.CLOSED) availability = "CLOSED";
+        else if (event.getStatus() == TeacherEvent.Status.ARCHIVED) availability = "ARCHIVED";
+        else if (event.isScheduledAt(now)) availability = "SCHEDULED";
+        else if (event.isEndedAt(now)) availability = "ENDED";
+        else availability = "OPEN";
+
+        List<Long> ids = taskQuestions.ids(event.getId());
         return TeacherEventResponse.builder()
                 .id(event.getId())
-                .questionIds(taskQuestions.ids(event.getId()))
+                .questionIds(ids)
+                .questionCount(ids.size())
                 .teacherId(event.getTeacherId())
                 .teacherName(event.getTeacherName())
                 .eventTitle(event.getEventTitle())
                 .eventDescription(event.getEventDescription())
                 .eventTimestamp(event.getEventTimestamp()).timestampUtc(event.isTimestampUtc())
-                .isGlobal(event.getIsGlobal())  // 添加 isGlobal 字段
+                .status(event.getStatus())
+                .startAt(event.getStartAt())
+                .dueAt(event.getDueAt())
+                .availability(availability)
+                .canAnswer("OPEN".equals(availability))
+                .isGlobal(event.getIsGlobal())
                 .createdAt(event.getCreatedAt())
                 .updatedAt(event.getUpdatedAt())
                 .build();

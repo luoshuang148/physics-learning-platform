@@ -68,11 +68,20 @@ class MySqlSchemaIntegrationTest {
     }
 
     @Test
-    void mysqlEnforcesOneActiveTaskWithGeneratedUniqueSlot() {
+    void mysqlAllowsParallelTasksAndStoresLifecycleColumns() {
         var a = user("mysql_teacher_a", User.UserType.TEACHER);
         var b = user("mysql_teacher_b", User.UserType.TEACHER);
         event(a);
-        assertThatThrownBy(() -> event(b)).isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
+        event(b);
+        assertThat(events.countByStatus(TeacherEvent.Status.PUBLISHED)).isEqualTo(2);
+        Integer lifecycleColumns = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='teacher_events' AND COLUMN_NAME IN ('status','start_at','due_at')",
+                Integer.class);
+        Integer legacyColumns = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='teacher_events' AND COLUMN_NAME IN ('is_global','active_slot')",
+                Integer.class);
+        assertThat(lifecycleColumns).isEqualTo(3);
+        assertThat(legacyColumns).isZero();
     }
     private void event(User user) {
         TeacherEvent event = new TeacherEvent(); event.setTeacherId(user.getId()); event.setTeacherName(user.getRealName());

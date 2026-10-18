@@ -21,7 +21,7 @@ public class ReportInputRepository {
                 : load("a.user_id=? AND a.event_id=?",List.of(userId,eventId));
     }
     public List<AnswerRecord> teacher(Long eventId) {
-        return eventId==null ? load("a.event_id=(SELECT id FROM teacher_events WHERE is_global=true)",List.of())
+        return eventId==null ? load("a.event_id=(SELECT id FROM teacher_events WHERE status='PUBLISHED' ORDER BY created_at DESC, id DESC LIMIT 1)",List.of())
                 : load("a.event_id=?",List.of(eventId));
     }
     public List<AnswerRecord> question(Long questionId) {
@@ -36,7 +36,6 @@ public class ReportInputRepository {
             var batch=jdbc.query("""
                 SELECT a.id,a.user_id,a.event_id,a.question_id,a.session_id,a.selected_option,a.correct,
                  a.practice,a.attempt_order,a.answered_at,a.timestamp_utc,
-                 LEFT(a.error_reason,4097) AS reason,
                  LEFT(COALESCE(a.content_snapshot,q.content),4097) AS content,
                  LEFT(CASE WHEN a.content_snapshot IS NULL THEN q.options ELSE a.options_snapshot END,4097) AS options_text,
                  LEFT(CASE WHEN a.content_snapshot IS NULL THEN q.correct_option ELSE a.correct_snapshot END,4097) AS reference_answer,
@@ -52,14 +51,14 @@ public class ReportInputRepository {
                 row.setSessionId(rs.getString("session_id"));row.setUserAnswer(rs.getString("selected_option"));
                 row.setCorrect(rs.getObject("correct",Boolean.class));row.setPractice(rs.getBoolean("practice"));
                 row.setAttemptOrder(rs.getLong("attempt_order"));row.setAnsweredAt(rs.getTimestamp("answered_at").toLocalDateTime());
-                row.setTimestampUtc(rs.getBoolean("timestamp_utc"));row.setErrorReason(bounded(rs.getString("reason")));
+                row.setTimestampUtc(rs.getBoolean("timestamp_utc"));
                 row.setContentSnapshot(bounded(rs.getString("content")));row.setOptionsSnapshot(bounded(rs.getString("options_text")));
                 row.setCorrectSnapshot(bounded(rs.getString("reference_answer")));row.setAnalysisSnapshot(bounded(rs.getString("explanation")));
                 row.setDifficultySnapshot(rs.getObject("difficulty",Integer.class));row.setReportLegacyBankFallback(rs.getBoolean("legacy_fallback"));
                 return row;
             },args.toArray());
             for(var row:batch) {
-                bytes+=512+size(row.getContentSnapshot())+size(row.getOptionsSnapshot())+size(row.getAnalysisSnapshot())+size(row.getErrorReason());
+                bytes+=512+size(row.getContentSnapshot())+size(row.getOptionsSnapshot())+size(row.getAnalysisSnapshot());
                 if(bytes>MAX_INPUT_BYTES || result.size()>=MAX_ROWS)throw tooLarge();
                 result.add(row);cursor=row.getAttemptOrder();
             }

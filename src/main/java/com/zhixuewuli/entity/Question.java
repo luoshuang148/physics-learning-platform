@@ -86,14 +86,6 @@ public class Question extends BaseTimeEntity {
     private Integer difficulty = 1;
 
     /**
-     * 讲解视频映射 - key为选项标识，value为视频标题
-     * 存储格式示例：{"A": "牛顿第一定律讲解", "B": "力学基础概念", "C": "运动学分析", "D": "动力学原理"}
-     * 其中正确答案的视频标题也包含在此映射中
-     */
-    @Column(name = "explanation_video_mapping", columnDefinition = "LONGTEXT")
-    private String explanationVideoMapping;
-
-    /**
      * 题目图片Base64编码数据（仅支持PNG格式）
      * 
      * 可选字段，用于存储与题目相关的图片信息。

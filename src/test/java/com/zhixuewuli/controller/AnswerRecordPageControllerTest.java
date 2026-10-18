@@ -23,6 +23,10 @@ class AnswerRecordPageControllerTest extends BaseControllerIntegrationTest {
         assertThat(first.path("records").size()).isEqualTo(1);
         assertThat(first.path("records").get(0).path("imageBase64").isNull()
                 || first.path("records").get(0).path("imageBase64").isMissingNode()).isTrue();
+        assertThat(first.path("records").get(0).path("questionAnalysis").isNull()
+                || first.path("records").get(0).path("questionAnalysis").isMissingNode()).isTrue();
+        assertThat(first.path("records").get(0).path("questionOptions").isNull()
+                || first.path("records").get(0).path("questionOptions").isMissingNode()).isTrue();
         String id1 = first.path("records").get(0).path("recordId").asText();
         String id2 = second.path("records").get(0).path("recordId").asText();
         assertThat(id1).isGreaterThan(id2);

@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <title>卢瑟福 α 粒子散射实验室</title>
+    <link rel="stylesheet" href="../Shared/color.css">
+    <link rel="stylesheet" href="../Shared/theme.css">
+    <link rel="stylesheet" href="../Shared/style.css">
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+</head>
+
+<body>
+    <canvas id="c"></canvas>
+    <div id="hud-alive">
+        屏幕粒子数：<span id="hud-alive-count">0</span>
+    </div>
+
+    <div id="detector-panel">
+        <h3 style="color: var(--theme-primary);">荧光屏观测结果</h3>
+        <div class="detector-row">
+            <label for="obs-angle">观察窗角度（0°-360°）</label>
+            <span id="obs-angle-label">0°</span>
+        </div>
+        <input id="obs-angle" type="range" min="0" max="360" step="1" value="0" />
+
+        <div class="detector-row statline">
+            <span>收集数量</span><strong id="obs-count">0</strong>
+        </div>
+        <div class="detector-row statline">
+            <span>瞬时速率</span><strong id="obs-rate">0.00 粒子/s</strong>
+        </div>
+        <button id="btn-obs-clear-mode">模式：实时变化</button>
+        <canvas id="obs-screen" width="320" height="200"></canvas>
+        <div class=" chart-note">观察窗转动后，仅显示该方向附近命中的荧光闪烁结果。
+        </div>
+    </div>
+
+    <div id="top-center-container">
+        <div id="ai-panel" class="panel">
+            <details open>
+                <summary>
+                    <primary>🤖 AI 实验助教</primary>
+                </summary>
+                <p id="ai-text">你好！我是本实验的AI助教。建议先点击“开始/停止：连续发射”，观察小角散射占多数；再旋转观察窗查看不同方向计数变化。</p>
+            </details>
+        </div>
+    </div>
+
+    <div id="left-panel">
+        <div id="ui-panel" class="panel">
+            <details open>
+                <summary style="color: var(--theme-primary); font-weight: bold;">卢瑟福 α 粒子散射实验控制台</summary>
+                <div class="control-group" style="border-top: none;">
+                    <button id="btn-fire">开始/停止：连续发射</button>
+                    <button id="btn-collect">一键采集</button>
+                    <button id="btn-view">切换至【微观/宏观】视角</button>
+                    <button id="btn-reset">重置全部</button>
+                </div>
+
+                <div class="chart-wrap compact">
+                    <div class="chart-title">角度分布饼图（0°-3°、3°-180°）</div>
+                    <canvas id="pie" width="220" height="220"></canvas>
+                    <div class="chart-note">按 0°-3°、3°-180° 分箱，标注每个扇区的占比</div>
+                </div>
+            </details>
+        </div>
+    </div>
+
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+            "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+        }
+    }
+    </script>
+    <script type="module" src="main.js"></script>
+</body>
+
+</html>

@@ -15,7 +15,7 @@ import lombok.Data;
  * 字段说明：
  * </p>
  * <ul>
- * <li><strong>username</strong>: 登录标识（可输入用户名或真实姓名）</li>
+ * <li><strong>username</strong>: 登录标识，只接受用户名</li>
  * <li><strong>password</strong>: 登录密码，需符合安全要求</li>
  * </ul>
  * 
@@ -23,7 +23,7 @@ import lombok.Data;
  * 验证规则：
  * </p>
  * <ul>
- * <li>登录标识：非空，最大 100 字符</li>
+ * <li>登录标识：非空，最大 50 字符</li>
  * <li>密码：非空</li>
  * </ul>
  * 
@@ -39,10 +39,10 @@ public class LoginRequest {
     /**
      * 登录标识
      * 
-     * 登录时可输入用户名或真实姓名。
+     * 只接受用户名；真实姓名不能作为登录凭证。
      */
-    @NotBlank(message = "用户名或真实姓名不能为空")
-    @Size(max = 100, message = "用户名或真实姓名长度不能超过100位")
+    @NotBlank(message = "用户名不能为空")
+    @Size(max = 50, message = "用户名长度不能超过50位")
     private String username;
 
     /**

@@ -57,6 +57,11 @@ public class AnswerRecordController {
 
     private final AnswerRecordService answerRecordService;
 
+    @GetMapping("/teacher/student-stats")
+    public Result<java.util.List<com.zhixuewuli.dto.response.StudentAnswerStats>> studentStats(HttpServletRequest request) {
+        return Result.success(answerRecordService.getStudentAnswerStats((Long) request.getAttribute("userId")));
+    }
+
     /**
      * 提交答题记录（学生功能）
      * 
@@ -94,6 +99,44 @@ public class AnswerRecordController {
      * 
      * 查询当前登录用户的所有答题历史记录。
      */
+    @GetMapping("/student/history")
+    @Operation(summary = "分页查询我的答题历史", description = "轻量列表，不返回图片和完整解析；详情按记录 ID 加载")
+    public Result<com.zhixuewuli.common.result.PageResult<com.zhixuewuli.dto.response.AnswerRecordSummaryResponse>> history(
+            @RequestParam(defaultValue = "1") int page, @RequestParam(defaultValue = "20") int size,
+            @RequestParam(defaultValue = "false") boolean wrongOnly, @RequestParam(defaultValue = "") String keyword,
+            HttpServletRequest request) {
+        return Result.success(answerRecordService.getStudentHistory(
+                (Long) request.getAttribute("userId"), page, size, wrongOnly, keyword));
+    }
+
+    @GetMapping("/student/summary")
+    public Result<com.zhixuewuli.dto.response.StudentAnswerSummary> studentSummary(HttpServletRequest request) {
+        return Result.success(answerRecordService.getStudentAnswerSummary((Long) request.getAttribute("userId")));
+    }
+
+    @GetMapping("/student/practice-review/page")
+    public Result<com.zhixuewuli.common.result.PageResult<com.zhixuewuli.dto.response.AnswerRecordSummaryResponse>> practiceReviewPage(
+            @RequestParam(defaultValue = "1") int page, @RequestParam(defaultValue = "20") int size,
+            @RequestParam(defaultValue = "") String keyword, HttpServletRequest request) {
+        return Result.success(answerRecordService.getPracticeReviewPage(
+                (Long) request.getAttribute("userId"), page, size, keyword));
+    }
+
+    @GetMapping("/user/{userId}/history")
+    public Result<com.zhixuewuli.common.result.PageResult<com.zhixuewuli.dto.response.AnswerRecordSummaryResponse>> userHistory(
+            @PathVariable Long userId, @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "20") int size, @RequestParam(defaultValue = "false") boolean wrongOnly,
+            @RequestParam(defaultValue = "") String keyword, HttpServletRequest request) {
+        return Result.success(answerRecordService.getUserHistory(
+                userId, (Long) request.getAttribute("userId"), page, size, wrongOnly, keyword));
+    }
+
+    @GetMapping("/{recordId}")
+    public Result<AnswerRecordResponse> answerDetail(@PathVariable String recordId, HttpServletRequest request) {
+        return Result.success(answerRecordService.getAnswerRecordById(
+                recordId, (Long) request.getAttribute("userId")));
+    }
+
     @GetMapping("/student/my")
     @Operation(
         summary = "获取我的答题记录",
@@ -269,7 +312,10 @@ public class AnswerRecordController {
     }
     @GetMapping("/student/practice-review")
     public Result<AnswerRecordBatchResponse> practiceReview(HttpServletRequest request){
-        var data=taskAnswerRepository.findPracticeReview((Long)request.getAttribute("userId")).stream()
+        Long userId=(Long)request.getAttribute("userId");
+        long total=taskAnswerRepository.findPracticeReviewPage(userId,"%%",org.springframework.data.domain.PageRequest.of(0,1)).getTotalElements();
+        if(total>100) throw new IllegalArgumentException("错题记录超过100条，请使用分页接口获取");
+        var data=taskAnswerRepository.findPracticeReview(userId).stream()
             .map(row->taskAnswerConverter.convertToFullResponseDTO(row,row.getQuestion())).toList();
         return Result.success(AnswerRecordBatchResponse.builder().records(data).totalCount((long)data.size()).build());
     }

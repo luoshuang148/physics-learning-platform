@@ -70,7 +70,7 @@ public interface QuestionErrorAnalysisService {
     void streamTeacherQuestionAnalysis(AIAskRequest request, SseEmitter emitter, Long teacherId, String sessionId);
 
     /**
-     * 获取题目错误详情（学生列表 + 词云数据）- 单次查询优化
+     * 获取题目错误详情（学生列表）- 单次查询优化
      * 
      * @param questionId 题目 ID
      * @param teacherId  教师 ID

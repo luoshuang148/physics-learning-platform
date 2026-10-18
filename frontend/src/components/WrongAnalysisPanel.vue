@@ -1,7 +1,6 @@
 <template>
   <div class="wap-wrap">
     <button v-if="!started" class="wap-trigger" @click="start">
-      <span class="wap-trigger-icon">🤖</span>
       <span>AI 解惑</span>
       <span class="wap-trigger-sub">点击获取本题思路分析、讲解与学习建议</span>
     </button>
@@ -9,7 +8,6 @@
     <div v-else class="wap-panel">
       <div class="wap-header">
         <span class="wap-title">
-          <span class="wap-title-icon">🤖</span>
           AI 解惑
         </span>
         <div class="wap-header-right">
@@ -91,7 +89,7 @@
       </div>
 
       <div v-if="error" class="wap-error">
-        <span>⚠️ {{ error }}</span>
+        <span>{{ error }}</span>
         <button class="wap-retry" @click="start">重试</button>
       </div>
     </div>
@@ -109,7 +107,6 @@ const props = defineProps<{
   questionId: number;
   recordId?: string;
   autoStart?: boolean;
-  initialErrorReason?: string;
 }>();
 
 const started  = ref(false);
@@ -125,13 +122,7 @@ const activeAbortController = ref<AbortController | null>(null);
 const renderedContent = ref('');
 const streamingReasoningOpen = computed(() => Boolean(reasoning.value) && !content.value);
 
-const buildInitialPrompt = () => {
-  const reason = props.initialErrorReason?.trim();
-  if (reason && reason !== '未填写') {
-    return `我对这道题的自我分析是：${reason}。请结合这道题分析我的思路特点，说明关键解题路径，并给出学习建议。`;
-  }
-  return '请结合这道题分析关键思路、知识点和解题路径，并给出学习建议。';
-};
+const buildInitialPrompt = () => '请结合这道题分析关键思路、知识点和解题路径，并给出学习建议。';
 
 const isAbortError = (err: unknown) => {
   if (!err) return false;

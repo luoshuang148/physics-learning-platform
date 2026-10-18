@@ -27,7 +27,6 @@ import com.zhixuewuli.dto.request.QuestionCreateRequest;
 import com.zhixuewuli.dto.request.QuestionUpdateRequest;
 import com.zhixuewuli.entity.User;
 import com.zhixuewuli.repository.QuestionRepository;
-import com.zhixuewuli.repository.VideoRepository;
 
 /**
  * 题目控制器集成测试
@@ -70,15 +69,11 @@ public class QuestionControllerIntegrationTest extends BaseControllerIntegration
         @Autowired
         private QuestionRepository questionRepository;
 
-        @Autowired
-        private VideoRepository videoRepository;
-
         @BeforeEach
         void setUp() {
                 // 确保测试前数据库处于干净状态
                 // SQL脚本已提供基础数据，无需清理
                 // cleanTable("questions");
-                // cleanTable("videos");
                 // cleanTable("users");
         }
 
@@ -86,13 +81,11 @@ public class QuestionControllerIntegrationTest extends BaseControllerIntegration
         // 教师创建题目测试
         // ============================================================
 
-        @DisplayName("创建题目成功 - 教师权限（关联视频）")
+        @DisplayName("创建题目成功 - 教师权限")
         @Test
-        void testCreateQuestion_Success_WithVideo() throws Exception {
-                // Given: 教师用户和已存在的视频
+        void testCreateQuestion_Success() throws Exception {
                 Long teacherId = 2003L;
                 String teacherUsername = "teacher_question_test";
-                Long videoId = 3001L;
         
                 QuestionCreateRequest request = new QuestionCreateRequest();
                 request.setContent("关于牛顿第一定律，下列说法正确的是（ ）（测试）");
@@ -101,7 +94,6 @@ public class QuestionControllerIntegrationTest extends BaseControllerIntegration
                 request.setCorrectOption("B");
                 request.setExplanation("根据牛顿第一定律，力不是维持物体运动的原因，而是改变物体运动状态的原因。");
                 request.setDifficulty(2);
-                request.setExplanationVideoMapping("{\"A\": 3001, \"B\": 3001, \"C\": 3001, \"D\": 3001}");
         
                 // When: 发送创建题目请求
                 ResultActions result = mockMvc.perform(post("/questions/teacher/create")
@@ -131,9 +123,9 @@ public class QuestionControllerIntegrationTest extends BaseControllerIntegration
                 assertThat(count).isEqualTo(4L); // SQL 脚本 3 个 + 新建 1 个
         }
 
-        @DisplayName("创建题目成功 - 教师权限（关联视频）")
+        @DisplayName("创建题目成功 - 教师权限（不关联视频）")
         @Test
-        void testCreateQuestion_Success_WithVideo2() throws Exception {
+        void testCreateQuestion_Success_WithoutVideo() throws Exception {
                 // Given: 教师用户
                 Long teacherId = 2003L;
                 String teacherUsername = "teacher_question_test";

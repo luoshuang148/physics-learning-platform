@@ -317,8 +317,6 @@
 | 业务码 | 名称 | HTTP 状态 | 说明 |
 |-------|------|----------|------|
 | 5601 | QUESTION_ERROR_ANALYSIS_SERVICE_UNAVAILABLE | 503 | 错题分析服务不可用 |
-| 5602 | WORD_CLOUD_ANALYSIS_FAILED | 500 | 词云分析失败 |
-| 5603 | SEGMENTATION_FAILED | 500 | 分词处理失败 |
 
 ---
 

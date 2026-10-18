@@ -139,7 +139,7 @@ public class AIControllerAliyunIntegrationTest extends BaseControllerIntegration
                 questionIdWithoutErrors = 6003L; // 无错误记录的题目
                 // General teacher analysis now deliberately means the active task, never
                 // a cross-task latest-session blend. Attach this fixture explicitly.
-                jdbcTemplate.update("INSERT INTO teacher_events(id,teacher_id,teacher_name,event_title,event_timestamp,is_global,timestamp_utc) VALUES(890000,5001,'Fixture','Report fixture',CURRENT_TIMESTAMP,true,true)");
+                jdbcTemplate.update("INSERT INTO teacher_events(id,teacher_id,teacher_name,event_title,event_timestamp,status,timestamp_utc) VALUES(890000,5001,'Fixture','Report fixture',CURRENT_TIMESTAMP,'PUBLISHED',true)");
                 jdbcTemplate.update("UPDATE answer_records SET event_id=890000");
         }
 

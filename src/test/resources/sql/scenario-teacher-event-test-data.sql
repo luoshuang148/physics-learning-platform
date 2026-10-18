@@ -32,8 +32,8 @@ VALUES (2002, 'teacher_no_event', '$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGx
 -- ============================================================
 
 -- 创建一条全局事件（用于查询测试）
-INSERT INTO teacher_events (id, teacher_id, teacher_name, event_title, event_description, event_timestamp, is_global, created_at, updated_at)
-VALUES (1, 2001, '教师用户', '新学期开始', '2026 年春季学期正式开始', '2026-03-01 08:00:00', true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+INSERT INTO teacher_events (id, teacher_id, teacher_name, event_title, event_description, event_timestamp, status, created_at, updated_at)
+VALUES (1, 2001, '教师用户', '新学期开始', '2026 年春季学期正式开始', '2026-03-01 08:00:00', 'PUBLISHED', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
 
 -- ============================================================
 -- 测试数据说明
@@ -46,7 +46,7 @@ VALUES (1, 2001, '教师用户', '新学期开始', '2026 年春季学期正式�
 --   - 2002: teacher_no_event / 无事件教师 / null / 激活
 --
 -- 教师事件：
---   - 事件 ID 1: 全局事件 / 教师 2001 / 新学期开始 / 2026-03-01 08:00:00 / is_global=true
+--   - 事件 ID 1: 已发布任务 / 教师 2001 / 新学期开始 / 2026-03-01 08:00:00 / status=PUBLISHED
 --
 -- 所有用户密码：password123
 -- ============================================================

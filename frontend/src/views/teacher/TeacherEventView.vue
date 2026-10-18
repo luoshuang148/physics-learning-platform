@@ -1,1099 +1,384 @@
 <template>
-  <AppShell :subtitle="`实验任务 · ${auth.user?.realName ?? ''}`" :links="links">
+  <AppShell :subtitle="`任务管理 · ${auth.user?.realName ?? ''}`" :links="links">
     <div class="event-page teacher-font">
       <section class="event-hero">
         <div>
-          <span class="event-kicker">Experiment task workspace</span>
-          <h1 class="event-title">实验任务</h1>
-          <p class="event-summary">单班共享任务：替换会归档当前任务并发布新版本，历史作答和题目快照会保留。</p>
+          <span class="event-kicker">任务管理</span>
+          <h1 class="event-title">并行作业与生命周期</h1>
+          <p class="event-summary">单班内可以同时发布多个作业。草稿仅教师可见，发布后学生可作答；截止后保留作答与快照，归档后进入历史。</p>
         </div>
-        <div class="event-status-card" :class="current ? 'live' : 'idle'">
-          <span class="event-status-label">当前状态</span>
-          <strong>{{ current ? '已发布' : '未发布' }}</strong>
-          <span>{{ current ? current.eventTitle : '暂无实验任务' }}</span>
-          <div class="event-status-actions">
-            <button
-              v-if="current"
-              class="status-report-btn"
-              @click="openEventReport()"
-            >{{ eventReportButtonText }}</button>
-            <button v-if="current" class="status-delete-btn" @click="deleteTask">归档任务</button>
-          </div>
+        <div class="event-status-card" :class="openTasks.length ? 'live' : 'idle'">
+          <span class="event-status-label">任务状态</span>
+          <strong>{{ openTasks.length ? `已发布 ${openTasks.length}` : '未发布' }}</strong>
+          <span>进行中 {{ openTasks.length }} · 草稿 {{ draftTasks.length }} · 已截止 {{ closedTasks.length }}</span>
+          <span>共 {{ tasks.length }} 个未归档任务</span>
+          <button v-if="latestOpenTask" class="archive-btn" @click="archiveTask(latestOpenTask)">归档任务</button>
         </div>
       </section>
 
-      <details class="event-report-panel">
-        <summary>已归档任务（{{ historyTotal }}）</summary>
-        <p>归档后保留答题、对话和学习报告。</p>
-        <p v-for="event in archivedEvents" :key="event.id">
-          {{ event.eventTitle }} · {{ event.eventTimestamp }}
-          <RouterLink :to="{path:'/teacher/records',query:{eventId:event.id}}">查看作答</RouterLink>
-          <button @click="openEventReport(event)">查看任务分析</button>
-        </p>
-        <button class="status-report-btn" :disabled="historyPage <= 1" @click="historyPage--; loadHistory()">上一页</button>
-        <button class="status-report-btn" :disabled="historyPage * 10 >= historyTotal" @click="historyPage++; loadHistory()">下一页</button>
-      </details>
-
-      <section v-if="shouldShowEventReportPanel" class="event-report-panel">
-        <div class="report-panel-head">
+      <section class="task-board">
+        <div class="task-board-head">
           <div>
-            <div class="report-panel-title">实验学习报告</div>
-            <div class="report-panel-sub">当前实验任务：{{ reportEventTitle }}</div>
+            <h2>任务列表</h2>
+            <p>草稿、进行中、已截止任务都保留在这里；归档任务在页面底部历史中查看。</p>
           </div>
-          <div class="report-panel-actions">
-            <button
-              v-if="eventReportState.loading"
-              class="stop-inline-btn"
-              @click="stopEventReportStream"
-            >停止生成</button>
-            <button class="close-inline-btn" @click="closeEventReport">收起</button>
-          </div>
+          <button class="ghost-btn" :disabled="loadingTasks" @click="loadTasks">刷新任务</button>
         </div>
-        <StreamOutput
-          :loading="eventReportState.loading"
-          :progress="eventReportState.progress"
-          :content="eventReportState.content"
-          :reasoning="eventReportState.reasoning"
-          :token-usage="eventReportState.tokenUsage"
-          :error="eventReportState.error"
-        />
+        <div v-if="loadingTasks" class="empty-hint">加载任务中…</div>
+        <div v-else-if="tasks.length === 0" class="empty-hint">还没有任务，从下方创建第一个作业。</div>
+        <div v-else class="task-table">
+          <article v-for="task in tasks" :key="task.id" class="task-row">
+            <div class="task-row-main">
+              <div class="task-row-title">
+                <strong>{{ task.eventTitle }}</strong>
+                <span class="task-status" :class="task.status.toLowerCase()">{{ statusText(task) }}</span>
+              </div>
+              <div class="task-row-meta">
+                <span>{{ task.questionCount ?? task.questionIds?.length ?? 0 }} 题</span>
+                <span>开始 {{ formatWindow(task.startAt, '立即') }}</span>
+                <span>截止 {{ formatWindow(task.dueAt, '不限') }}</span>
+              </div>
+            </div>
+            <div class="task-row-actions">
+              <button v-if="task.status === 'DRAFT'" class="ghost-btn" @click="editDraft(task)">编辑</button>
+              <button v-if="task.status === 'DRAFT'" class="ghost-btn primary-text" @click="publishExisting(task)">发布</button>
+              <button v-if="task.status === 'PUBLISHED'" class="ghost-btn" @click="closeExisting(task)">截止</button>
+              <RouterLink :to="{ path: '/teacher/records', query: { eventId: task.id } }" class="ghost-btn">查看记录</RouterLink>
+              <button class="ghost-btn danger-text" @click="archiveTask(task)">归档</button>
+            </div>
+          </article>
+        </div>
       </section>
 
       <div class="main-layout">
         <section class="left-panel">
-          <div class="exp-tabs">
-            <button
-              v-for="series in experimentSeries"
-              :key="series.key"
-              class="exp-tab"
-              :class="{ active: editingSeries === series.key, published: current?.eventTitle === series.key }"
-              @click="editingSeries = series.key"
-            >
-              <span class="exp-tab-name">{{ series.label }}</span>
-              <span class="exp-tab-badge">{{ seriesConfig[series.key]?.length ?? 0 }}</span>
-            </button>
+          <div class="panel-head">
+            <div>
+              <h2>{{ editingTask ? '编辑草稿' : '新建任务' }}</h2>
+              <p>{{ editingTask ? '草稿可修改题目和时间，发布后题目快照固定。' : '可先保存草稿，也可以直接发布。' }}</p>
+            </div>
+            <button v-if="editingTask" class="ghost-btn" @click="resetForm">取消编辑</button>
           </div>
 
-          <div class="left-content">
-            <div class="series-summary">
-              <div>
-                <div class="series-summary-label">当前系列</div>
-                <div class="series-summary-title">{{ currentSeriesMeta.label }}</div>
+          <label class="field-label" for="task-title">任务名称</label>
+          <input id="task-title" v-model="taskTitle" class="title-input" maxlength="20" placeholder="例如：牛顿第二定律练习" />
+
+          <div class="time-grid">
+            <label class="field-label">开始时间
+              <input v-model="startAt" type="datetime-local" class="time-input" />
+            </label>
+            <label class="field-label">截止时间
+              <input v-model="dueAt" type="datetime-local" class="time-input" />
+            </label>
+          </div>
+          <p class="time-hint">留空表示立即开始 / 不设截止。截止时间必须晚于开始时间。</p>
+
+          <div class="selected-head">
+            <span>已选题目</span>
+            <span>{{ selectedIds.length }} 题</span>
+          </div>
+
+          <div v-if="selectedIds.length === 0" class="empty-hint">
+            <p>从右侧题库选择题目加入任务。草稿可以暂时不选题。</p>
+          </div>
+
+          <div v-else class="selected-list">
+            <div v-for="(id, idx) in selectedIds" :key="id" class="selected-item">
+              <span class="rank">{{ idx + 1 }}</span>
+              <div class="selected-body">
+                <div class="selected-content"><LatexText :content="questionMap[id]?.content ?? `题目 #${id}`" /></div>
+                <span class="question-id">#{{ id }}</span>
               </div>
-              <span class="series-chip">{{ currentSeriesMeta.experiments.length }} 个实验</span>
-            </div>
-
-            <div class="series-exp-list">
-              <div v-for="exp in currentSeriesMeta.experiments" :key="exp.id" class="series-exp-item">
-                <span class="series-exp-index">{{ exp.order }}</span>
-                <div class="series-exp-body">
-                  <div class="series-exp-name">{{ exp.title }}</div>
-                  <div class="series-exp-path">{{ exp.folder }}</div>
-                </div>
-              </div>
-            </div>
-
-            <div class="left-head">
-              <span class="left-head-title">已选题目</span>
-              <span class="left-head-count">{{ currentSeriesIds.length }} 题</span>
-            </div>
-
-            <div v-if="currentSeriesIds.length === 0" class="empty-hint">
-              <div class="empty-icon">📋</div>
-              <p>右侧题库中选择题目加入当前系列。</p>
-            </div>
-
-            <div v-else class="selected-list">
-              <div
-                v-for="(id, idx) in currentSeriesIds" :key="id"
-                class="sel-item"
-                :class="{ expanded: expandedId === id }"
-              >
-                <div class="sel-item-main" @click="toggleExpand(id)">
-                  <span class="sel-rank">{{ idx + 1 }}</span>
-                  <span class="sel-badge">#{{ id }}</span>
-                  <span class="sel-preview"><LatexText :content="questionMap[id]?.content?.slice(0, 40) ?? ''" />…</span>
-                  <div class="sel-actions" @click.stop>
-                    <button class="icon-btn" :disabled="idx === 0" @click="moveUp(idx)">↑</button>
-                    <button class="icon-btn" :disabled="idx === currentSeriesIds.length - 1" @click="moveDown(idx)">↓</button>
-                    <button class="icon-btn danger" @click="removeFromSeries(id)">✕</button>
-                  </div>
-                </div>
-                <div v-if="expandedId === id" class="sel-detail">
-                  <div class="sel-detail-q"><LatexText :content="questionMap[id]?.content ?? ''" /></div>
-                  <div v-if="questionMap[id]?.imageBase64" class="sel-detail-image-wrap">
-                    <img :src="questionMap[id]?.imageBase64 ?? ''" alt="题目图片预览" class="sel-detail-image" />
-                  </div>
-                  <div v-if="previewOptions(questionMap[id]?.options).length" class="sel-detail-options">
-                    <div
-                      v-for="option in previewOptions(questionMap[id]?.options)"
-                      :key="`${id}-${option.key}`"
-                      class="sel-detail-option"
-                    >
-                      <span class="sel-detail-option-key">{{ option.key }}</span>
-                      <span class="sel-detail-option-text"><LatexText :content="option.text" /></span>
-                    </div>
-                  </div>
-                </div>
+              <div class="selected-actions">
+                <button :disabled="idx === 0" @click="moveUp(idx)">↑</button>
+                <button :disabled="idx === selectedIds.length - 1" @click="moveDown(idx)">↓</button>
+                <button class="danger" @click="removeQuestion(id)">✕</button>
               </div>
             </div>
           </div>
 
           <div class="publish-zone">
-            <button
-              class="publish-btn"
-              :disabled="!currentSeriesIds.length"
-              :class="{ active: currentSeriesIds.length > 0 }"
-              @click="publishTask"
-            >
-              发布 {{ currentSeriesMeta.label }}
+            <button class="publish-btn" :disabled="!canPublish || publishing" @click="publishTask">
+              {{ publishing ? '处理中…' : editingTask ? '保存并发布' : '发布任务' }}
             </button>
+            <button class="draft-btn" :disabled="!canSaveDraft || publishing" @click="saveDraft">
+              {{ editingTask ? '保存草稿' : '保存为新草稿' }}
+            </button>
+            <p v-if="!taskTitle.trim()" class="publish-hint">请填写任务名称</p>
+            <p v-else-if="selectedIds.length === 0" class="publish-hint">发布前请至少选择一道题目</p>
           </div>
         </section>
 
         <section class="right-panel">
-          <div class="right-head">
-            <span class="right-head-title">题库</span>
-            <span class="right-head-count">{{ allQuestions.length }} 题</span>
-            <div class="search-box">
-              <input v-model="searchText" placeholder="搜索题目 ID 或内容…" class="search-input" />
+          <div class="panel-head">
+            <div>
+              <h2>题库</h2>
+              <p>共 {{ allQuestions.length }} 道题</p>
             </div>
+            <input v-model="searchText" class="search-input" placeholder="搜索题目 ID 或内容…" />
           </div>
 
-          <div v-if="loadingQ" class="loading-hint">加载题目中…</div>
+          <div v-if="loadingQuestions" class="empty-hint">加载题目中…</div>
           <div v-else-if="allQuestions.length === 0" class="empty-hint">
-            <div class="empty-icon">📭</div>
-            <p>题库暂无题目</p>
+            <p>题库暂无题目，请先在题库管理中创建。</p>
           </div>
           <div v-else class="bank-list">
-            <div
-              v-for="q in filteredQuestions" :key="q.id"
-              class="bank-item"
-              :class="{ added: currentSeriesIds.includes(q.id), expanded: expandedId === q.id }"
-            >
-              <div class="bank-item-main" @click="toggleExpand(q.id)">
-                <span class="bank-badge">#{{ q.id }}</span>
-                <span class="bank-preview"><LatexText :content="q.content?.slice(0, 60) ?? ''" /></span>
-                <button
-                  class="add-btn"
-                  :class="{ added: currentSeriesIds.includes(q.id) }"
-                  :disabled="currentSeriesIds.includes(q.id)"
-                  @click.stop="addToSeries(q.id)"
-                >
-                  {{ currentSeriesIds.includes(q.id) ? '已加入' : '加入' }}
-                </button>
+            <article v-for="question in filteredQuestions" :key="question.id" class="bank-item"
+              :class="{ added: selectedIds.includes(question.id) }">
+              <div class="bank-main">
+                <span class="question-id">#{{ question.id }}</span>
+                <div class="bank-content"><LatexText :content="question.content" /></div>
+                <button class="add-btn" :disabled="selectedIds.includes(question.id) || selectedIds.length >= 200"
+                  @click="addQuestion(question.id)">{{ selectedIds.includes(question.id) ? '已加入' : '加入' }}</button>
               </div>
-              <div v-if="expandedId === q.id" class="bank-detail">
-                <div class="bank-detail-q"><LatexText :content="q.content" /></div>
-                <div v-if="q.imageBase64" class="bank-detail-image-wrap">
-                  <img :src="q.imageBase64" alt="题目图片预览" class="bank-detail-image" />
-                </div>
-                <div v-if="previewOptions(q.options).length" class="bank-detail-options">
-                  <div
-                    v-for="option in previewOptions(q.options)"
-                    :key="`${q.id}-${option.key}`"
-                    class="bank-detail-option"
-                  >
-                    <span class="bank-detail-option-key">{{ option.key }}</span>
-                    <span class="bank-detail-option-text"><LatexText :content="option.text" /></span>
-                  </div>
-                </div>
+              <div v-if="question.imageBase64" class="image-wrap">
+                <img :src="question.imageBase64" alt="题目图片" />
               </div>
-            </div>
-            <div v-if="filteredQuestions.length === 0" class="empty-hint">
-              <p class="muted">无匹配题目</p>
-            </div>
+            </article>
+            <div v-if="filteredQuestions.length === 0" class="empty-hint"><p>没有匹配的题目</p></div>
           </div>
         </section>
       </div>
+
+      <details class="archive-panel">
+        <summary>已归档任务（{{ historyTotal }}）</summary>
+        <p class="archive-note">归档后保留答题记录、历史快照和学习报告。</p>
+        <div v-for="event in archivedEvents" :key="event.id" class="archive-row">
+          <div>
+            <strong>{{ event.eventTitle }}</strong>
+            <span>{{ event.questionIds?.length ?? 0 }} 题 · {{ formatDate(event.eventTimestamp) }}</span>
+          </div>
+          <RouterLink :to="{ path: '/teacher/records', query: { eventId: event.id } }">查看作答</RouterLink>
+        </div>
+        <div class="archive-pager">
+          <button :disabled="historyPage <= 1" @click="changeHistoryPage(-1)">上一页</button>
+          <span>{{ historyPage }} / {{ historyPages || 1 }}</span>
+          <button :disabled="historyPage >= historyPages" @click="changeHistoryPage(1)">下一页</button>
+        </div>
+      </details>
     </div>
+
+    <AppToast :visible="visible" :type="type" :message="message" />
   </AppShell>
 </template>
 
 <script setup lang="ts">
-import { createReportRequestGuard } from '@/utils/reportRequestGuard';
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import AppShell from '@/layouts/AppShell.vue';
 import LatexText from '@/components/LatexText.vue';
-import StreamOutput from '@/components/StreamOutput.vue';
+import AppToast from '@/components/AppToast.vue';
 import { teacherNavLinks } from '@/constants/navigation';
 import { useAuthStore } from '@/stores/auth';
-import { useTeacherEventReportStore } from '@/stores/teacherEventReport';
 import { useToast } from '@/composables/useToast';
-import { useAIStreamState } from '@/composables/useAIStreamState';
 import {
+  closeTaskApi,
   createTeacherEventApi,
   deleteTeacherEventApi,
-  getTeacherEventHistoryApi, replaceTeacherEventApi,
-  getTeacherEventApi,
+  getTeacherEventHistoryApi,
+  getTeacherTasksApi,
+  publishDraftTaskApi,
+  updateDraftTaskApi,
 } from '@/api/teacher-event';
 import { getAllQuestionsApi } from '@/api/question';
-import { streamTeacherReport } from '@/api/ai';
 import type { QuestionResponse } from '@/types/question';
 import type { TeacherEventResponse } from '@/types/teacher-event';
 
 const auth = useAuthStore();
-const reportStore = useTeacherEventReportStore();
-const { show } = useToast();
-const { state: eventReportState, reset: resetEventReport } = useAIStreamState();
-
+const { visible, type, message, show } = useToast();
 const links = teacherNavLinks;
 
-const experimentSeries = [
-  {
-    key: '原子物理系列实验',
-    label: '原子物理系列实验',
-    experiments: [
-      { id: 'alpha', order: '01', title: '卢瑟福 α 粒子散射实验', folder: 'Alpha particle scattering experiment' },
-      { id: 'bohr', order: '02', title: '波尔理论实验', folder: 'Bohr theory' },
-      { id: 'cloud', order: '03', title: '电子云模型实验', folder: 'Electron cloud model' },
-      { id: 'photoelectric', order: '04', title: '光电效应实验', folder: 'Photoelectric' },
-    ],
-  },
-  {
-    key: '万有引力与宇宙航天系列实验',
-    label: '万有引力与宇宙航天系列实验',
-    experiments: [
-      { id: 'kepler', order: '01', title: '开普勒三定律实验', folder: 'Kepler' },
-      { id: 'cosmic', order: '02', title: '三大宇宙速度实验', folder: 'Cosmis_Velocity' },
-      { id: 'hohmann', order: '03', title: '卫星变轨实验', folder: 'Hohmann_Transfer' },
-      { id: 'lightspeed', order: '04', title: '光速视界实验', folder: 'LightspeedVista' },
-    ],
-  },
-] as const;
-
-type SeriesKey = typeof experimentSeries[number]['key'];
-
-const seriesOptions = experimentSeries.map(item => item.key);
-const defaultSeries = seriesOptions[0];
-const seriesConfig = ref<Record<SeriesKey, number[]>>({
-  '原子物理系列实验': [],
-  '万有引力与宇宙航天系列实验': [],
-});
-const editingSeries = ref<SeriesKey>(defaultSeries);
-const expandedId = ref<number | null>(null);
-const searchText = ref('');
-const showEventReport = ref(false);
-const activeReportSessionType = ref('');
-const reportRequestGuard = createReportRequestGuard();
-const activeReportEvent = ref<{ eventId: number; title: string } | null>(null);
-const activeAbortController = ref<AbortController | null>(null);
-
-const toggleExpand = (id: number) => {
-  expandedId.value = expandedId.value === id ? null : id;
-};
-
 const allQuestions = ref<QuestionResponse[]>([]);
-const loadingQ = ref(false);
-const current = ref<TeacherEventResponse | null>(null);
-
-const currentSeriesIds = computed(() => seriesConfig.value[editingSeries.value] ?? []);
-const currentSeriesMeta = computed(() =>
-  experimentSeries.find(item => item.key === editingSeries.value) ?? experimentSeries[0]
-);
-
-const questionMap = computed<Record<number, QuestionResponse>>(() => {
-  const m: Record<number, QuestionResponse> = {};
-  for (const q of allQuestions.value) m[q.id] = q;
-  return m;
-});
-
-const previewOptions = (options?: QuestionResponse['options']) => {
-  if (!options) return [] as Array<{ key: string; text: string }>;
-  return Object.entries(options).map(([key, text]) => ({ key, text: text ?? '' }));
-};
-
-const filteredQuestions = computed(() => {
-  const s = searchText.value.trim().toLowerCase();
-  if (!s) return allQuestions.value;
-  return allQuestions.value.filter(q =>
-    String(q.id).includes(s) || q.content?.toLowerCase().includes(s)
-  );
-});
-
-const shouldShowEventReportPanel = computed(() =>
-  showEventReport.value
-);
-
-const reportEventTitle = computed(() =>
-  activeReportEvent.value?.title || current.value?.eventTitle || '未发布'
-);
-
-const eventReportButtonText = computed(() => {
-  if (eventReportState.value.loading) return showEventReport.value ? '生成中…' : '查看生成中的实验学习报告';
-  if (eventReportState.value.content || eventReportState.value.reasoning || eventReportState.value.error) return '查看实验学习报告';
-  return '生成实验学习报告';
-});
-
-const addToSeries = (id: number) => {
-  const list = seriesConfig.value[editingSeries.value];
-  if (!list.includes(id)) list.push(id);
-};
-
-const removeFromSeries = (id: number) => {
-  seriesConfig.value[editingSeries.value] = seriesConfig.value[editingSeries.value].filter(x => x !== id);
-};
-
-const moveUp = (idx: number) => {
-  const list = seriesConfig.value[editingSeries.value];
-  if (idx <= 0) return;
-  [list[idx - 1], list[idx]] = [list[idx], list[idx - 1]];
-};
-
-const moveDown = (idx: number) => {
-  const list = seriesConfig.value[editingSeries.value];
-  if (idx >= list.length - 1) return;
-  [list[idx + 1], list[idx]] = [list[idx], list[idx + 1]];
-};
-
-const parseQuestionIds = (description: string | null): number[] => {
-  if (!description?.startsWith('QIDS:')) return [];
-  return description.slice(5).split(',').map(Number).filter(n => n > 0);
-};
-
-
-const normalizeEventReportError = (raw: string | undefined): string => {
-  const text = raw ?? '';
-  if (!text) return '实验学习报告暂时无法生成，请稍后重试。';
-
-  const friendlyMappings = [
-    { patterns: ['暂无任何学生答题数据', '暂无学生答题记录', '没有学生答题记录', '答题记录不存在'], message: '当前还没有学生答题记录哦' },
-    { patterns: ['无法生成教师报告', '无法生成教师学情报告'], message: '当前还没有学生答题记录哦' },
-  ];
-
-  for (const mapping of friendlyMappings) {
-    if (mapping.patterns.some(pattern => text.includes(pattern))) {
-      return mapping.message;
-    }
-  }
-
-  const jsonMessageMatch = text.match(/"message"\s*:\s*"([^"]+)"/);
-  if (jsonMessageMatch?.[1]) {
-    return normalizeEventReportError(jsonMessageMatch[1]);
-  }
-
-  return '实验学习报告暂时无法生成，请稍后重试。';
-};
-
-const isAbortError = (error: unknown) => {
-  if (!error) return false;
-  return (error instanceof DOMException && error.name === 'AbortError')
-    || (typeof error === 'object' && (error as { name?: string }).name === 'AbortError');
-};
-
-const restoreCachedEventReport = () => {
-  reportStore.hydrateFromStorage();
-  const cached = reportStore.cachedReport;
-  if (!cached) return;
-
-  const normalizedCachedError = normalizeEventReportError(cached.error);
-  const shouldDropStaleError = !cached.loading && !cached.content && !cached.reasoning
-    && normalizedCachedError === '当前还没有学生答题记录哦';
-
-  if (shouldDropStaleError) {
-    reportStore.clearCachedReport();
-    return;
-  }
-
-  if (cached.eventId == null) { reportStore.clearCachedReport(); return; }
-  activeReportEvent.value = { eventId: cached.eventId, title: cached.currentEventTitle };
-  eventReportState.value.loading = cached.loading;
-  eventReportState.value.progress = cached.progress;
-  eventReportState.value.content = cached.content;
-  eventReportState.value.reasoning = cached.reasoning;
-  eventReportState.value.error = normalizedCachedError;
-  eventReportState.value.tokenUsage = cached.tokenUsage;
-  activeReportSessionType.value = cached.eventId ? `teacher_event_report_${cached.eventId}` : '';
-};
-
-const persistEventReport = () => {
-  if (!activeReportEvent.value) return;
-  if (!eventReportState.value.loading && !eventReportState.value.content && !eventReportState.value.reasoning && !eventReportState.value.error) return;
-  reportStore.setCachedReport({
-    loading: eventReportState.value.loading,
-    progress: eventReportState.value.progress,
-    content: eventReportState.value.content,
-    reasoning: eventReportState.value.reasoning,
-    error: eventReportState.value.error,
-    tokenUsage: eventReportState.value.tokenUsage,
-    currentEventTitle: reportEventTitle.value,
-    eventId: activeReportEvent.value.eventId,
-  });
-};
-
-const clearEventReport = () => {
-  reportRequestGuard.invalidate();
-  activeAbortController.value?.abort();
-  activeAbortController.value = null;
-  activeReportEvent.value = null;
-  resetEventReport();
-  activeReportSessionType.value = '';
-  reportStore.clearCachedReport();
-};
-
-const startEventReportStream = async (event: TeacherEventResponse) => {
-  if (!event) return;
-  clearEventReport();
-  const scope = reportRequestGuard.begin(event.id, event.eventTitle);
-  activeReportEvent.value = { eventId: scope.eventId, title: scope.title };
-  activeReportSessionType.value = `teacher_event_report_${scope.eventId}`;
-  eventReportState.value.loading = true;
-  eventReportState.value.error = '';
-  persistEventReport();
-  const abortController = new AbortController();
-  activeAbortController.value = abortController;
-  try {
-    await streamTeacherReport({
-      eventId: scope.eventId,
-      signal: abortController.signal,
-      sessionType: activeReportSessionType.value,
-      onMessage: (payload) => {
-        if (!scope.isCurrent()) return;
-        eventReportState.value.content += payload.content;
-        persistEventReport();
-      },
-      onProgress: (payload) => {
-        if (!scope.isCurrent()) return;
-        eventReportState.value.progress = payload.progress ?? eventReportState.value.progress;
-        persistEventReport();
-      },
-      onReasoning: (payload) => {
-        if (!scope.isCurrent()) return;
-        eventReportState.value.reasoning += payload.reasoning;
-        persistEventReport();
-      },
-      onComplete: (payload) => {
-        if (!scope.isCurrent()) return;
-        eventReportState.value.loading = false;
-        eventReportState.value.tokenUsage = `Token: ${payload.totalTokens ?? 0}`;
-        persistEventReport();
-      },
-      onError: (payload) => {
-        if (!scope.isCurrent()) return;
-        eventReportState.value.loading = false;
-        eventReportState.value.error = normalizeEventReportError(payload.message);
-        persistEventReport();
-      },
-    });
-  } catch (error: any) {
-    if (!scope.isCurrent()) return;
-    if (isAbortError(error)) {
-      eventReportState.value.loading = false;
-      persistEventReport();
-      return;
-    }
-    eventReportState.value.loading = false;
-    eventReportState.value.error = normalizeEventReportError(error?.message);
-    persistEventReport();
-  } finally {
-    if (activeAbortController.value === abortController) {
-      activeAbortController.value = null;
-    }
-  }
-};
-
-watch(() => current.value?.id, (id) => {
-  if (activeReportEvent.value && activeReportEvent.value.eventId !== id) {
-    clearEventReport();
-    showEventReport.value = false;
-  }
-});
-
-const stopEventReportStream = () => {
-  if (!eventReportState.value.loading) return;
-  activeAbortController.value?.abort();
-};
-
-const openEventReport = async (event:TeacherEventResponse|null=current.value) => {
-  if (!event) {
-    show('当前没有已发布实验任务，无法生成实验学习报告', 'info');
-    return;
-  }
-
-  showEventReport.value = true;
-  const sessionType = `teacher_event_report_${event.id}`;
-  const hasCachedCurrentReport = reportStore.cachedReport?.eventId === event.id;
-
-  if (eventReportState.value.loading && activeReportSessionType.value === sessionType) return;
-  if (hasCachedCurrentReport && (eventReportState.value.content || eventReportState.value.reasoning || eventReportState.value.error)) return;
-
-  await startEventReportStream(event);
-};
-
-const closeEventReport = () => {
-  showEventReport.value = false;
-};
-
-watch(eventReportState, () => {
-  persistEventReport();
-}, { deep: true });
-
-const load = async () => {
-  loadingQ.value = true;
-  try {
-    const [qData, eventData] = await Promise.allSettled([
-      getAllQuestionsApi(),
-      getTeacherEventApi(),
-    ]);
-    if (qData.status === 'fulfilled') {
-      allQuestions.value = Array.isArray(qData.value) ? qData.value : [];
-    }
-    if (eventData.status === 'fulfilled' && eventData.value) {
-      current.value = eventData.value;
-      const ids = eventData.value.questionIds ?? parseQuestionIds(eventData.value.eventDescription ?? null);
-      const title = eventData.value.eventTitle;
-      if ((seriesOptions as readonly string[]).includes(title) && ids.length) {
-        seriesConfig.value[title as SeriesKey] = ids;
-        editingSeries.value = title as SeriesKey;
-      }
-    }
-  } finally {
-    loadingQ.value = false;
-  }
-};
-
-onMounted(() => {
-  restoreCachedEventReport();
-  load();
-});
-
-onUnmounted(() => {
-  activeAbortController.value?.abort();
-});
-
-const publishTask = async () => {
-  const ids = seriesConfig.value[editingSeries.value] ?? [];
-  if (!ids.length) { show('请先为当前实验系列加入至少一道题目', 'info'); return; }
-
-  const payload = {
-    eventTitle: editingSeries.value,
-    questionIds: ids,
-    eventTimestamp: new Date().toISOString().slice(0, 19),
-  };
-  try {
-    current.value = current.value
-      ? await replaceTeacherEventApi(current.value.id,payload)
-      : await createTeacherEventApi(payload);
-    show(`${editingSeries.value} 已发布，共 ${ids.length} 题`, 'success');
-  } catch (error: any) {
-    show(error?.response?.data?.message ?? '发布失败，请重试', 'error');
-  }
-};
-
-const archivedEvents = ref<import('@/types/teacher-event').TeacherEventResponse[]>([]);
+const selectedIds = ref<number[]>([]);
+const tasks = ref<TeacherEventResponse[]>([]);
+const editingTask = ref<TeacherEventResponse | null>(null);
+const taskTitle = ref('');
+const searchText = ref('');
+const startAt = ref('');
+const dueAt = ref('');
+const loadingQuestions = ref(false);
+const loadingTasks = ref(false);
+const publishing = ref(false);
+const archivedEvents = ref<TeacherEventResponse[]>([]);
 const historyPage = ref(1);
 const historyTotal = ref(0);
+const historyPages = ref(0);
+
+const questionMap = computed<Record<number, QuestionResponse>>(() => {
+  const map: Record<number, QuestionResponse> = {};
+  for (const question of allQuestions.value) map[question.id] = question;
+  return map;
+});
+const filteredQuestions = computed(() => {
+  const keyword = searchText.value.trim().toLowerCase();
+  if (!keyword) return allQuestions.value;
+  return allQuestions.value.filter(question => String(question.id).includes(keyword) || question.content.toLowerCase().includes(keyword));
+});
+const draftTasks = computed(() => tasks.value.filter(task => task.status === 'DRAFT'));
+const openTasks = computed(() => tasks.value.filter(task => task.status === 'PUBLISHED' && task.availability === 'OPEN'));
+const closedTasks = computed(() => tasks.value.filter(task => task.status === 'CLOSED' || task.availability === 'ENDED'));
+const latestOpenTask = computed(() => openTasks.value[0] ?? null);
+const canPublish = computed(() => Boolean(taskTitle.value.trim()) && selectedIds.value.length > 0);
+const canSaveDraft = computed(() => Boolean(taskTitle.value.trim()));
+
+const statusText = (task: TeacherEventResponse) => {
+  if (task.status === 'DRAFT') return '草稿';
+  if (task.status === 'CLOSED') return '已截止';
+  if (task.status === 'ARCHIVED') return '已归档';
+  if (task.availability === 'SCHEDULED') return '未开始';
+  if (task.availability === 'ENDED') return '已截止';
+  return '进行中';
+};
+const formatDate = (value: string) => new Date(value).toLocaleString('zh-CN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+const formatWindow = (value: string | null, fallback: string) => value ? formatDate(value) : fallback;
+const toUtcIso = (value: string) => value ? new Date(value).toISOString().slice(0, 19) : null;
+const toLocalInput = (value: string | null) => {
+  if (!value) return '';
+  const date = new Date(value);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return date.getFullYear() + '-' + pad(date.getMonth() + 1) + '-' + pad(date.getDate()) + 'T' + pad(date.getHours()) + ':' + pad(date.getMinutes());
+};
+const validateTime = () => {
+  if (startAt.value && dueAt.value && new Date(dueAt.value) <= new Date(startAt.value)) {
+    show('截止时间必须晚于开始时间', 'error');
+    return false;
+  }
+  return true;
+};
+
+const loadQuestions = async () => {
+  loadingQuestions.value = true;
+  try { allQuestions.value = await getAllQuestionsApi(); }
+  catch (error: any) { show(error?.response?.data?.message ?? '加载题库失败', 'error'); }
+  finally { loadingQuestions.value = false; }
+};
+const loadTasks = async () => {
+  loadingTasks.value = true;
+  try { tasks.value = await getTeacherTasksApi(); }
+  catch (error: any) { show(error?.response?.data?.message ?? '加载任务失败', 'error'); }
+  finally { loadingTasks.value = false; }
+};
 const loadHistory = async () => {
   try {
     const data = await getTeacherEventHistoryApi(historyPage.value);
     archivedEvents.value = data.records;
     historyTotal.value = data.total;
+    historyPages.value = data.pages;
   } catch (error: any) { show(error?.response?.data?.message ?? '读取归档任务失败', 'error'); }
 };
-onMounted(loadHistory);
-
-const deleteTask = async () => {
-  try {
-    await deleteTeacherEventApi(current.value!.id);
-    current.value = null;
-    showEventReport.value = false;
-    clearEventReport();
-    await loadHistory();
-    show('任务已归档，学习记录已保留', 'success');
-  } catch {
-    show('操作失败', 'error');
-  }
+const changeHistoryPage = async (delta: number) => {
+  const next = historyPage.value + delta;
+  if (next < 1 || (historyPages.value && next > historyPages.value)) return;
+  historyPage.value = next;
+  await loadHistory();
 };
+const addQuestion = (id: number) => {
+  if (!selectedIds.value.includes(id) && selectedIds.value.length < 200) selectedIds.value.push(id);
+};
+const removeQuestion = (id: number) => { selectedIds.value = selectedIds.value.filter(value => value !== id); };
+const moveUp = (index: number) => {
+  if (index <= 0) return;
+  [selectedIds.value[index - 1], selectedIds.value[index]] = [selectedIds.value[index], selectedIds.value[index - 1]];
+};
+const moveDown = (index: number) => {
+  if (index >= selectedIds.value.length - 1) return;
+  [selectedIds.value[index + 1], selectedIds.value[index]] = [selectedIds.value[index], selectedIds.value[index + 1]];
+};
+const resetForm = () => {
+  editingTask.value = null; taskTitle.value = ''; selectedIds.value = []; startAt.value = ''; dueAt.value = '';
+};
+const editDraft = (task: TeacherEventResponse) => {
+  editingTask.value = task;
+  taskTitle.value = task.eventTitle;
+  selectedIds.value = [...(task.questionIds ?? [])];
+  startAt.value = toLocalInput(task.startAt);
+  dueAt.value = toLocalInput(task.dueAt);
+};
+const payload = (status: 'DRAFT' | 'PUBLISHED') => ({
+  eventTitle: taskTitle.value.trim(),
+  questionIds: [...selectedIds.value],
+  eventTimestamp: new Date().toISOString().slice(0, 19),
+  status,
+  startAt: toUtcIso(startAt.value),
+  dueAt: toUtcIso(dueAt.value),
+});
+const saveDraft = async () => {
+  if (!canSaveDraft.value || publishing.value || !validateTime()) return;
+  publishing.value = true;
+  try {
+    if (editingTask.value) await updateDraftTaskApi(editingTask.value.id, payload('DRAFT'));
+    else await createTeacherEventApi(payload('DRAFT'));
+    resetForm(); await Promise.all([loadTasks(), loadHistory()]);
+    show('草稿已保存', 'success');
+  } catch (error: any) { show(error?.response?.data?.message ?? '保存草稿失败', 'error'); }
+  finally { publishing.value = false; }
+};
+const publishTask = async () => {
+  if (!canPublish.value || publishing.value || !validateTime()) return;
+  publishing.value = true;
+  try {
+    if (editingTask.value) {
+      await updateDraftTaskApi(editingTask.value.id, payload('DRAFT'));
+      await publishDraftTaskApi(editingTask.value.id);
+    } else {
+      await createTeacherEventApi(payload('PUBLISHED'));
+    }
+    resetForm(); await Promise.all([loadTasks(), loadHistory()]);
+    show('任务已发布', 'success');
+  } catch (error: any) { show(error?.response?.data?.message ?? '发布失败，请检查任务名称和题目后重试', 'error'); }
+  finally { publishing.value = false; }
+};
+const publishExisting = async (task: TeacherEventResponse) => {
+  try { await publishDraftTaskApi(task.id); await loadTasks(); show('草稿已发布', 'success'); }
+  catch (error: any) { show(error?.response?.data?.message ?? '发布失败', 'error'); }
+};
+const closeExisting = async (task: TeacherEventResponse) => {
+  try { await closeTaskApi(task.id); await loadTasks(); show('任务已截止，学生不能再提交', 'success'); }
+  catch (error: any) { show(error?.response?.data?.message ?? '截止失败', 'error'); }
+};
+const archiveTask = async (task: TeacherEventResponse) => {
+  try {
+    await deleteTeacherEventApi(task.id);
+    if (editingTask.value?.id === task.id) resetForm();
+    await Promise.all([loadTasks(), loadHistory()]);
+    show('任务已归档，历史作答已保留', 'success');
+  } catch (error: any) { show(error?.response?.data?.message ?? '归档失败，请重试', 'error'); }
+};
+onMounted(async () => { await Promise.all([loadQuestions(), loadTasks(), loadHistory()]); });
 </script>
 
 <style scoped>
-.event-page {
-  display: grid;
-  gap: 18px;
-}
-
-.event-hero,
-.event-status-card,
-.left-panel,
-.right-panel,
-.event-report-panel {
-  border: 1px solid rgba(123, 146, 255, 0.14);
-  border-radius: 22px;
-  background: linear-gradient(160deg, rgba(12, 18, 37, 0.96), rgba(7, 11, 24, 0.98));
-  box-shadow: 0 24px 60px rgba(2, 6, 18, 0.32);
-}
-
-.event-hero {
-  display: grid;
-  grid-template-columns: 1.2fr 0.8fr;
-  gap: 18px;
-  padding: 24px 28px;
-}
-
-.event-kicker {
-  display: inline-flex;
-  padding: 6px 10px;
-  border-radius: 999px;
-  border: 1px solid rgba(123, 146, 255, 0.18);
-  color: #95abd8;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  font-size: var(--font-size-xs);
-}
-
-.event-title {
-  margin: 14px 0 8px;
-  font-size: clamp(30px, 4vw, 42px);
-}
-
-.event-summary {
-  color: #b7c4e8;
-  line-height: 1.8;
-}
-
-.event-status-card {
-  padding: 18px;
-  display: grid;
-  gap: 8px;
-}
-
-.event-status-card strong {
-  font-size: 28px;
-}
-
-.event-status-label {
-  font-size: 11px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-}
-
-.event-status-card.live strong {
-  color: rgba(120, 220, 150, 0.95);
-}
-
-.event-status-card.idle strong {
-  color: #f4fbff;
-}
-
-.event-status-actions {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-  margin-top: 6px;
-}
-
-.event-report-panel {
-  padding: 18px;
-  display: grid;
-  gap: 14px;
-}
-
-.report-panel-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 14px;
-}
-
-.report-panel-actions {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.report-panel-title {
-  font-size: 22px;
-  font-weight: 800;
-  color: #f4fbff;
-}
-
-.report-panel-sub {
-  margin-top: 4px;
-  color: #9fb0d6;
-  font-size: 13px;
-}
-
-.close-inline-btn {
-  cursor: pointer;
-  border-radius: 12px;
-  border: 1px solid rgba(151, 172, 249, 0.2);
-  background: rgba(255, 255, 255, 0.04);
-  color: var(--text);
-  padding: 10px 14px;
-}
-
-.stop-inline-btn {
-  cursor: pointer;
-  border-radius: 12px;
-  border: 1px solid rgba(255, 107, 145, 0.45);
-  background: rgba(255, 107, 145, 0.12);
-  color: #ffd5e2;
-  padding: 10px 14px;
-  font-weight: 700;
-}
-
-.status-delete-btn,
-.status-report-btn,
-.publish-btn,
-.add-btn,
-.icon-btn,
-.close-btn {
-  cursor: pointer;
-}
-
-.status-delete-btn,
-.status-report-btn,
-.publish-btn,
-.add-btn,
-.icon-btn {
-  border-radius: 12px;
-  border: 1px solid rgba(151, 172, 249, 0.2);
-  background: rgba(255, 255, 255, 0.04);
-  color: var(--text);
-}
-
-.status-delete-btn,
-.status-report-btn,
-.publish-btn,
-.add-btn {
-  padding: 10px 14px;
-}
-
-.status-delete-btn {
-  border-color: rgba(255, 100, 100, 0.3);
-  color: rgba(255, 140, 140, 0.95);
-}
-
-.status-report-btn,
-.publish-btn.active {
-  border-color: rgba(90, 243, 211, 0.45);
-  background: linear-gradient(120deg, rgba(90, 243, 211, 0.88), rgba(255, 199, 122, 0.88));
-  color: #061016;
-  font-weight: 800;
-}
-
-.sel-detail,
-.bank-detail {
-  display: grid;
-  gap: 12px;
-}
-
-.sel-detail-q,
-.bank-detail-q {
-  color: #edf3ff;
-  line-height: 1.8;
-}
-
-.sel-detail-image-wrap,
-.bank-detail-image-wrap {
-  overflow: hidden;
-  border-radius: 16px;
-  border: 1px solid rgba(151, 172, 249, 0.16);
-  background: rgba(255, 255, 255, 0.03);
-}
-
-.sel-detail-image,
-.bank-detail-image {
-  display: block;
-  width: 100%;
-  max-height: 240px;
-  object-fit: contain;
-  background: rgba(7, 11, 24, 0.92);
-}
-
-.sel-detail-options,
-.bank-detail-options {
-  display: grid;
-  gap: 10px;
-}
-
-.sel-detail-option,
-.bank-detail-option {
-  display: grid;
-  grid-template-columns: 30px 1fr;
-  gap: 12px;
-  align-items: start;
-  padding: 10px 12px;
-  border-radius: 14px;
-  border: 1px solid rgba(151, 172, 249, 0.12);
-  background: rgba(255, 255, 255, 0.03);
-}
-
-.sel-detail-option-key,
-.bank-detail-option-key {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(123, 146, 255, 0.16);
-  color: #f4fbff;
-  font-weight: 700;
-}
-
-.sel-detail-option-text,
-.bank-detail-option-text {
-  color: #dfe9ff;
-  line-height: 1.75;
-}
-
-.main-layout {
-  display: grid;
-  grid-template-columns: 380px 1fr;
-  gap: 18px;
-}
-
-.left-panel,
-.right-panel {
-  overflow: hidden;
-}
-
-.exp-tabs {
-  display: flex;
-  flex-direction: column;
-  border-bottom: 1px solid rgba(151, 172, 249, 0.08);
-  background: rgba(151, 172, 249, 0.03);
-}
-
-.exp-tab {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 12px 14px;
-  border: none;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
-  background: transparent;
-  color: var(--text-muted);
-  cursor: pointer;
-  text-align: left;
-}
-
-.exp-tab.active {
-  background: rgba(151, 172, 249, 0.08);
-  color: #f4fbff;
-}
-
-.exp-tab.published {
-  box-shadow: inset 3px 0 0 rgba(90, 243, 211, 0.8);
-}
-
-.exp-tab-name {
-  flex: 1;
-  font-size: 14px;
-}
-
-.exp-tab-badge,
-.series-chip,
-.left-head-count,
-.right-head-count {
-  font-size: 11px;
-  padding: 3px 8px;
-  border-radius: 999px;
-  background: rgba(151, 172, 249, 0.1);
-  color: #9fb0db;
-}
-
-.left-content,
-.right-panel {
-  padding: 18px;
-}
-
-.series-summary,
-.left-head,
-.right-head,
-.panel-head,
-.report-dialog-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.series-summary {
-  margin-bottom: 16px;
-}
-
-.series-summary-label,
-.series-exp-path,
-.loading-hint,
-.muted,
-.report-dialog-sub {
-  color: var(--text-muted);
-}
-
-.series-summary-title,
-.right-head-title,
-.left-head-title,
-.report-dialog-title {
-  font-size: 18px;
-  font-weight: 700;
-}
-
-.series-exp-list,
-.selected-list,
-.bank-list {
-  display: grid;
-  gap: 10px;
-}
-
-.series-exp-item,
-.sel-item-main,
-.bank-item-main {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 12px 14px;
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(151, 172, 249, 0.08);
-}
-
-.series-exp-index,
-.sel-rank,
-.bank-badge {
-  min-width: 34px;
-  height: 34px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(151, 172, 249, 0.12);
-  color: #a9bcf0;
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.series-exp-body,
-.sel-preview,
-.bank-preview {
-  min-width: 0;
-  flex: 1;
-}
-
-.series-exp-name {
-  font-size: 14px;
-  color: #f4fbff;
-}
-
-.empty-hint {
-  padding: 24px;
-  text-align: center;
-  color: var(--text-muted);
-}
-
-.empty-icon {
-  font-size: 36px;
-  margin-bottom: 10px;
-}
-
-.sel-item,
-.bank-item {
-  display: grid;
-  gap: 8px;
-}
-
-.sel-actions {
-  display: flex;
-  gap: 8px;
-}
-
-.icon-btn {
-  width: 34px;
-  height: 34px;
-}
-
-.icon-btn.danger {
-  border-color: rgba(255, 100, 100, 0.3);
-  color: rgba(255, 140, 140, 0.95);
-}
-
-.sel-detail,
-.bank-detail {
-  padding: 14px;
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.025);
-  border: 1px solid rgba(151, 172, 249, 0.08);
-}
-
-.publish-zone {
-  padding: 18px;
-  border-top: 1px solid rgba(151, 172, 249, 0.08);
-}
-
-.publish-btn {
-  width: 100%;
-}
-
-.search-box {
-  min-width: 240px;
-}
-
-.loading-hint {
-  padding: 40px;
-  text-align: center;
-}
-
-.add-btn.added {
-  opacity: 0.7;
-}
-
-.dialog-mask {
-  position: fixed;
-  inset: 0;
-  z-index: 140;
-  background: rgba(6, 8, 20, 0.72);
-  backdrop-filter: blur(6px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
-}
-
-.report-dialog {
-  width: min(100%, 920px);
-  max-height: calc(100vh - 48px);
-  display: grid;
-  grid-template-rows: auto 1fr;
-  overflow: hidden;
-}
-
-.report-dialog-head {
-  padding: 16px 18px;
-  border-bottom: 1px solid rgba(151, 172, 249, 0.1);
-}
-
-.close-btn {
-  width: 34px;
-  height: 34px;
-}
-
-.report-dialog-body {
-  min-height: 0;
-  overflow: auto;
-  padding: 18px;
-}
-
-@media (max-width: 1100px) {
-  .event-hero,
-  .main-layout {
-    grid-template-columns: 1fr;
-  }
-}
-
-@media (max-width: 760px) {
-  .series-summary,
-  .left-head,
-  .right-head,
-  .event-status-actions,
-  .report-dialog-head {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .search-box {
-    min-width: 0;
-    width: 100%;
-  }
+.event-page { display: grid; gap: 18px; }
+.event-hero { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 18px; align-items: center; }
+.event-status-card { display: grid; gap: 8px; align-content: start; padding: 16px; border-radius: 10px; }
+.task-board { padding: 16px 18px; border-radius: 12px; }
+.task-board-head { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; margin-bottom: 12px; }
+.task-board-head h2 { margin: 0 0 4px; font-size: 16px; }
+.task-board-head p { margin: 0; color: #64748b; font-size: 12px; }
+.task-table { display: grid; gap: 8px; }
+.task-row { display: flex; justify-content: space-between; gap: 16px; align-items: center; padding: 10px 12px; border: 1px solid #e2e8f0; border-radius: 8px; background: #fff; }
+.task-row-main { min-width: 0; display: grid; gap: 4px; }
+.task-row-title { display: flex; align-items: center; gap: 8px; }
+.task-row-title strong { color: #172033; font-size: 13px; }
+.task-status { padding: 1px 6px; border-radius: 4px; background: #f1f5f9; color: #475569; font-size: 10px; }
+.task-status.draft { background: #fef3c7; color: #92400e; }
+.task-status.published { background: #ecfdf5; color: #0f766e; }
+.task-status.closed { background: #f1f5f9; color: #64748b; }
+.task-row-meta { display: flex; gap: 14px; flex-wrap: wrap; color: #64748b; font-size: 11px; }
+.task-row-actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.task-row-actions .ghost-btn { min-height: 30px; padding: 0 9px; font-size: 11px; }
+.primary-text { color: #0f766e !important; }
+.danger-text { color: #b91c1c !important; }
+.time-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.time-grid label { display: grid; gap: 6px; }
+.time-input { width: 100%; padding: 9px 10px; border: 1px solid #dbe3ec; border-radius: 8px; color: #172033; background: #fff; }
+.time-hint { margin: -4px 0 0; color: #94a3b8; font-size: 11px; }
+.publish-zone { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.draft-btn { min-height: 38px; padding: 0 14px; border: 1px solid #dbe3ec; border-radius: 8px; background: #fff; color: #334155; cursor: pointer; }
+.draft-btn:disabled { opacity: .5; cursor: not-allowed; }
+@media (max-width: 900px) {
+  .event-hero { grid-template-columns: 1fr; }
+  .task-row { flex-direction: column; align-items: stretch; }
+  .task-row-actions { justify-content: flex-start; }
+  .time-grid { grid-template-columns: 1fr; }
 }
 </style>

@@ -8,7 +8,6 @@ import com.zhixuewuli.common.exception.BusinessException;
 import com.zhixuewuli.common.exception.auth.RealNameDuplicateException;
 import com.zhixuewuli.common.exception.auth.UserNameDuplicateException;
 import com.zhixuewuli.common.exception.question.QuestionContentDuplicateException;
-import com.zhixuewuli.common.exception.video.VideoAlreadyExistsException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Tag;
@@ -147,24 +146,6 @@ class DatabaseExceptionParserUtilUnitTest extends BaseUnitTest {
             assertThat(info.getConstraintType()).isEqualTo("UNIQUE");
         }
 
-        @Test
-        @DisplayName("TC-DB-06: 应该成功解析视频 URL 重复异常")
-        void testParse_MySqlDuplicateEntry_VideoUrl() {
-            // Given
-            String errorMessage = "Duplicate entry 'https://example.com/video.mp4' for key 'videos.url'";
-            DataIntegrityViolationException exception = new DataIntegrityViolationException(errorMessage);
-
-            // When
-            DatabaseExceptionParserUtil.DatabaseConstraintInfo info = DatabaseExceptionParserUtil
-                    .parseException(exception);
-
-            // Then
-            assertThat(info).isNotNull();
-            assertThat(info.getFriendlyMessage()).isEqualTo("视频播放链接已存在：https://example.com/video.mp4");
-            assertThat(info.getDuplicateValue()).isEqualTo("https://example.com/video.mp4");
-            assertThat(info.getFieldName()).isEqualTo("url");
-            assertThat(info.getConstraintType()).isEqualTo("UNIQUE");
-        }
     }
 
     // ==================== MySQL 外键约束异常解析测试 ====================
@@ -314,24 +295,6 @@ class DatabaseExceptionParserUtilUnitTest extends BaseUnitTest {
             assertThat(info.getConstraintType()).isEqualTo("UNIQUE");
         }
 
-        @Test
-        @DisplayName("TC-DB-15: 应该成功解析 H2 主键违反")
-        void testParse_H2DuplicateEntry_PrimaryKey() {
-            // Given
-            String errorMessage = "Unique index or primary key violation: \"PUBLIC.CONSTRAINT_INDEX_1 ON PUBLIC.VIDEOS(URL) VALUES ('https://example.com/video.mp4')\"";
-            DataIntegrityViolationException exception = new DataIntegrityViolationException(errorMessage);
-
-            // When
-            DatabaseExceptionParserUtil.DatabaseConstraintInfo info = DatabaseExceptionParserUtil
-                    .parseException(exception);
-
-            // Then
-            assertThat(info).isNotNull();
-            assertThat(info.getFriendlyMessage()).isEqualTo("视频播放链接已存在：https://example.com/video.mp4");
-            assertThat(info.getDuplicateValue()).isEqualTo("https://example.com/video.mp4");
-            assertThat(info.getFieldName()).isEqualTo("url");
-            assertThat(info.getConstraintType()).isEqualTo("UNIQUE");
-        }
     }
 
     // ==================== 未知/无法解析异常处理测试 ====================
@@ -454,34 +417,6 @@ class DatabaseExceptionParserUtilUnitTest extends BaseUnitTest {
             assertThatThrownBy(() -> DatabaseExceptionParserUtil.throwAppropriateBusinessException(exception))
                     .isInstanceOf(QuestionContentDuplicateException.class)
                     .hasMessageContaining("题目内容 123");
-        }
-
-        @Test
-        @DisplayName("TC-DB-23: 应该抛出 VideoAlreadyExistsException (标题) - 当 title 重复时")
-        void testThrowBusinessException_VideoTitleDuplicate() {
-            // Given
-            String errorMessage = "Duplicate entry '教学视频标题' for key 'videos.title'";
-            DataIntegrityViolationException exception = new DataIntegrityViolationException(errorMessage);
-
-            // When & Then
-            assertThatThrownBy(() -> DatabaseExceptionParserUtil.throwAppropriateBusinessException(exception))
-                    .isInstanceOf(VideoAlreadyExistsException.class)
-                    .hasMessageContaining("标题")
-                    .hasMessageContaining("教学视频标题");
-        }
-
-        @Test
-        @DisplayName("TC-DB-24: 应该抛出 VideoAlreadyExistsException (播放链接) - 当 url 重复时")
-        void testThrowBusinessException_VideoUrlDuplicate() {
-            // Given
-            String errorMessage = "Duplicate entry 'https://video.com/test.mp4' for key 'videos.url'";
-            DataIntegrityViolationException exception = new DataIntegrityViolationException(errorMessage);
-
-            // When & Then
-            assertThatThrownBy(() -> DatabaseExceptionParserUtil.throwAppropriateBusinessException(exception))
-                    .isInstanceOf(VideoAlreadyExistsException.class)
-                    .hasMessageContaining("播放链接")
-                    .hasMessageContaining("https://video.com/test.mp4");
         }
 
         @Test

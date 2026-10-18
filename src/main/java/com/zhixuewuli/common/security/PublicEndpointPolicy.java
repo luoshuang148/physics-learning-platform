@@ -9,7 +9,7 @@ public final class PublicEndpointPolicy {
  }
  public static boolean isPublic(String path,boolean docsEnabled) {
   return path.equals("/auth/login")||path.equals("/auth/register")||path.equals("/actuator/health")
-   ||path.startsWith("/videos/")||(docsEnabled&&(path.equals("/v3/api-docs")||path.startsWith("/v3/api-docs/")
+   ||(docsEnabled&&(path.equals("/v3/api-docs")||path.startsWith("/v3/api-docs/")
    ||path.equals("/swagger-ui.html")||path.startsWith("/swagger-ui/")||path.startsWith("/webjars/")));
  }
  public static boolean isMonitoring(String path){return path.equals("/actuator")||path.startsWith("/actuator/");}

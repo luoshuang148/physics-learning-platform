@@ -3,7 +3,7 @@
     <div class="record-page ops-typography">
       <section class="record-hero">
         <div class="hero-copy">
-          <span class="hero-kicker">Archive Console</span>
+          <span class="hero-kicker">答题记录</span>
           <h2 class="hero-title">答题记录</h2>
           <p class="hero-desc">把会话检索、错题排查与清理操作合并到一条工作流里，方便教师快速定位异常答题轨迹。</p>
         </div>
@@ -68,7 +68,7 @@
         <div class="record-list-panel">
           <div class="panel-head">
             <div>
-              <div class="panel-kicker">Records</div>
+              <div class="panel-kicker">记录列表</div>
               <div class="panel-title">记录列表</div>
             </div>
             <span class="panel-count">{{ filteredRecords.length }} / {{ records.length }}</span>
@@ -82,7 +82,7 @@
               :key="record.recordId"
               class="record-item"
               :class="{ active: selectedRecord?.recordId === record.recordId, wrong: !record.correct, correct: record.correct }"
-              @click="selectedRecord = record"
+              @click="selectRecord(record)"
             >
               <div class="record-item-top">
                 <span class="record-badge">{{ record.correct ? '正确' : '错题' }}</span>
@@ -99,7 +99,7 @@
           <template v-else>
             <div class="panel-head detail-head">
               <div>
-                <div class="panel-kicker">Inspection</div>
+                <div class="panel-kicker">记录详情</div>
                 <div class="detail-title">记录详情</div>
                 <div class="detail-sub">recordId: {{ selectedRecord.recordId }}</div>
               </div>
@@ -119,7 +119,7 @@
               <div class="detail-card">
                 <div class="detail-row"><span>作答时间</span><strong>{{ formatDate(selectedRecord.answeredAt) }}</strong></div>
                 <div class="detail-row"><span>记录状态</span><strong>{{ selectedRecord.correct ? '用于正确率统计' : '已进入错题链路' }}</strong></div>
-                <div class="detail-row"><span>后续操作</span><strong>支持删除或继续排查错误原因</strong></div>
+                <div class="detail-row"><span>后续操作</span><strong>支持删除或继续查看作答详情</strong></div>
               </div>
             </div>
 
@@ -148,10 +148,6 @@
               <div class="question-content"><LatexText :content="selectedRecord.questionAnalysis" /></div>
             </div>
 
-            <div v-if="selectedRecord.errorReason" class="analysis-card reason-card">
-              <div class="question-title">学生填写的错误原因</div>
-              <div class="question-content">{{ selectedRecord.errorReason }}</div>
-            </div>
           </template>
         </div>
       </section>
@@ -173,6 +169,7 @@ import {
   batchDeleteAnswerRecordsApi,
   deleteAnswerRecordApi,
   getAnswerRecordPageApi,
+  getAnswerRecordDetailApi,
 } from '@/api/answer-record';
 import { teacherNavLinks } from '@/constants/navigation';
 import type { AnswerRecordResponse } from '@/types/answer-record';
@@ -200,6 +197,7 @@ const studentFilter = ref('');
 let loadSequence = 0;
 const records = ref<AnswerRecordResponse[]>([]);
 const selectedRecord = ref<AnswerRecordResponse | null>(null);
+let detailSequence = 0;
 
 const totalCountText = computed(() => total.value.toLocaleString());
 const wrongCount = computed(() => records.value.filter(item => !item.correct).length);
@@ -228,9 +226,21 @@ const formatDate = (date: string) => new Date(date).toLocaleString('zh-CN', {
   minute: '2-digit',
 });
 
-const applyRecords = (next: AnswerRecordResponse[]) => {
+const selectRecord = async (record: AnswerRecordResponse | undefined) => {
+  const sequence = ++detailSequence;
+  selectedRecord.value = record ?? null;
+  if (!record) return;
+  try {
+    const detail = await getAnswerRecordDetailApi(record.recordId);
+    if (sequence === detailSequence) selectedRecord.value = detail;
+  } catch {
+    // Keep the lightweight row selectable; a retry happens on the next click.
+  }
+};
+
+const applyRecords = async (next: AnswerRecordResponse[]) => {
   records.value = next;
-  selectedRecord.value = next[0] ?? null;
+  await selectRecord(next[0]);
 };
 
 const loadPage = async () => {
@@ -243,7 +253,7 @@ const loadPage = async () => {
     total.value = data.total;
     totalPages.value = data.pages;
     if (data.pages > 0 && page.value > data.pages) { page.value = data.pages; await loadPage(); return; }
-    applyRecords(data.records ?? []);
+    await applyRecords(data.records ?? []);
   } catch (error: any) {
     if (sequence === loadSequence) show(error?.response?.data?.message ?? '加载记录失败', 'error');
   } finally {

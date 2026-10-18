@@ -25,7 +25,6 @@
 
         <div v-if="loading" class="qm-loading">加载中…</div>
         <div v-else-if="filteredQuestions.length === 0" class="qm-empty">
-          <div class="empty-icon">📭</div>
           <p>{{ questions.length === 0 ? '题库暂无题目' : '无匹配题目' }}</p>
         </div>
         <div v-else class="qm-list">
@@ -40,8 +39,8 @@
               <span class="qm-correct">答案 {{ q.correctOption }}</span>
               <span v-if="q.difficulty" class="qm-diff" :class="diffClass(q.difficulty)">D{{ q.difficulty }}</span>
               <div class="qm-item-actions" @click.stop>
-                <button class="icon-act edit" @click="openEdit(q)" title="编辑">✏️</button>
-                <button class="icon-act del" @click="confirmDelete(q.id)" title="删除">🗑️</button>
+                <button class="icon-act edit" @click="openEdit(q)" title="编辑">编辑</button>
+                <button class="icon-act del" @click="confirmDelete(q.id)" title="删除">删除</button>
               </div>
             </div>
             <div class="qm-item-content"><LatexText :content="q.content?.slice(0,80) ?? ''" /></div>
@@ -51,9 +50,6 @@
             <div class="qm-item-opts">
               <span v-for="(_, key) in q.options" :key="key" class="qm-opt-chip" :class="{ correct: key === q.correctOption }">
                 {{ key }}</span>
-            </div>
-            <div v-if="optionVideoSummary(q.explanationVideoMapping).length" class="qm-video-map">
-              <span class="qm-video-chip" v-for="item in optionVideoSummary(q.explanationVideoMapping)" :key="item">{{ item }}</span>
             </div>
           </div>
         </div>
@@ -112,41 +108,21 @@
                       <div class="preview-content"><LatexText :content="optionInputs[key]" /></div>
                     </div>
                   </div>
-                  <div class="field-stack">
-                    <select
-                      :value="optionVideoSelections[key] === null ? '' : String(optionVideoSelections[key])"
-                      @change="optionVideoSelections[key] = ($event.target as HTMLSelectElement).value === '' ? null : Number(($event.target as HTMLSelectElement).value)"
-                      class="opt-input opt-video-select"
-                    >
-                      <option value="">请选择要关联的视频</option>
-                      <option v-for="video in videos" :key="video.id" :value="String(video.id)">
-                        #{{ video.id }} · {{ video.title }}
-                      </option>
-                    </select>
-                  </div>
                 </div>
                 <span v-if="form.correctOption === key" class="opt-correct-mark">✓</span>
               </div>
             </div>
-            <div class="form-hint">点击字母按钮设置正确答案；每个选项可单独绑定一个现有视频</div>
+            <div class="form-hint">点击字母按钮设置正确答案</div>
           </div>
 
-          <div class="form-row">
-            <div class="form-section half">
-              <div class="form-label">难度</div>
-              <div class="diff-picker">
-                <button v-for="d in [1,2,3,4,5]" :key="d"
-                  class="diff-pick-btn"
-                  :class="{ active: form.difficulty === d }"
-                  @click="form.difficulty = d"
-                >{{ d }}</button>
-              </div>
-            </div>
-            <div class="form-section half">
-              <div class="form-label">视频资源</div>
-              <div class="video-summary" :class="{ loading: videoLoading }">
-                {{ videoLoading ? '视频列表加载中…' : videos.length ? `当前可选 ${videos.length} 个视频资源` : '当前没有可选视频，请先到视频管理创建视频' }}
-              </div>
+          <div class="form-section">
+            <div class="form-label">难度</div>
+            <div class="diff-picker">
+              <button v-for="d in [1,2,3,4,5]" :key="d"
+                class="diff-pick-btn"
+                :class="{ active: form.difficulty === d }"
+                @click="form.difficulty = d"
+              >{{ d }}</button>
             </div>
           </div>
 
@@ -192,9 +168,7 @@ import LatexText from '@/components/LatexText.vue';
 import { useToast } from '@/composables/useToast';
 import { useAuthStore } from '@/stores/auth';
 import { createQuestionApi, deleteQuestionApi, getAllQuestionsApi, updateQuestionApi } from '@/api/question';
-import { getAllVideosApi } from '@/api/video';
 import type { QuestionResponse } from '@/types/question';
-import type { VideoResponse } from '@/types/video';
 import { teacherNavLinks } from '@/constants/navigation';
 
 const auth = useAuthStore();
@@ -205,9 +179,7 @@ const optionKeys = ['A', 'B', 'C', 'D'] as const;
 type OptionKey = typeof optionKeys[number];
 
 const questions = ref<QuestionResponse[]>([]);
-const videos = ref<VideoResponse[]>([]);
 const loading = ref(true);
-const videoLoading = ref(false);
 const submitting = ref(false);
 const imageReading = ref(false);
 const isDragOver = ref(false);
@@ -226,12 +198,6 @@ const form = reactive({
 });
 
 const optionInputs = reactive<Record<OptionKey, string>>({ A: '', B: '', C: '', D: '' });
-const optionVideoSelections = reactive<Record<OptionKey, number | null>>({ A: null, B: null, C: null, D: null });
-
-const getSelectedVideoTitle = (videoId: number | null) => {
-  if (!videoId) return '';
-  return videos.value.find((video) => video.id === videoId)?.title ?? '';
-};
 
 const filteredQuestions = computed(() => {
   let list = [...questions.value].sort((a, b) => b.id - a.id);
@@ -240,17 +206,6 @@ const filteredQuestions = computed(() => {
   if (s) list = list.filter(q => String(q.id).includes(s) || q.content?.toLowerCase().includes(s));
   return list;
 });
-
-const optionVideoSummary = (mapping: QuestionResponse['explanationVideoMapping']) => {
-  if (!mapping) return [];
-  return optionKeys
-    .map((key) => {
-      const videoId = mapping[key] ?? null;
-      if (!videoId) return null;
-      return `${key}→${getSelectedVideoTitle(videoId) || `#${videoId}`}`;
-    })
-    .filter((item): item is string => Boolean(item));
-};
 
 const diffClass = (d: number | null) => {
   if (!d) return '';
@@ -269,10 +224,6 @@ const resetForm = () => {
   optionInputs.B = '';
   optionInputs.C = '';
   optionInputs.D = '';
-  optionVideoSelections.A = null;
-  optionVideoSelections.B = null;
-  optionVideoSelections.C = null;
-  optionVideoSelections.D = null;
 };
 
 const openCreate = () => {
@@ -292,10 +243,6 @@ const openEdit = (q: QuestionResponse) => {
   optionInputs.B = q.options?.B ?? '';
   optionInputs.C = q.options?.C ?? '';
   optionInputs.D = q.options?.D ?? '';
-  optionVideoSelections.A = q.explanationVideoMapping?.A ?? null;
-  optionVideoSelections.B = q.explanationVideoMapping?.B ?? null;
-  optionVideoSelections.C = q.explanationVideoMapping?.C ?? null;
-  optionVideoSelections.D = q.explanationVideoMapping?.D ?? null;
   showForm.value = true;
 };
 
@@ -361,11 +308,6 @@ const handleImageDrop = async (event: DragEvent) => {
 };
 
 const buildOptionsJson = () => JSON.stringify({ A: optionInputs.A, B: optionInputs.B, C: optionInputs.C, D: optionInputs.D });
-const buildExplanationVideoMappingJson = () => JSON.stringify(
-  Object.fromEntries(
-    optionKeys.map((key) => [key, optionVideoSelections[key]])
-  )
-);
 
 const submit = async () => {
   if (!form.content.trim()) { show('请填写题目内容', 'info'); return; }
@@ -380,7 +322,6 @@ const submit = async () => {
       correctOption: form.correctOption,
       explanation: form.explanation || undefined,
       difficulty: form.difficulty,
-      explanationVideoMapping: buildExplanationVideoMappingJson(),
       imageBase64: form.imageBase64 || undefined,
     };
     if (editing.value) {
@@ -417,21 +358,13 @@ const doDelete = async () => {
 
 const load = async () => {
   loading.value = true;
-  videoLoading.value = true;
   try {
-    const [questionList, videoList] = await Promise.all([
-      getAllQuestionsApi(),
-      getAllVideosApi(),
-    ]);
-    questions.value = questionList;
-    videos.value = videoList;
+    questions.value = await getAllQuestionsApi();
   } catch (e: any) {
     questions.value = [];
-    videos.value = [];
-    show(e?.response?.data?.message ?? '题目或视频列表加载失败', 'error');
+    show(e?.response?.data?.message ?? '题目列表加载失败', 'error');
   } finally {
     loading.value = false;
-    videoLoading.value = false;
   }
 };
 
@@ -582,20 +515,6 @@ onMounted(load);
   background: rgba(151,172,249,0.08);
 }
 .qm-opt-chip.correct { color: rgba(120,220,150,0.95); background: rgba(120,220,150,0.1); }
-.qm-video-map {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-  margin-top: 8px;
-}
-.qm-video-chip {
-  padding: 3px 8px;
-  border-radius: 999px;
-  font-size: 11px;
-  color: rgba(90,243,211,0.95);
-  background: rgba(90,243,211,0.1);
-}
-
 .qm-form-panel {
   border: 1px solid rgba(151,172,249,0.15);
   border-radius: 14px;
@@ -707,15 +626,6 @@ onMounted(load);
   color: #ff9ab4;
   cursor: pointer;
 }
-.opt-video-proxy {
-  cursor: pointer;
-}
-.opt-video-proxy.is-empty {
-  color: rgba(214,224,255,0.5);
-}
-.opt-video-proxy::placeholder {
-  color: rgba(214,224,255,0.5);
-}
 .form-textarea { resize: vertical; }
 .form-textarea:focus,
 .form-input:focus,
@@ -744,31 +654,6 @@ onMounted(load);
   gap: 6px;
   position: relative;
 }
-.opt-video-menu {
-  position: absolute;
-  top: calc(100% + 6px);
-  left: 0;
-  right: 0;
-  z-index: 20;
-  max-height: 220px;
-  overflow-y: auto;
-  border-radius: 10px;
-  border: 1px solid rgba(151,172,249,0.16);
-  background: var(--select-option-bg);
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.28);
-}
-.opt-video-menu-item {
-  width: 100%;
-  padding: 10px 12px;
-  border: 0;
-  background: transparent;
-  color: var(--select-option-text);
-  text-align: left;
-  cursor: pointer;
-}
-.opt-video-menu-item:hover {
-  background: rgba(151,172,249,0.12);
-}
 .field-tip {
   padding: 8px 12px;
   border-radius: 10px;
@@ -788,26 +673,11 @@ onMounted(load);
   cursor: pointer;
 }
 .opt-key-btn.correct,
-.opt-row.correct .opt-input,
-.opt-row.correct .opt-video-proxy {
+ .opt-row.correct .opt-input {
   border-color: rgba(120,220,150,0.35);
 }
 .opt-correct-mark { color: rgba(120,220,150,0.95); font-weight: 700; }
 .form-hint { font-size: 11px; color: var(--text-muted); opacity: 0.7; }
-.video-summary {
-  min-height: 42px;
-  display: flex;
-  align-items: center;
-  padding: 0 12px;
-  border-radius: 10px;
-  border: 1px dashed rgba(151,172,249,0.2);
-  background: rgba(255,255,255,0.03);
-  color: var(--text-muted);
-  font-size: 12px;
-}
-.video-summary.loading {
-  opacity: 0.75;
-}
 .diff-picker { display: flex; gap: 6px; flex-wrap: wrap; }
 .diff-pick-btn {
   width: 34px;

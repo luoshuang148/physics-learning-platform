@@ -37,7 +37,6 @@ public class BootstrapTeacherInitializer implements ApplicationRunner {
             return;
         }
         if (password.length() < 12) throw new IllegalArgumentException("初始教师密码至少12个字符");
-        if (users.existsByRealName(username)) throw new IllegalArgumentException("初始教师用户名与现有姓名冲突");
         User teacher = new User(); teacher.setUsername(username); teacher.setRealName(username);
         teacher.setUserType(User.UserType.TEACHER); teacher.setActive(true);
         teacher.setPasswordHash(passwords.encode(password)); users.save(teacher);

@@ -13,7 +13,7 @@ public class AICapabilityController {
  public Result<Map<String,Object>> capabilities(){
   boolean reports=properties.isEnabled()&&present(properties.getAliyunApiKey());
   boolean tutoring=properties.isEnabled()&&present(properties.getZhipuApiKey());
-  return Result.success(Map.of("reports",reports,"tutoring",tutoring,"notice","AI 建议仅供学习参考，需核实。问题、作答和自述错因会发送至模型服务，请勿填写个人敏感信息。"));
+  return Result.success(Map.of("reports",reports,"tutoring",tutoring,"notice","AI 建议仅供学习参考，需核实。问题和作答会发送至模型服务，请勿填写个人敏感信息。"));
  }
  private boolean present(String key){return key!=null&&!key.isBlank();}
 }

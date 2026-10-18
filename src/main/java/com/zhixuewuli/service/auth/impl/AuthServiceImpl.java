@@ -14,8 +14,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
-import java.util.Optional;
 
 /**
  * 认证服务实现类
@@ -76,16 +74,9 @@ public class AuthServiceImpl implements AuthService {
 
         String loginId = username.trim();
 
-        // 真实姓名优先，未命中再按用户名匹配
-        Optional<User> userOpt = userRepository.findByRealName(loginId);
-        if (userOpt.isEmpty()) {
-            userOpt = userRepository.findByUsername(loginId);
-        }
-        if (userOpt.isEmpty()) {
-            throw new UserNotFoundException();
-        }
-
-        User user = userOpt.get();
+        // 登录标识只有唯一用户名；真实姓名仅用于展示和教师检索。
+        User user = userRepository.findByUsername(loginId)
+                .orElseThrow(UserNotFoundException::new);
 
         // 检查账户状态
         if (!Boolean.TRUE.equals(user.getActive())) {
@@ -132,12 +123,8 @@ public class AuthServiceImpl implements AuthService {
         }
         log.debug("开始处理用户注册请求，用户名: {}", request.getUsername());
 
-        // 验证用户名唯一性
+        // 用户名唯一性只由用户名字段和数据库唯一约束保障。
         if (userRepository.existsByUsername(request.getUsername())) {
-            throw new UserNameDuplicateException(request.getUsername());
-        }
-        // 用户名不得与任何真实姓名重复，避免占用真实姓名登录标识
-        if (userRepository.existsByRealName(request.getUsername())) {
             throw new UserNameDuplicateException(request.getUsername());
         }
 
@@ -153,8 +140,14 @@ public class AuthServiceImpl implements AuthService {
         String encryptedPassword = passwordUtil.encode(request.getPassword());
         newUser.setPasswordHash(encryptedPassword);
 
-        // 保存用户
-        User savedUser = userRepository.save(newUser);
+        // flush 让并发注册的数据库唯一约束冲突在事务内暴露并映射为业务错误。
+        User savedUser;
+        try {
+            savedUser = userRepository.saveAndFlush(newUser);
+        } catch (org.springframework.dao.DataIntegrityViolationException conflict) {
+            com.zhixuewuli.common.util.DatabaseExceptionParserUtil.throwAppropriateBusinessException(conflict);
+            throw conflict;
+        }
 
         log.debug("用户注册成功，用户ID: {}, 用户名: {}", savedUser.getId(), savedUser.getUsername());
 

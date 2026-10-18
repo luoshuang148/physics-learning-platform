@@ -5,9 +5,8 @@
     </div>
 
     <div v-if="shouldShowFriendlyEmpty" class="stream-empty-state">
-      <div class="stream-empty-icon">📝</div>
       <div class="stream-empty-title">当前还没有学生答题记录哦</div>
-      <p class="stream-empty-desc">学生完成答题后，这里会自动生成对应的实验学习报告。</p>
+      <p class="stream-empty-desc">学生完成答题后，这里会自动生成对应的任务学习报告。</p>
     </div>
 
     <!-- 依赖Vue响应式：loading变化时自动重新渲染，表格在结束后会被完整解析 -->
@@ -52,7 +51,7 @@ const friendlyEmptyPatterns = [
   '暂无学生作答记录',
   '还没有学生答题记录',
   '没有学生答题记录',
-  '无法生成实验学习报告',
+  '无法生成任务学习报告',
 ];
 
 const shouldShowFriendlyEmpty = computed(() => {

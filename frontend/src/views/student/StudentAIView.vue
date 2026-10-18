@@ -3,7 +3,7 @@
     <div class="ai-page student-font">
       <section class="ai-hero">
         <div>
-          <span class="ai-kicker">AI study assistant</span>
+          <span class="ai-kicker">AI 学习助手</span>
           <h1 class="ai-title">AI 问答</h1>
           <p class="ai-summary">在同一个页面中完成提问、查看回答与切换问答模式。</p>
         </div>
@@ -125,6 +125,7 @@ const { state, reset } = useAIStreamState();
 
 const links = [
   { label: '首页', to: '/student/home' },
+  { label: '作业', to: '/student/task' },
   { label: '错题本', to: '/student/wrong-book' },
   { label: 'AI 问答', to: '/student/ai' },
   { label: '学习报告', to: '/student/report' },

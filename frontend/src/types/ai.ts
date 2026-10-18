@@ -39,11 +39,9 @@ export interface QuestionStudentErrorDetail {
   className: string;
   userAnswer: string;
   answerTime: string;
-  errorReason: string | null;
 }
 
 export interface TeacherQuestionErrorDetails {
   studentList: QuestionStudentErrorDetail[];
-  wordCloud: Record<string, number>;
 }
 

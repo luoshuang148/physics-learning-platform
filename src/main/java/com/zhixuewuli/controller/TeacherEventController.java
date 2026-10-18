@@ -19,16 +19,16 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 /**
  * 教师事件管理控制器
  * 
- * 提供教师全局事件管理的 RESTful API 接口。
- * 实现事件发布、删除和查询功能，全局事件在整个系统中唯一。
+ * 提供教师教学任务管理的 RESTful API 接口。
+ * 单班内允许并行任务，任务按草稿、已发布、已截止、已归档流转。
  * 
  * <p>
  * 接口设计特点：
  * </p>
  * <ul>
  * <li>无状态设计：所有操作基于 JWT 中的用户身份</li>
- * <li>全局事件唯一：整个系统共享同一个教师事件</li>
- * <li>简洁 API：无需传递事件 ID，操作针对全局事件</li>
+ * <li>并行任务：同一班级可同时存在多个已发布任务</li>
+ * <li>生命周期：草稿、发布、截止、归档</li>
  * <li>标准响应：统一使用 Result 包装响应数据</li>
  * <li>完整文档：集成 Swagger API 文档</li>
  * </ul>
@@ -61,7 +61,7 @@ public class TeacherEventController {
      * 发布教师事件
      * 
      * 教师发布新的学习事件作为时间基准点。
-     * 如果全局事件已存在，将返回 409 Conflict 错误码。
+     * 默认直接发布；传入 status=DRAFT 可保存草稿。
      * 
      * @param request       事件创建请求
      * @param authorization Authorization 头部，包含 JWT 令牌
@@ -80,13 +80,13 @@ public class TeacherEventController {
     @PostMapping
     @Operation(
         summary = "发布教师事件",
-        description = "教师发布新的学习事件作为时间基准点，如果全局事件已存在将返回 409 错误码",
+        description = "教师创建教学任务，默认直接发布，也可以保存为草稿",
         responses = {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "201", description = "发布成功"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "参数错误"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "未认证"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "权限不足（非教师身份）"),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "409", description = "全局事件已存在")
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "任务参数不合法")
         }
     )
     @ResponseStatus(HttpStatus.CREATED)
@@ -94,7 +94,7 @@ public class TeacherEventController {
             @io.swagger.v3.oas.annotations.Parameter(description = "事件创建请求参数", required = true) @RequestBody @Valid TeacherEventCreateRequest request,
             HttpServletRequest httpRequest) {
     
-        log.info("收到发布全局事件请求");
+        log.info("收到创建教学任务请求");
     
         // 从请求属性中获取用户 ID（由拦截器解析 JWT 提供）
         Long currentUserId = (Long) httpRequest.getAttribute("userId");
@@ -106,7 +106,7 @@ public class TeacherEventController {
     /**
      * 删除当前事件
      * 
-     * 归档当前事件，保留学习记录和报告。
+     * 归档最新发布任务，保留学习记录和报告。
      * 删除操作幂等：事件不存在也视为成功。
      * 
      * @param authorization Authorization 头部，包含 JWT 令牌
@@ -119,8 +119,8 @@ public class TeacherEventController {
      */
     @DeleteMapping
     @Operation(
-        summary = "归档当前事件",
-        description = "归档当前事件并保留学习数据，操作幂等",
+        summary = "归档最新发布任务",
+        description = "兼容旧入口：归档最新发布任务并保留学习数据，操作幂等",
         responses = {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "删除成功"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "未认证"),
@@ -129,7 +129,7 @@ public class TeacherEventController {
     )
     public Result<Void> deleteCurrentEvent(HttpServletRequest httpRequest, @RequestParam Long expectedEventId) {
     
-        log.info("收到删除全局事件请求");
+        log.info("收到归档任务请求");
     
         // 从请求属性中获取用户 ID（由拦截器解析 JWT 提供）
         Long currentUserId = (Long) httpRequest.getAttribute("userId");
@@ -141,7 +141,7 @@ public class TeacherEventController {
     /**
      * 查询当前事件
      * 
-     * 查询全局事件信息。所有认证用户可访问。
+     * 查询最新发布任务，用于兼容旧调用；新前端使用 /all 或 /available。
      * 如果事件不存在，将返回 null 数据。
      * 
      * @param authorization Authorization 头部，包含 JWT 令牌
@@ -155,7 +155,7 @@ public class TeacherEventController {
     @GetMapping
     @Operation(
         summary = "查询当前事件",
-        description = "查询全局事件信息，所有认证用户可访问，如果事件不存在则 data 为 null",
+        description = "查询最新发布任务，用于兼容旧调用；不存在时 data 为 null",
         responses = {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "查询成功"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "未认证")
@@ -163,17 +163,49 @@ public class TeacherEventController {
     )
     public Result<TeacherEventResponse> getCurrentEvent(HttpServletRequest httpRequest) {
 
-        log.info("收到查询全局事件请求");
+        log.info("收到查询最新任务请求");
 
         // 不再需要传递 userId，直接调用 getGlobalEvent()
         TeacherEventResponse response = teacherEventService.getGlobalEvent();
         return Result.success(response);
     }
 
+    @GetMapping("/all")
+    @Operation(summary = "教师任务列表", description = "返回当前教师所有未归档任务，支持并行任务管理")
+    public Result<java.util.List<TeacherEventResponse>> allTasks(HttpServletRequest request) {
+        return Result.success(teacherEventService.listTeacherTasks((Long) request.getAttribute("userId")));
+    }
+
+    @GetMapping("/available")
+    @Operation(summary = "学生可用任务列表", description = "返回已发布任务，包含未开始、进行中和已截止状态")
+    public Result<java.util.List<TeacherEventResponse>> availableTasks(HttpServletRequest request) {
+        return Result.success(teacherEventService.listStudentTasks((Long) request.getAttribute("userId")));
+    }
+
+    @PutMapping("/{id}/draft")
+    public Result<TeacherEventResponse> updateDraft(@PathVariable Long id, @Valid @RequestBody TeacherEventCreateRequest payload,
+            HttpServletRequest request) {
+        return Result.success(teacherEventService.updateDraft(id, payload, (Long) request.getAttribute("userId")));
+    }
+
+    @PostMapping("/{id}/publish")
+    public Result<TeacherEventResponse> publishDraft(@PathVariable Long id, HttpServletRequest request) {
+        return Result.success(teacherEventService.publishTask(id, (Long) request.getAttribute("userId")));
+    }
+
+    @PostMapping("/{id}/close")
+    public Result<TeacherEventResponse> closeTask(@PathVariable Long id, HttpServletRequest request) {
+        return Result.success(teacherEventService.closeTask(id, (Long) request.getAttribute("userId")));
+    }
+
     @GetMapping("/{id}")
-    public Result<TeacherEventResponse> getEvent(@PathVariable Long id){return Result.success(teacherEventService.getEvent(id));}
+    public Result<TeacherEventResponse> getEvent(@PathVariable Long id, HttpServletRequest request){
+        return Result.success(teacherEventService.getEvent(id, (Long) request.getAttribute("userId")));
+    }
     @GetMapping("/{id}/questions")
-    public Result<java.util.List<com.zhixuewuli.dto.response.QuestionResponse>> getQuestions(@PathVariable Long id){return Result.success(teacherEventService.getEventQuestions(id));}
+    public Result<java.util.List<com.zhixuewuli.dto.response.QuestionResponse>> getQuestions(@PathVariable Long id,HttpServletRequest request){
+        return Result.success(teacherEventService.getEventQuestions(id,(Long)request.getAttribute("userId")));
+    }
     @PutMapping("/{id}/replace")
     public Result<TeacherEventResponse> replace(@PathVariable Long id,@Valid @RequestBody TeacherEventCreateRequest payload,HttpServletRequest request){
         return Result.success(teacherEventService.replaceEvent(id,payload,(Long)request.getAttribute("userId")));

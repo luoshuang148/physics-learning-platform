@@ -504,13 +504,11 @@ public class QuestionErrorAnalysisControllerIntegrationTest extends BaseControll
                                 .andExpect(jsonPath("$.code").value(200))
                                 .andExpect(jsonPath("$.data.studentList").isArray())
                                 .andExpect(jsonPath("$.data.studentList.length()").value(3)) // 3 个错误学生
-                                .andExpect(jsonPath("$.data.wordCloud").isMap())
                                 .andExpect(jsonPath("$.data.studentList[0].userId").exists())
                                 .andExpect(jsonPath("$.data.studentList[0].studentName").exists())
                                 .andExpect(jsonPath("$.data.studentList[0].className").exists())
                                 .andExpect(jsonPath("$.data.studentList[0].userAnswer").exists())
-                                .andExpect(jsonPath("$.data.studentList[0].answerTime").exists())
-                                .andExpect(jsonPath("$.data.studentList[0].errorReason").exists());
+                                .andExpect(jsonPath("$.data.studentList[0].answerTime").exists());
         }
 
         @DisplayName("获取题目错误详情 - 无错误记录")
@@ -526,8 +524,7 @@ public class QuestionErrorAnalysisControllerIntegrationTest extends BaseControll
                                 .andExpect(status().isOk())
                                 .andExpect(jsonPath("$.code").value(200))
                                 .andExpect(jsonPath("$.data.studentList").isArray())
-                                .andExpect(jsonPath("$.data.studentList.length()").value(0))
-                                .andExpect(jsonPath("$.data.wordCloud").isMap());
+                                .andExpect(jsonPath("$.data.studentList.length()").value(0));
         }
 
         @DisplayName("获取题目错误详情失败 - 题目不存在")

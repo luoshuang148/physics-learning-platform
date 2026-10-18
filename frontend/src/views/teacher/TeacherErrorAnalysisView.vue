@@ -3,7 +3,6 @@
 
     <div v-if="loading" class="page-loading">加载数据中…</div>
     <div v-else-if="summary.length === 0" class="page-empty">
-      <div class="empty-icon">📊</div>
       <p>暂无题目分析数据</p>
       <p class="empty-sub">学生答题后将在此显示错误统计</p>
     </div>
@@ -26,7 +25,7 @@
             <div class="rail-item-top">
               <span class="rail-badge">#{{ item.questionId }}</span>
               <div class="rail-item-actions" @click.stop>
-                <button class="rail-ai-btn" title="AI分析" @click="openAIAnalysis(item)">🤖 AI分析</button>
+                <button class="rail-ai-btn" title="AI分析" @click="openAIAnalysis(item)">AI 分析</button>
                 <span class="rail-rate" :class="rateClass(item.errorRate)">{{ item.errorRate?.toFixed(0) }}%</span>
               </div>
             </div>
@@ -45,7 +44,7 @@
               <span class="qcard-id">#{{ selected.questionId }}</span>
               <span class="qcard-diff" v-if="selected.difficulty">难度 {{ selected.difficulty }}</span>
               <span class="qcard-count">错 {{ selected.errorCount }} 人 · 对 {{ selected.correctCount }} 人</span>
-              <button class="qcard-ai-btn" @click="openAIAnalysis(selected)">🤖 AI分析</button>
+              <button class="qcard-ai-btn" @click="openAIAnalysis(selected)">AI 分析</button>
               <span class="qcard-rate" :class="rateClass(selected.errorRate)">错误率 {{ selected.errorRate?.toFixed(1) }}%</span>
             </div>
             <div class="qcard-content"><LatexText :content="selected.content" /></div>
@@ -90,18 +89,6 @@
             </div>
           </div>
 
-          <div class="wordcloud-card" v-if="wordCloudTop.length">
-            <div class="wc-head">高频错误关键词</div>
-            <div class="wc-body">
-              <span
-                v-for="entry in wordCloudTop"
-                :key="entry[0]"
-                class="wc-word"
-                :style="wordStyle(entry[1])"
-              >{{ entry[0] }}</span>
-            </div>
-          </div>
-
           <div class="student-card">
             <div class="student-head">
               <span class="student-title">学生作答记录</span>
@@ -117,7 +104,7 @@
             </div>
             <div class="student-table">
               <div class="student-table-head">
-                <span>姓名</span><span>班级</span><span>选项</span><span>作答时间</span><span>错误原因</span>
+                <span>姓名</span><span>班级</span><span>选项</span><span>作答时间</span>
               </div>
               <div v-if="loadingDetail" class="student-loading">加载中…</div>
               <template v-else>
@@ -130,7 +117,6 @@
                   <span class="s-class">{{ s.className || '—' }}</span>
                   <span class="s-ans wrong-ans">{{ s.userAnswer }}</span>
                   <span class="s-time">{{ formatTime(s.answerTime) }}</span>
-                  <span class="s-reason">{{ s.errorReason || '未填写' }}</span>
                 </div>
                 <div v-if="filteredStudents.length === 0" class="student-empty">无匹配记录</div>
               </template>
@@ -236,7 +222,7 @@
                     :disabled="aiState.loading || !speechSupported"
                     :title="speechSupported ? (speechListening ? '停止语音输入' : '语音输入') : '浏览器不支持语音输入'"
                     @click="toggleSpeechInput"
-                  >🎤</button>
+                  >语音</button>
                 </div>
                 <button
                   v-if="aiState.loading"
@@ -351,13 +337,6 @@ const previewOptions = (options?: Record<string, string>) => {
   return Object.entries(options).map(([key, text]) => ({ key, text: text ?? '' }));
 };
 
-const wordCloudTop = computed(() => {
-  if (!details.value) return [] as [string, number][];
-  return Object.entries(details.value.wordCloud)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 24);
-});
-
 const answerDist = computed<Record<string, number>>(() => {
   if (!details.value || !selected.value) return {};
   const dist: Record<string, number> = {};
@@ -443,20 +422,6 @@ const rateClass = (rate: number | null | undefined) => {
   if (rate >= 60) return 'rate-high';
   if (rate >= 30) return 'rate-mid';
   return 'rate-low';
-};
-
-const wordStyle = (count: number) => {
-  const max = wordCloudTop.value[0]?.[1] ?? 1;
-  const ratio = count / max;
-  const size = 12 + Math.round(ratio * 22);
-  const opacity = 0.45 + ratio * 0.55;
-  const hue = Math.round(220 + ratio * 40);
-  return {
-    fontSize: `${size}px`,
-    opacity,
-    color: `hsl(${hue}, 80%, 75%)`,
-    fontWeight: ratio > 0.6 ? '700' : '400',
-  };
 };
 
 const formatTime = (t: string) =>
@@ -827,17 +792,6 @@ onBeforeUnmount(() => {
 .dist-pct { font-size: 12px; font-weight: 600; color: var(--text-muted); width: 36px; text-align: right; flex-shrink: 0; }
 .dist-n { font-size: 11px; color: var(--text-muted); opacity: 0.4; flex-shrink: 0; }
 
-.wordcloud-card {
-  border: 1px solid rgba(151,172,249,0.15);
-  border-radius: 12px;
-  padding: 14px 16px;
-  background: rgba(255,255,255,0.01);
-}
-.wc-head { font-size: 12px; font-weight: 600; color: var(--text-muted); letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 12px; }
-.wc-body { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: baseline; padding: 4px 0; }
-.wc-word { cursor: default; transition: opacity 0.2s; line-height: 1.4; }
-.wc-word:hover { opacity: 1 !important; }
-
 .student-card {
   border: 1px solid rgba(151,172,249,0.15);
   border-radius: 14px;
@@ -871,7 +825,7 @@ onBeforeUnmount(() => {
 .student-table { overflow-x: auto; }
 .student-table-head {
   display: grid;
-  grid-template-columns: 1fr 0.8fr 0.5fr 1.1fr 1.6fr;
+  grid-template-columns: 1fr 0.8fr 0.5fr 1.1fr;
   padding: 7px 14px;
   background: rgba(151,172,249,0.04);
   border-bottom: 1px solid rgba(151,172,249,0.06);
@@ -882,7 +836,7 @@ onBeforeUnmount(() => {
 }
 .student-row {
   display: grid;
-  grid-template-columns: 1fr 0.8fr 0.5fr 1.1fr 1.6fr;
+  grid-template-columns: 1fr 0.8fr 0.5fr 1.1fr;
   padding: 9px 14px;
   border-bottom: 1px solid rgba(255,255,255,0.03);
   font-size: 12px;
@@ -896,7 +850,6 @@ onBeforeUnmount(() => {
 .s-ans { font-family: monospace; font-weight: 700; }
 .wrong-ans { color: rgba(255,120,100,0.9); }
 .s-time { color: var(--text-muted); font-size: 11px; }
-.s-reason { color: var(--text-muted); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .dialog-mask {
   position: fixed;

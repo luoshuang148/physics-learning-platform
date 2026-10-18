@@ -2,7 +2,6 @@ package com.zhixuewuli.service.unit;
 
 import com.zhixuewuli.common.exception.InsufficientPermissionException;
 import com.zhixuewuli.common.exception.auth.UserNotFoundException;
-import com.zhixuewuli.common.exception.teacherevent.EventAlreadyExistsException;
 import com.zhixuewuli.common.util.UserPermissionUtil;
 import com.zhixuewuli.dto.request.TeacherEventCreateRequest;
 import com.zhixuewuli.dto.response.TeacherEventResponse;
@@ -94,7 +93,6 @@ class TeacherEventServiceUnitTest {
     void publishEvent_shouldCreateEvent_whenValidRequest() {
         // Given
         doNothing().when(userPermissionUtil).checkTeacherPermission(teacherId);
-        when(teacherEventRepository.existsByIsGlobalTrue()).thenReturn(false);
         when(userRepository.findById(teacherId)).thenReturn(Optional.of(mockTeacher));
         when(teacherEventRepository.saveAndFlush(any(TeacherEvent.class))).thenReturn(mockEvent);
 
@@ -110,7 +108,6 @@ class TeacherEventServiceUnitTest {
         assertThat(result.getEventDescription()).isEqualTo("2026 年春季学期正式开始");
 
         verify(userPermissionUtil).checkTeacherPermission(teacherId);
-        verify(teacherEventRepository).existsByIsGlobalTrue();
         verify(userRepository).findById(teacherId);
         verify(teacherEventRepository).saveAndFlush(any(TeacherEvent.class));
     }
@@ -126,33 +123,28 @@ class TeacherEventServiceUnitTest {
                 .isInstanceOf(InsufficientPermissionException.class);
 
         verify(userPermissionUtil).checkTeacherPermission(teacherId);
-        verify(teacherEventRepository, never()).existsByIsGlobalTrue();
         verify(userRepository, never()).findById(anyLong());
         verify(teacherEventRepository, never()).saveAndFlush(any(TeacherEvent.class));
     }
 
     @Test
-    void publishEvent_shouldThrowEventAlreadyExistsException_whenEventAlreadyExists() {
-        // Given
+    void publishEvent_shouldAllowParallelTasks_whenPublishedTaskExists() {
         doNothing().when(userPermissionUtil).checkTeacherPermission(teacherId);
-        when(teacherEventRepository.existsByIsGlobalTrue()).thenReturn(true);
+        when(userRepository.findById(teacherId)).thenReturn(Optional.of(mockTeacher));
+        when(teacherEventRepository.saveAndFlush(any(TeacherEvent.class))).thenReturn(mockEvent);
 
-        // When & Then
-        assertThatThrownBy(() -> teacherEventService.publishEvent(createRequest, teacherId))
-                .isInstanceOf(EventAlreadyExistsException.class)
-                .hasMessageContaining("全局事件已存在");
+        TeacherEventResponse result = teacherEventService.publishEvent(createRequest, teacherId);
 
+        assertThat(result).isNotNull();
         verify(userPermissionUtil).checkTeacherPermission(teacherId);
-        verify(teacherEventRepository).existsByIsGlobalTrue();
-        verify(userRepository, never()).findById(anyLong());
-        verify(teacherEventRepository, never()).saveAndFlush(any(TeacherEvent.class));
+        verify(userRepository).findById(teacherId);
+        verify(teacherEventRepository).saveAndFlush(any(TeacherEvent.class));
     }
 
     @Test
     void publishEvent_shouldThrowUserNotFoundException_whenTeacherNotFound() {
         // Given
         doNothing().when(userPermissionUtil).checkTeacherPermission(teacherId);
-        when(teacherEventRepository.existsByIsGlobalTrue()).thenReturn(false);
         when(userRepository.findById(teacherId)).thenReturn(Optional.empty());
 
         // When & Then
@@ -161,7 +153,6 @@ class TeacherEventServiceUnitTest {
                 .hasMessage("用户不存在");
 
         verify(userPermissionUtil).checkTeacherPermission(teacherId);
-        verify(teacherEventRepository).existsByIsGlobalTrue();
         verify(userRepository).findById(teacherId);
         verify(teacherEventRepository, never()).saveAndFlush(any(TeacherEvent.class));
     }
@@ -170,7 +161,6 @@ class TeacherEventServiceUnitTest {
     void deleteCurrentEvent_shouldDeleteEvent_whenEventExists() {
         // Given
         doNothing().when(userPermissionUtil).checkTeacherPermission(teacherId);
-        when(teacherEventRepository.existsByIsGlobalTrue()).thenReturn(true);
         when(teacherEventRepository.findByIsGlobalTrue()).thenReturn(Optional.of(mockEvent));
 
         // When
@@ -178,7 +168,6 @@ class TeacherEventServiceUnitTest {
 
         // Then
         verify(userPermissionUtil).checkTeacherPermission(teacherId);
-        verify(teacherEventRepository).existsByIsGlobalTrue();
         assertThat(mockEvent.getIsGlobal()).isFalse();
         verify(teacherEventRepository).saveAndFlush(mockEvent);
         verify(answerRecordRepository, never()).deleteAll();
@@ -190,14 +179,13 @@ class TeacherEventServiceUnitTest {
     void deleteCurrentEvent_shouldDoNothing_whenEventNotExists() {
         // Given
         doNothing().when(userPermissionUtil).checkTeacherPermission(teacherId);
-        when(teacherEventRepository.existsByIsGlobalTrue()).thenReturn(false);
+        when(teacherEventRepository.findByIsGlobalTrue()).thenReturn(Optional.empty());
 
         // When
         teacherEventService.deleteCurrentEvent(teacherId);
 
         // Then
         verify(userPermissionUtil).checkTeacherPermission(teacherId);
-        verify(teacherEventRepository).existsByIsGlobalTrue();
         verify(teacherEventRepository, never()).deleteAllEvents();
         verify(answerRecordRepository, never()).deleteAll();
         verify(conversationHistoryRepository, never()).deleteAll();
@@ -215,7 +203,6 @@ class TeacherEventServiceUnitTest {
                 .isInstanceOf(InsufficientPermissionException.class);
 
         verify(userPermissionUtil).checkTeacherPermission(teacherId);
-        verify(teacherEventRepository, never()).existsByIsGlobalTrue();
         verify(teacherEventRepository, never()).deleteAllEvents();
     }
 
@@ -257,7 +244,6 @@ class TeacherEventServiceUnitTest {
         createRequest.setEventDescription(null);
 
         doNothing().when(userPermissionUtil).checkTeacherPermission(teacherId);
-        when(teacherEventRepository.existsByIsGlobalTrue()).thenReturn(false);
         when(userRepository.findById(teacherId)).thenReturn(Optional.of(mockTeacher));
         when(teacherEventRepository.saveAndFlush(any(TeacherEvent.class))).thenReturn(mockEvent);
 
@@ -275,7 +261,6 @@ class TeacherEventServiceUnitTest {
         createRequest.setEventDescription("");
 
         doNothing().when(userPermissionUtil).checkTeacherPermission(teacherId);
-        when(teacherEventRepository.existsByIsGlobalTrue()).thenReturn(false);
         when(userRepository.findById(teacherId)).thenReturn(Optional.of(mockTeacher));
         when(teacherEventRepository.saveAndFlush(any(TeacherEvent.class))).thenReturn(mockEvent);
 

@@ -1,124 +1,66 @@
 package com.zhixuewuli.repository;
 
 import com.zhixuewuli.entity.TeacherEvent;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
+import jakarta.persistence.LockModeType;
+import java.util.List;
 import java.util.Optional;
 
-/**
- * 教师事件数据访问接口
- * 
- * 提供教师事件的增删改查操作，包括全局事件的查询和删除操作。
- * 
- * @author 智学物理开发团队
- * @version 1.0.0
- * @since 2026
- * @see TeacherEvent 教师事件实体类
- */
 @Repository
 public interface TeacherEventRepository extends JpaRepository<TeacherEvent, Long> {
-    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select e from TeacherEvent e where e.id=:id")
     Optional<TeacherEvent> lockById(@Param("id") Long id);
-    org.springframework.data.domain.Page<TeacherEvent> findByIsGlobalFalse(org.springframework.data.domain.Pageable page);
 
+    /** Multiple first attempts may read the task concurrently; close/archive waits for them. */
+    @Lock(LockModeType.PESSIMISTIC_READ)
+    @Query("select e from TeacherEvent e where e.id=:id")
+    Optional<TeacherEvent> lockSharedById(@Param("id") Long id);
 
-    /**
-     * 根据教师 ID 查找事件
-     * 
-     * <p>查询指定教师的最新事件记录。</p>
-     * 
-     * <p><strong>查询条件：</strong>teacherId = ?1</p>
-     * 
-     * @param teacherId 教师 ID
-     * @return Optional<TeacherEvent> 事件对象（如果存在）
-     */
+    /** Legacy single-task compatibility: newest published task. */
+    @Query(value = "select * from teacher_events where status='PUBLISHED' order by created_at desc, id desc limit 1", nativeQuery = true)
+    Optional<TeacherEvent> findByIsGlobalTrue();
+
+    @Query("select count(e) > 0 from TeacherEvent e where e.status = com.zhixuewuli.entity.TeacherEvent.Status.PUBLISHED")
+    boolean existsByIsGlobalTrue();
+
+    /** Legacy history endpoint: archived tasks. */
+    @Query("select e from TeacherEvent e where e.status = com.zhixuewuli.entity.TeacherEvent.Status.ARCHIVED")
+    Page<TeacherEvent> findByIsGlobalFalse(Pageable page);
+
+    List<TeacherEvent> findByStatusNotOrderByCreatedAtDesc(TeacherEvent.Status status);
+
+    List<TeacherEvent> findByStatusOrderByCreatedAtDesc(TeacherEvent.Status status);
+
+    List<TeacherEvent> findByStatusOrderByStartAtAscCreatedAtDesc(TeacherEvent.Status status);
+
+    @Query("select e from TeacherEvent e where e.status = com.zhixuewuli.entity.TeacherEvent.Status.PUBLISHED order by e.createdAt desc, e.id desc")
+    List<TeacherEvent> findPublishedTasks();
+
+    long countByStatus(TeacherEvent.Status status);
+
+    long countByStatusNot(TeacherEvent.Status status);
+
+    /** Legacy helper kept for older tests/callers; prefer lists in new code. */
     Optional<TeacherEvent> findByTeacherId(Long teacherId);
 
-    /**
-     * 检查教师是否存在事件
-     * 
-     * <p>验证指定教师是否已经发布了事件。</p>
-     * 
-     * <p><strong>查询条件：</strong>teacherId = ?1</p>
-     * 
-     * @param teacherId 教师 ID
-     * @return boolean 是否存在事件
-     */
     boolean existsByTeacherId(Long teacherId);
 
-    /**
-     * 删除指定教师的事件
-     * 
-     * <p>删除指定教师的所有事件记录。</p>
-     * 
-     * <p><strong>JPQL 查询逻辑：</strong></p>
-     * <pre>{@code
-     * DELETE FROM TeacherEvent te 
-     * WHERE te.teacherId = :teacherId  -- 教师 ID 匹配
-     * }</pre>
-     * 
-     * <p><strong>事务说明：</strong>使用 {@link Modifying} 和 {@link Transactional} 注解确保数据一致性</p>
-     * 
-     * @param teacherId 教师 ID
-     * @return int 删除的记录数
-     * 
-     * @see Modifying 修改操作注解
-     * @see Transactional 事务管理注解
-     */
     @Modifying
     @Transactional
     @Query("DELETE FROM TeacherEvent te WHERE te.teacherId = :teacherId")
     int deleteByTeacherId(@Param("teacherId") Long teacherId);
 
-    // ==================== 全局事件相关方法（新增） ====================
-
-    /**
-     * 查询全局事件
-     * 
-     * <p>查找 is_global=true 的事件记录。</p>
-     * 
-     * <p><strong>查询条件：</strong>isGlobal = true</p>
-     * 
-     * @return Optional<TeacherEvent> 全局事件对象（如果存在）
-     */
-    Optional<TeacherEvent> findByIsGlobalTrue();
-
-    /**
-     * 检查全局事件是否存在
-     * 
-     * <p>验证系统中是否已经发布了全局事件。</p>
-     * 
-     * <p><strong>查询条件：</strong>isGlobal = true</p>
-     * 
-     * @return boolean 是否存在全局事件
-     */
-    boolean existsByIsGlobalTrue();
-
-    /**
-     * 删除所有事件
-     * 
-     * <p>删除表中的所有事件记录（用于全局事件删除场景）。</p>
-     * 
-     * <p><strong>JPQL 查询逻辑：</strong></p>
-     * <pre>{@code
-     * DELETE FROM TeacherEvent  -- 无条件删除所有记录
-     * }</pre>
-     * 
-     * <p><strong>事务说明：</strong>使用 {@link Modifying} 和 {@link Transactional} 注解确保数据一致性</p>
-     * 
-     * <p><strong>警告：</strong>此方法会删除所有数据，谨慎使用！</p>
-     * 
-     * @return int 删除的记录数
-     * 
-     * @see Modifying 修改操作注解
-     * @see Transactional 事务管理注解
-     */
     @Modifying
     @Transactional
     @Query("DELETE FROM TeacherEvent")

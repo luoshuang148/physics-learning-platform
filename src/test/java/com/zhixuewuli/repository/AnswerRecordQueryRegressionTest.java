@@ -19,7 +19,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 @ActiveProfiles("test")
 @Tag("integration-repository")
 @Import({com.zhixuewuli.service.teacherEvent.TaskQuestionService.class, AnswerRecordServiceImpl.class, UserPermissionUtil.class, QuestionResponseConverter.class,
-        OptionMappingUtil.class, ObjectMapper.class})
+        OptionMappingUtil.class, ObjectMapper.class, com.zhixuewuli.service.question.AnswerAccessPolicy.class,
+        com.zhixuewuli.service.question.QuestionImageStore.class})
 class AnswerRecordQueryRegressionTest {
     @Autowired EntityManager em;
     @Autowired AnswerRecordServiceImpl service;

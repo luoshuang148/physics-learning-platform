@@ -5,10 +5,10 @@ import router from './router';
 import './style.css';
 import 'katex/dist/katex.min.css';
 
-const FONT_SIZE_STORAGE_KEY = 'zxwl-font-scale';
-const FONT_SIZE_MIN = 16;
-const FONT_SIZE_MAX = 20;
-const DEFAULT_FONT_SIZE = 18;
+const FONT_SIZE_STORAGE_KEY = 'zxwl-font-scale-v2';
+const FONT_SIZE_MIN = 13;
+const FONT_SIZE_MAX = 18;
+const DEFAULT_FONT_SIZE = 15;
 
 const normalizeFontSize = (value: number) => Math.min(FONT_SIZE_MAX, Math.max(FONT_SIZE_MIN, value));
 

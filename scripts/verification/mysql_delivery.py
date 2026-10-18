@@ -27,7 +27,16 @@ if args.phase=='upgrade':
     INSERT INTO answer_records(id,user_id,question_id,session_id,selected_option,correct,answered_at) VALUES('migration-attempt',920001,920001,'legacy','B',false,CURRENT_TIMESTAMP);""",'zhixuewuli')
     file('src/main/resources/sql/upgrades/V2__archive_teaching_events.sql','zhixuewuli')
     file('src/main/resources/sql/upgrades/V3__task_snapshots_and_attempts.sql','zhixuewuli')
+    file('src/main/resources/sql/upgrades/V4__content_addressed_question_images.sql','zhixuewuli')
+    file('src/main/resources/sql/upgrades/V5__remove_retired_learning_features.sql','zhixuewuli')
+    file('src/main/resources/sql/upgrades/V6__parallel_assignments_lifecycle.sql','zhixuewuli')
     assert sql('SELECT GROUP_CONCAT(snapshot_origin ORDER BY position_number) FROM teacher_event_questions','zhixuewuli')=='MIGRATED,MISSING'
+    assert sql("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA='zhixuewuli' AND TABLE_NAME='teacher_events' AND COLUMN_NAME IN ('status','start_at','due_at')",'zhixuewuli')=='3'
+    assert sql("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA='zhixuewuli' AND TABLE_NAME='teacher_events' AND COLUMN_NAME IN ('is_global','active_slot')",'zhixuewuli')=='0'
+    assert sql("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA='zhixuewuli' AND COLUMN_NAME IN ('error_reason','explanation_video_mapping')",'zhixuewuli')=='0'
+    assert sql("SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA='zhixuewuli' AND TABLE_NAME IN ('videos','experiments')",'zhixuewuli')=='0'
+    assert sql("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA='zhixuewuli' AND TABLE_NAME='answer_records' AND COLUMN_NAME='image_ref'",'zhixuewuli')=='1'
+    assert sql("SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA='zhixuewuli' AND TABLE_NAME='question_images'",'zhixuewuli')=='1'
     assert sql("SELECT CONCAT(practice,':',attempt_order) FROM answer_records WHERE id='migration-attempt'",'zhixuewuli')=='1:1'
     assert sql('SELECT event_description FROM teacher_events WHERE id=920001','zhixuewuli')=='QIDS:920001,920002,920001'
     assert sql('SELECT COUNT(*) FROM teacher_event_questions WHERE event_id=920002','zhixuewuli')=='0'

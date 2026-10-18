@@ -9,4 +9,7 @@ public interface TeacherEventQuestionRepository extends JpaRepository<TeacherEve
  List<Long> findQuestionIdsByEventId(@org.springframework.data.repository.query.Param("id") Long id);
  List<TeacherEventQuestion> findByEventIdOrderByPositionNumberAsc(Long eventId);
  Optional<TeacherEventQuestion> findByEventIdAndQuestionId(Long eventId,Long questionId);
+ @org.springframework.data.jpa.repository.Modifying
+ @org.springframework.data.jpa.repository.Query("delete from TeacherEventQuestion q where q.eventId=:eventId")
+ void deleteByEventId(@org.springframework.data.repository.query.Param("eventId") Long eventId);
 }

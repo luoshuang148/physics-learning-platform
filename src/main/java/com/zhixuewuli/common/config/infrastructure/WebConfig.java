@@ -4,15 +4,11 @@ import com.zhixuewuli.common.config.properties.SecurityProperties;
 import com.zhixuewuli.common.interceptor.SessionIdInterceptor;
 import com.zhixuewuli.common.interceptor.UserIdInterceptor;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
-import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.ViewControllerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
-
-import java.io.File;
 
 /**
  * Web MVC配置类
@@ -27,7 +23,6 @@ import java.io.File;
  * <li><strong>CORS配置</strong>: 允许跨域请求，支持前后端分离架构</li>
  * <li><strong>拦截器配置</strong>: 注册认证拦截器，保护API安全</li>
  * <li><strong>路径排除</strong>: 为公开接口和文档接口设置白名单</li>
- * <li><strong>静态资源映射</strong>: 配置视频等静态资源的访问路径</li>
  * </ul>
  * 
  * <p>
@@ -52,12 +47,6 @@ public class WebConfig implements WebMvcConfigurer {
     private final SessionIdInterceptor sessionIdInterceptor;
     private final SecurityProperties securityProperties;
 
-    @Value("${app.video.storage-path}")
-    private String videoStoragePath;
-
-    @Value("${app.video.access-path}")
-    private String videoAccessPath;
-
     @Override
     public void addCorsMappings(CorsRegistry registry) {
         registry.addMapping("/**")
@@ -67,13 +56,6 @@ public class WebConfig implements WebMvcConfigurer {
                 .exposedHeaders("X-Session-Id")
                 .allowCredentials(securityProperties.isCorsAllowCredentials())
                 .maxAge(securityProperties.getCorsMaxAge());
-    }
-
-    @Override
-    public void addResourceHandlers(ResourceHandlerRegistry registry) {
-        // 视频静态资源访问映射
-        registry.addResourceHandler(videoAccessPath + "/**")
-                .addResourceLocations("file:" + videoStoragePath + File.separator);
     }
 
     @Override

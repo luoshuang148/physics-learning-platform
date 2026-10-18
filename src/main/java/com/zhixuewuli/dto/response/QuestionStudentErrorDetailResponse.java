@@ -59,6 +59,4 @@ public class QuestionStudentErrorDetailResponse {
     @Schema(description = "答题时间")
     private LocalDateTime answerTime;
 
-    @Schema(description = "错误原因")
-    private String errorReason;
 }

@@ -127,9 +127,9 @@ public class TeacherEventControllerIntegrationTest extends BaseControllerIntegra
                 assertThat(teacherEventRepository.findByIsGlobalTrue().get().getIsGlobal()).isTrue();
         }
 
-        @DisplayName("发布教师事件 - 事件已存在")
+        @DisplayName("发布教师事件 - 已存在任务时仍可并行创建")
         @Test
-        void testPublishEvent_EventAlreadyExists() throws Exception {
+        void testPublishEvent_AllowsParallelTask() throws Exception {
                 // Given: 已有事件的教师尝试发布新事件
                 TeacherEventCreateRequest request = new TeacherEventCreateRequest();
                 request.setEventTitle("新事件");
@@ -144,9 +144,9 @@ public class TeacherEventControllerIntegrationTest extends BaseControllerIntegra
                                                 createAuthHeader(TEACHER_WITH_EVENT_ID, TEACHER_WITH_EVENT_USERNAME)))
                                 .andDo(print());
 
-                // Then: 验证事件已存在错误（4702）
-                result.andExpect(status().is4xxClientError())
-                                .andExpect(jsonPath("$.code").value(4702));
+                // Then: 单班多任务允许并行创建
+                result.andExpect(status().isCreated())
+                                .andExpect(jsonPath("$.code").value(201));
         }
 
         @DisplayName("发布教师事件 - 非教师用户")
@@ -564,14 +564,12 @@ public class TeacherEventControllerIntegrationTest extends BaseControllerIntegra
                                                 createAuthHeader(TEACHER_NO_EVENT_ID, TEACHER_NO_EVENT_USERNAME)))
                                 .andDo(print());
 
-                // Then: 第二次应该失败 (返回 410/4702 事件已存在)
-                result2.andExpect(status().is4xxClientError())
-                                .andExpect(jsonPath("$.code").value(4702)); // EventAlreadyExistsException
+                // Then: 第二次同样成功，允许并行任务
+                result2.andExpect(status().isCreated())
+                                .andExpect(jsonPath("$.code").value(201));
 
-                // 最终验证：数据库中只有一条全局事件
-                assertThat(teacherEventRepository.findByIsGlobalTrue()).isPresent();
-                assertThat(teacherEventRepository.findByIsGlobalTrue().get().getEventTitle())
-                                .isEqualTo("并发测试事件");
+                assertThat(teacherEventRepository.findByStatusOrderByCreatedAtDesc(
+                                com.zhixuewuli.entity.TeacherEvent.Status.PUBLISHED)).hasSizeGreaterThanOrEqualTo(2);
         }
 
         @DisplayName("全局事件唯一性 - 不同教师快速连续发布")
@@ -608,13 +606,10 @@ public class TeacherEventControllerIntegrationTest extends BaseControllerIntegra
                                                 createAuthHeader(TEACHER_WITH_EVENT_ID, TEACHER_WITH_EVENT_USERNAME)))
                                 .andDo(print());
 
-                // Then: 教师 B 应该失败 (事件已存在)
-                result2.andExpect(status().is4xxClientError())
-                                .andExpect(jsonPath("$.code").value(4702));
-
-                // 最终验证：数据库中只有一条全局事件
-                assertThat(teacherEventRepository.findByIsGlobalTrue()).isPresent();
-                assertThat(teacherEventRepository.count()).isEqualTo(2L);
+                // Then: 不同教师也可以各自创建任务
+                result2.andExpect(status().isCreated())
+                                .andExpect(jsonPath("$.code").value(201));
+                assertThat(teacherEventRepository.count()).isGreaterThanOrEqualTo(2L);
         }
         @org.springframework.beans.factory.annotation.Autowired
         private com.zhixuewuli.service.teacherEvent.TeacherEventService currentTasks;

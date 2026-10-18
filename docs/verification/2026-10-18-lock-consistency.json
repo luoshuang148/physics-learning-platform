@@ -1,0 +1,37 @@
+{
+  "sameRequestKey": {
+    "statuses": [
+      201,
+      201,
+      201,
+      201,
+      201,
+      201,
+      201,
+      201,
+      201,
+      201
+    ],
+    "uniqueRecordIds": 1,
+    "allSame": true,
+    "recordCount": 1
+  },
+  "duplicateFirstAttempt": {
+    "statuses": [
+      201,
+      409
+    ],
+    "recordCount": 1
+  },
+  "submitVsArchive": {
+    "submitStatus": 409,
+    "archiveStatus": 200,
+    "recordCount": 0
+  },
+  "submitVsReplace": {
+    "submitStatus": 409,
+    "replaceStatus": 200,
+    "newEventId": 10,
+    "oldRecordCount": 0
+  }
+}

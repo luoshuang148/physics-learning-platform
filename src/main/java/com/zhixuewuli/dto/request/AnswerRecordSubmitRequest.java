@@ -20,7 +20,6 @@ import java.time.LocalDateTime;
  * <ul>
  * <li><strong>questionId</strong>: 关联的题目ID，必须存在</li>
  * <li><strong>userAnswer</strong>: 用户的实际答案内容</li>
- * <li><strong>errorReason</strong>: 用户对错误原因的主观描述（可选）</li>
  * <li><strong>answeredAt</strong>: 答题时间戳，默认为当前时间</li>
  * </ul>
  * 
@@ -56,17 +55,6 @@ public class AnswerRecordSubmitRequest {
     @NotBlank(message = "用户答案不能为空")
     @Schema(description = "用户答案", example = "A")
     private String userAnswer;
-
-    /**
-     * 错误原因
-     * 
-     * 可选填写，用户对自己错误原因的主观描述。
-     * 用于辅助错误分析和学习改进建议。
-     * 长度限制不超过200个字符。
-     */
-    @Size(max = 200, message = "错误原因长度不能超过200个字符")
-    @Schema(description = "错误原因", example = "对电磁感应定律的理解不够深入")
-    private String errorReason;
 
     /**
      * 答题时间

@@ -91,11 +91,11 @@ class TeacherEventArchiveRegressionTest extends BaseControllerIntegrationTest {
     }
 
     @Test
-    void databaseRejectsTwoActiveEventsEvenIfServiceChecksAreBypassed() {
+    void databaseAllowsMultiplePublishedEventsInOneClass() {
         TeacherEvent competing = new TeacherEvent(); competing.setTeacherId(2002L);
         competing.setTeacherName("无事件教师"); competing.setEventTitle("competing");
         competing.setEventTimestamp(LocalDateTime.now()); competing.setIsGlobal(true);
-        assertThatThrownBy(() -> eventRepository.saveAndFlush(competing))
-                .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
+        eventRepository.saveAndFlush(competing);
+        assertThat(eventRepository.findByStatusOrderByCreatedAtDesc(TeacherEvent.Status.PUBLISHED)).hasSizeGreaterThanOrEqualTo(2);
     }
 }

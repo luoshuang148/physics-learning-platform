@@ -10,7 +10,6 @@ import com.zhixuewuli.common.exception.question.QuestionNotFoundException;
 import com.zhixuewuli.common.exception.answerrecord.AnswerRecordNotFoundException;
 import com.zhixuewuli.common.result.ResultCode;
 import com.zhixuewuli.common.util.AIStreamExecutor;
-import com.zhixuewuli.common.util.HanLPWordCloudUtil;
 import com.zhixuewuli.common.util.OptionMappingUtil;
 import com.zhixuewuli.common.util.QuestionErrorConverter;
 import com.zhixuewuli.common.util.StreamContentFixer;
@@ -111,20 +110,8 @@ public class QuestionErrorAnalysisServiceImpl implements QuestionErrorAnalysisSe
                     .convertStudentErrorDetails(studentErrors);
             log.info("转换完成，返回 {} 个学生", studentList.size());
 
-            // 5. 从查询结果中提取错误原因（避免第二次查询）
-            List<String> errorReasons = studentErrors.stream()
-                    .map(row -> (String) row[5]) // error_reason 在第 5 个位置
-                    .filter(reason -> reason != null && !reason.trim().isEmpty())
-                    .collect(java.util.stream.Collectors.toList());
-
-            // 6. 生成词云数据
-            Map<String, Integer> wordCloud = HanLPWordCloudUtil.analyzeErrorReasons(errorReasons);
-            log.info("词云生成完成，包含 {} 个词", wordCloud.size());
-
-            // 7. 构建响应
             return QuestionErrorDetailsResponse.builder()
                     .studentList(studentList)
-                    .wordCloud(wordCloud)
                     .build();
         } catch (Exception e) {
             log.error("获取题目错误详情失败 - QuestionId: {}, Error: {}", questionId, e.getMessage(), e);

@@ -63,6 +63,7 @@ public class QuestionController {
 
     private final QuestionService questionService;
     private final OptionMappingUtil optionMappingUtil;
+    private final com.zhixuewuli.service.question.AnswerAccessPolicy answerAccess;
 
     @PostMapping("/teacher/create")
     @Operation(
@@ -146,19 +147,20 @@ public class QuestionController {
     @GetMapping("/teacher/get/{id}")
     @Operation(
         summary = "获取题目详情",
-        description = "根据ID获取题目详细信息（无需身份认证）",
+        description = "根据ID获取题目信息；学生只能看到已开放答案的受保护字段",
         responses = {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "查询成功"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "题目不存在")
         }
     )
     public Result<QuestionResponse> getQuestionById(
-            @io.swagger.v3.oas.annotations.Parameter(description = "题目 ID", required = true) @PathVariable @Positive(message = "题目ID必须为正数") Long id) {
+            @io.swagger.v3.oas.annotations.Parameter(description = "题目 ID", required = true) @PathVariable @Positive(message = "题目ID必须为正数") Long id,
+            HttpServletRequest httpRequest) {
 
         log.info("查询题目详情，ID: {}", id);
 
         Question question = questionService.getQuestionById(id);
-        QuestionResponse response = convertToResponse(question);
+        QuestionResponse response = answerAccess.forBank((Long) httpRequest.getAttribute("userId"), convertToResponse(question));
 
         return Result.success(response);
     }
@@ -184,7 +186,7 @@ public class QuestionController {
                 .map(this::convertToResponse)
                 .collect(Collectors.toList());
 
-        return Result.success(responses);
+        return Result.success(answerAccess.forBank(userId, responses));
     }
 
     /**
@@ -201,7 +203,6 @@ public class QuestionController {
                 .correctOption(question.getCorrectOption())
                 .explanation(question.getExplanation())
                 .difficulty(question.getDifficulty())
-                .explanationVideoMapping(optionMappingUtil.jsonToVideoMapping(question.getExplanationVideoMapping()))
                 .imageBase64(question.getImageBase64())
                 .createdAt(question.getCreatedAt())
                 .updatedAt(question.getUpdatedAt())

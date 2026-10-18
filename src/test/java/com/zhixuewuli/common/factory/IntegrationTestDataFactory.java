@@ -24,7 +24,6 @@ import java.util.UUID;
  * </p>
  * <ul>
  * <li>自动处理实体的持久化和 ID 生成</li>
- * <li>支持关联关系的自动构建（如 Video-Question）</li>
  * <li>提供事务边界管理</li>
  * <li>支持批量创建和场景构建器模式</li>
  * </ul>
@@ -87,34 +86,12 @@ public class IntegrationTestDataFactory {
     }
 
     /**
-     * 创建并保存视频
-     * 
-     * @return 已保存的视频实体
-     */
-    public Video createVideoAndSave() {
-        Video video = TestDataFactory.createVideo();
-        return save(video);
-    }
-
-    /**
      * 创建并保存题目（不关联视频）
      * 
      * @return 已保存的题目实体
      */
     public Question createQuestionAndSave() {
         Question question = TestDataFactory.createQuestion();
-        return save(question);
-    }
-
-    /**
-     * 创建并保存题目（关联到指定视频）
-     * 
-     * @param videoId 关联的视频 ID
-     * @return 已保存的题目实体
-     */
-    public Question createQuestionAndSave(Long videoId) {
-        Question question = TestDataFactory.createQuestion();
-        // Video 关系由 JPA 自动管理，这里暂时不设置
         return save(question);
     }
 
@@ -226,7 +203,6 @@ public class IntegrationTestDataFactory {
     public class TeachingScenarioBuilder {
         private final Long teacherId;
         private final int studentCount;
-        private Video video;
         private List<Question> questions = new ArrayList<>();
         private List<User> students = new ArrayList<>();
         private List<AnswerRecord> answerRecords = new ArrayList<>();
@@ -237,22 +213,11 @@ public class IntegrationTestDataFactory {
         }
 
         /**
-         * 创建视频
-         */
-        public TeachingScenarioBuilder withVideo() {
-            this.video = createVideoAndSave();
-            return this;
-        }
-
-        /**
          * 创建指定数量的题目（关联到视频）
          */
         public TeachingScenarioBuilder withQuestions(int count) {
-            if (video == null) {
-                withVideo();
-            }
             for (int i = 0; i < count; i++) {
-                questions.add(createQuestionAndSave(video.getId()));
+                questions.add(createQuestionAndSave());
             }
             return this;
         }
@@ -295,14 +260,12 @@ public class IntegrationTestDataFactory {
          * 构建并返回场景对象
          */
         public TeachingScenario build() {
-            if (video == null)
-                withVideo();
             if (questions.isEmpty())
                 withQuestions(3);
             if (students.isEmpty())
                 withStudents();
 
-            return new TeachingScenario(video, questions, students, answerRecords);
+            return new TeachingScenario(questions, students, answerRecords);
         }
 
         /**
@@ -317,21 +280,15 @@ public class IntegrationTestDataFactory {
      * 教学场景封装类
      */
     public static class TeachingScenario {
-        private final Video video;
         private final List<Question> questions;
         private final List<User> students;
         private final List<AnswerRecord> answerRecords;
 
-        public TeachingScenario(Video video, List<Question> questions,
+        public TeachingScenario(List<Question> questions,
                 List<User> students, List<AnswerRecord> answerRecords) {
-            this.video = video;
             this.questions = questions;
             this.students = students;
             this.answerRecords = answerRecords;
-        }
-
-        public Video getVideo() {
-            return video;
         }
 
         public List<Question> getQuestions() {

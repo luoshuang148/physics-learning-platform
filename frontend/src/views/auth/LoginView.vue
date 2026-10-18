@@ -4,8 +4,8 @@
     <p class="auth-sub">进入智学物理的 AI 教学空间</p>
 
     <form class="form" @submit.prevent="onSubmit">
-      <label>用户名 / 真实姓名</label>
-      <input v-model="form.username" placeholder="请输入用户名或真实姓名" />
+      <label>用户名</label>
+      <input v-model="form.username" placeholder="请输入用户名" autocomplete="username" />
 
       <label>密码</label>
       <input v-model="form.password" type="password" placeholder="请输入密码" />

@@ -4,7 +4,6 @@ export interface QuestionPayload {
   correctOption: 'A' | 'B' | 'C' | 'D';
   explanation?: string;
   difficulty?: number | null;
-  explanationVideoMapping?: string;
   imageBase64?: string;
 }
 
@@ -20,7 +19,6 @@ export interface QuestionResponse {
   correctOption: 'A' | 'B' | 'C' | 'D';
   explanation: string | null;
   difficulty: number | null;
-  explanationVideoMapping: Record<string, number | null> | null;
   imageBase64: string | null;
   createdAt: string;
   updatedAt: string;

@@ -135,16 +135,6 @@ public class QuestionUpdateRequest {
     private Integer difficulty;
 
     /**
-     * 讲解视频映射
-     * 
-     * 可选参数，用于指定各选项对应的讲解视频。
-     * 使用JSON格式的Map结构存储，key为选项标识，value为视频ID。
-     * 注意：如果传入空字符串或null，会清空原有的视频映射。
-     */
-    @Schema(description = "讲解视频映射（JSON格式）", example = "{\"A\": 123, \"B\": 456, \"C\": 789, \"D\": 101}")
-    private String explanationVideoMapping;
-
-    /**
      * 题目图片Base64编码数据（仅支持PNG格式）
      * 
      * 可选参数，用于存储与题目相关的图片信息。
