@@ -6,8 +6,6 @@
       <section class="detail-hero">
         <div>
           <RouterLink to="/teacher/event-manage" class="back-link">← 返回任务管理</RouterLink>
-          <div class="detail-kicker">作业详情</div>
-          <h1>{{ data.title }}</h1>
           <div class="detail-meta">
             <span class="status-pill" :class="data.availability.toLowerCase()">{{ statusText }}</span>
             <span>共 {{ data.questionCount }} 题</span>
@@ -34,7 +32,6 @@
         <div class="section-head">
           <div>
             <h2>学生完成情况</h2>
-            <p>按首次作答统计，补练不计入完成率。</p>
           </div>
           <div class="filter-tabs">
             <button v-for="item in filters" :key="item.key" class="filter-btn" :class="{ active: filter === item.key }" @click="filter = item.key">
@@ -67,7 +64,6 @@
         <div class="section-head">
           <div>
             <h2>每题表现</h2>
-            <p>基于本次作业的题目快照，不读取题库当前内容。</p>
           </div>
         </div>
         <div class="table-wrap">

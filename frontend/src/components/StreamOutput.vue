@@ -6,14 +6,13 @@
 
     <div v-if="shouldShowFriendlyEmpty" class="stream-empty-state">
       <div class="stream-empty-title">当前还没有学生答题记录哦</div>
-      <p class="stream-empty-desc">学生完成答题后，这里会自动生成对应的任务学习报告。</p>
     </div>
 
     <!-- 依赖Vue响应式：loading变化时自动重新渲染，表格在结束后会被完整解析 -->
     <div v-else-if="content" class="stream-content markdown-body" v-html="renderMarkdown(content)"></div>
 
     <details v-if="reasoning" class="reasoning-box">
-      <summary>查看 AI 思考过程</summary>
+      <summary>思考过程</summary>
       <div class="reasoning-content markdown-body" v-html="renderMarkdown(reasoning)"></div>
     </details>
 

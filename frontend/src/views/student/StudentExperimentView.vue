@@ -55,7 +55,6 @@
       <!-- 右：实验 iframe -->
       <div class="exp-main" ref="fullscreenContainerRef">
         <div v-if="!activeExperiment" class="exp-placeholder">
-          <p class="muted">{{ experiments.length ? '请从左侧选择实验' : '正在加载 3D 实验…' }}</p>
         </div>
         <iframe
           v-else

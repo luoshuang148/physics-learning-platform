@@ -70,12 +70,10 @@
             <span>返回上一步</span>
           </button>
           <div class="main-header-copy">
-            <div class="main-kicker">{{ auth.user?.userType === 'TEACHER' ? '教师工作台' : '学生工作台' }}</div>
             <div class="shell-subtitle">{{ subtitle }}</div>
           </div>
         </div>
         <div class="main-header-right">
-          <span v-if="aiNotice" class="ai-status-chip" :title="aiNotice">{{ aiNotice.includes('暂不可用') ? 'AI 暂不可用' : 'AI 使用提示' }}</span>
           <div class="main-badge">{{ auth.user?.userType === 'TEACHER' ? '教师端' : '学生端' }}</div>
         </div>
       </div>
@@ -138,7 +136,6 @@
         <div class="profile-modal-head">
           <div>
             <h3>修改个人信息</h3>
-            <p>支持修改用户名、密码、姓名和班级；角色由教师管理。</p>
           </div>
           <button class="profile-close" @click="closeProfileEditor">×</button>
         </div>
@@ -148,13 +145,13 @@
           <input v-model="profileForm.username" placeholder="请输入用户名" />
 
           <label>新密码</label>
-          <input v-model="profileForm.password" type="password" placeholder="留空则不修改" />
+          <input v-model="profileForm.password" type="password" placeholder="" />
 
           <label>真实姓名</label>
           <input v-model="profileForm.realName" placeholder="请输入真实姓名" />
 
           <label>班级</label>
-          <input v-model="profileForm.className" placeholder="留空表示不设班级" />
+          <input v-model="profileForm.className" placeholder="" />
 
           <div class="profile-actions">
             <button type="button" class="secondary-btn" @click="closeProfileEditor">取消</button>
@@ -174,12 +171,6 @@ import { computed, reactive, ref, onMounted, onBeforeUnmount, nextTick, watch } 
 import { useAuthStore } from '@/stores/auth';
 import { useRoute, useRouter } from 'vue-router';
 import { updateCurrentUserApi } from '@/api/user';
-import { getAICapabilitiesApi } from '@/api/ai';
-const aiNotice=ref('');
-onMounted(async () => {
-  try { const capability=await getAICapabilitiesApi();aiNotice.value=(!capability.reports && !capability.tutoring ? 'AI 暂不可用。' : '') + capability.notice; }
-  catch { aiNotice.value='AI 功能状态暂时无法确认，请稍后重试。'; }
-});
 interface Link {
   label: string;
   to: string;

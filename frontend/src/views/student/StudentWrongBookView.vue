@@ -2,11 +2,6 @@
   <AppShell :subtitle="`错题本 · ${auth.user?.realName ?? ''}`" :links="links">
     <div class="wb-page student-font">
       <section class="wb-hero">
-        <div>
-          <span class="wb-kicker">错题复习</span>
-          <h1 class="wb-title">错题本</h1>
-          <p class="wb-summary">定位错题，针对性补练，并查看最新掌握状态。</p>
-        </div>
         <div class="wb-tools">
           <input v-model="searchText" class="wb-search" placeholder="搜索题目内容…" />
           <span v-if="!loading" class="wb-count">已显示 {{ records.length }} / {{ total }} 道</span>
@@ -87,7 +82,6 @@
               <div class="wb-ai-head">
                 <div>
                   <div class="wb-ai-title">AI 追问</div>
-                  <div class="wb-ai-sub">首次分析会使用系统预设提示词，生成完成后才能继续追问。</div>
                 </div>
                 <button
                   v-if="hasInitialAnalysis(item.recordId)"

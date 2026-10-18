@@ -2,21 +2,14 @@
   <AppShell :subtitle="`学生学情分析 · ${auth.user?.realName ?? ''}`" :links="links">
     <div class="student-analysis-page teacher-font">
       <section class="analysis-hero">
-        <div>
-          <span class="analysis-kicker">学生学情</span>
-          <h1 class="analysis-title">学生学情分析</h1>
-          <p class="analysis-summary">按学生查看答题记录、错题记录与个人学习报告，快速判断每位学生的学习状态。</p>
-        </div>
         <div class="hero-stats">
           <div class="hero-stat-card">
             <span class="hero-stat-label">学生人数</span>
             <strong class="hero-stat-value">{{ filteredStudents.length }}</strong>
-            <span class="hero-stat-note">当前筛选结果</span>
           </div>
           <div class="hero-stat-card warm">
             <span class="hero-stat-label">平均错误率</span>
             <strong class="hero-stat-value">{{ averageErrorRateText }}</strong>
-            <span class="hero-stat-note">基于当前筛选学生</span>
           </div>
         </div>
       </section>
@@ -107,7 +100,6 @@
               <div v-else-if="reportMessage" class="report-placeholder">
                 <div>
                   <h3>{{ reportMessage.title }}</h3>
-                  <p>{{ reportMessage.desc }}</p>
                 </div>
               </div>
               <div v-else class="report-output">

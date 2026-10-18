@@ -1424,3 +1424,77 @@ section.toolbar > select {
 }
 .task-list-link { text-decoration: none !important; display: inline-flex; align-items: center; }
 .task-unavailable { color: #64748b; font-size: 12px; }
+/* Unified page headers: no duplicated hero copy */
+.record-hero,
+.user-hero,
+.analysis-hero,
+.wb-hero,
+.report-hero,
+.ai-hero,
+.event-hero {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 12px !important;
+  padding: 14px 16px !important;
+}
+.record-hero .hero-stats,
+.user-hero .hero-stats,
+.analysis-hero .hero-stats {
+  width: 100% !important;
+  margin: 0 !important;
+}
+.dashboard-hero { grid-template-columns: 1fr !important; }
+.event-status-card {
+  flex: 1 !important;
+  display: flex !important;
+  flex-wrap: wrap !important;
+  align-items: center !important;
+  gap: 8px 14px !important;
+}
+.event-status-card .archive-btn { margin-left: auto !important; margin-top: 0 !important; }
+.wb-tools { margin-left: auto !important; }
+.report-hero .report-actions,
+.ai-hero .mode-tabs { margin-left: auto !important; }
+.overview-title,
+.overview-kicker,
+.hero-kicker,
+.hero-summary,
+.hero-desc,
+.event-kicker,
+.event-title,
+.event-summary,
+.analysis-kicker,
+.analysis-title,
+.analysis-summary,
+.report-kicker,
+.report-title,
+.report-summary,
+.wb-kicker,
+.wb-title,
+.wb-summary,
+.ai-kicker,
+.ai-title,
+.ai-summary,
+.detail-kicker,
+.panel-subtitle,
+.time-hint,
+.archive-note,
+.publish-hint,
+.form-hint,
+.empty-sub {
+  display: none !important;
+}
+.section-head p,
+.panel-head p { display: none !important; }
+.panel-data { color: #64748b; font-size: 11px; }
+.report-hero,
+.ai-hero {
+  padding: 0 !important;
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  min-height: 0 !important;
+}
+.report-hero .report-actions,
+.ai-hero .mode-tabs { margin-left: auto !important; }

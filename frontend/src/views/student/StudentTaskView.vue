@@ -13,7 +13,6 @@
                 <h3 class="task-title">{{ task.eventTitle }}</h3>
                 <span class="task-status" :class="task.availability?.toLowerCase()">{{ statusText(task) }}</span>
               </div>
-              <p class="task-desc">共 {{ task.questionCount ?? task.questionIds?.length ?? 0 }} 道题，按教师配置的顺序作答。</p>
               <div class="task-meta">
                 <span>发布教师：{{ task.teacherName }}</span>
                 <span>开始：{{ task.startAt ? formatTime(task.startAt) : '立即' }}</span>

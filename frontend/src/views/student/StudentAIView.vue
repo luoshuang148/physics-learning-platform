@@ -2,11 +2,6 @@
   <AppShell :subtitle="`AI 问答 · ${auth.user?.realName ?? ''}`" :links="links">
     <div class="ai-page student-font">
       <section class="ai-hero">
-        <div>
-          <span class="ai-kicker">AI 学习助手</span>
-          <h1 class="ai-title">AI 问答</h1>
-          <p class="ai-summary">在同一个页面中完成提问、查看回答与切换问答模式。</p>
-        </div>
         <div class="mode-tabs">
           <button
             class="mode-tab"

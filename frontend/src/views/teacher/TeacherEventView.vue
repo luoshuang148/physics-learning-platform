@@ -2,11 +2,6 @@
   <AppShell :subtitle="`任务管理 · ${auth.user?.realName ?? ''}`" :links="links">
     <div class="event-page teacher-font">
       <section class="event-hero">
-        <div>
-          <span class="event-kicker">任务管理</span>
-          <h1 class="event-title">并行作业与生命周期</h1>
-          <p class="event-summary">单班内可以同时发布多个作业。草稿仅教师可见，发布后学生可作答；截止后保留作答与快照，归档后进入历史。</p>
-        </div>
         <div class="event-status-card" :class="openTasks.length ? 'live' : 'idle'">
           <span class="event-status-label">任务状态</span>
           <strong>{{ openTasks.length ? `已发布 ${openTasks.length}` : '未发布' }}</strong>
@@ -18,14 +13,11 @@
 
       <section class="task-board">
         <div class="task-board-head">
-          <div>
-            <h2>任务列表</h2>
-            <p>草稿、进行中、已截止任务都保留在这里；归档任务在页面底部历史中查看。</p>
-          </div>
+          <h2>任务列表</h2>
           <button class="ghost-btn" :disabled="loadingTasks" @click="loadTasks">刷新任务</button>
         </div>
         <div v-if="loadingTasks" class="empty-hint">加载任务中…</div>
-        <div v-else-if="tasks.length === 0" class="empty-hint">还没有任务，从下方创建第一个作业。</div>
+        <div v-else-if="tasks.length === 0" class="empty-hint">暂无任务</div>
         <div v-else class="task-table">
           <article v-for="task in tasks" :key="task.id" class="task-row">
             <div class="task-row-main">
@@ -55,13 +47,12 @@
           <div class="panel-head">
             <div>
               <h2>{{ editingTask ? '编辑草稿' : '新建任务' }}</h2>
-              <p>{{ editingTask ? '草稿可修改题目和时间，发布后题目快照固定。' : '可先保存草稿，也可以直接发布。' }}</p>
             </div>
             <button v-if="editingTask" class="ghost-btn" @click="resetForm">取消编辑</button>
           </div>
 
           <label class="field-label" for="task-title">任务名称</label>
-          <input id="task-title" v-model="taskTitle" class="title-input" maxlength="20" placeholder="例如：牛顿第二定律练习" />
+          <input id="task-title" v-model="taskTitle" class="title-input" maxlength="20"  />
 
           <div class="time-grid">
             <label class="field-label">开始时间
@@ -71,18 +62,14 @@
               <input v-model="dueAt" type="datetime-local" class="time-input" />
             </label>
           </div>
-          <p class="time-hint">留空表示立即开始 / 不设截止。截止时间必须晚于开始时间。</p>
 
           <div class="selected-head">
             <span>已选题目</span>
             <span>{{ selectedIds.length }} 题</span>
           </div>
 
-          <div v-if="selectedIds.length === 0" class="empty-hint">
-            <p>从右侧题库选择题目加入任务。草稿可以暂时不选题。</p>
-          </div>
 
-          <div v-else class="selected-list">
+          <div v-if="selectedIds.length > 0" class="selected-list">
             <div v-for="(id, idx) in selectedIds" :key="id" class="selected-item">
               <span class="rank">{{ idx + 1 }}</span>
               <div class="selected-body">
@@ -104,8 +91,6 @@
             <button class="draft-btn" :disabled="!canSaveDraft || publishing" @click="saveDraft">
               {{ editingTask ? '保存草稿' : '保存为新草稿' }}
             </button>
-            <p v-if="!taskTitle.trim()" class="publish-hint">请填写任务名称</p>
-            <p v-else-if="selectedIds.length === 0" class="publish-hint">发布前请至少选择一道题目</p>
           </div>
         </section>
 
@@ -113,15 +98,12 @@
           <div class="panel-head">
             <div>
               <h2>题库</h2>
-              <p>共 {{ allQuestions.length }} 道题</p>
+              <span class="panel-data">共 {{ allQuestions.length }} 道题</span>
             </div>
             <input v-model="searchText" class="search-input" placeholder="搜索题目 ID 或内容…" />
           </div>
 
           <div v-if="loadingQuestions" class="empty-hint">加载题目中…</div>
-          <div v-else-if="allQuestions.length === 0" class="empty-hint">
-            <p>题库暂无题目，请先在题库管理中创建。</p>
-          </div>
           <div v-else class="bank-list">
             <article v-for="question in filteredQuestions" :key="question.id" class="bank-item"
               :class="{ added: selectedIds.includes(question.id) }">
@@ -142,7 +124,6 @@
 
       <details class="archive-panel">
         <summary>已归档任务（{{ historyTotal }}）</summary>
-        <p class="archive-note">归档后保留答题记录、历史快照和学习报告。</p>
         <div v-for="event in archivedEvents" :key="event.id" class="archive-row">
           <div>
             <strong>{{ event.eventTitle }}</strong>
@@ -381,4 +362,34 @@ onMounted(async () => { await Promise.all([loadQuestions(), loadTasks(), loadHis
   .task-row-actions { justify-content: flex-start; }
   .time-grid { grid-template-columns: 1fr; }
 }
+
+.main-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+.left-panel, .right-panel { display: grid; gap: 12px; align-content: start; padding: 16px; }
+.panel-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.panel-head h2 { margin: 0; font-size: 16px; color: #172033; }
+.field-label { display: grid; gap: 6px; color: #334155; font-size: 12px; font-weight: 500; }
+.title-input, .search-input, .time-input { width: 100%; min-height: 38px; padding: 8px 10px; border: 1px solid #dbe3ec; border-radius: 8px; background: #fff; color: #172033; }
+.selected-head { display: flex; justify-content: space-between; color: #64748b; font-size: 11px; }
+.selected-list, .bank-list { display: grid; gap: 8px; }
+.selected-item, .bank-item { display: flex; align-items: center; gap: 10px; padding: 10px; border: 1px solid #eef2f7; border-radius: 8px; background: #fff; }
+.bank-item { justify-content: space-between; }
+.selected-body { display: grid; gap: 4px; min-width: 0; flex: 1; }
+.bank-main { display: flex; align-items: center; gap: 8px; min-width: 0; flex: 1; }
+.bank-content { flex: 1; }
+.selected-content, .bank-content { color: #334155; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.question-id, .panel-data { color: #94a3b8; font-size: 10px; }
+.rank { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; background: #ecfdf5; color: #0f766e; font-size: 10px; }
+.selected-actions { display: flex; gap: 4px; }
+.selected-actions button, .add-btn { border: 1px solid #e2e8f0; background: #fff; color: #475569; border-radius: 5px; padding: 3px 7px; font-size: 11px; cursor: pointer; }
+.selected-actions .danger { color: #b91c1c; }
+.selected-actions button:disabled, .add-btn:disabled { opacity: .45; cursor: not-allowed; }
+ .add-btn { color: #0f766e; flex: 0 0 auto; white-space: nowrap; }
+.empty-hint { padding: 10px 0; color: #94a3b8; font-size: 12px; }
+.publish-zone { display: flex; flex-wrap: wrap; gap: 8px; }
+.publish-btn { min-height: 38px; padding: 0 16px; border: 1px solid #0f766e; border-radius: 8px; background: #0f766e; color: #fff; cursor: pointer; }
+.publish-btn:disabled { opacity: .5; cursor: not-allowed; }
+.draft-btn { min-height: 38px; padding: 0 14px; border: 1px solid #dbe3ec; border-radius: 8px; background: #fff; color: #334155; cursor: pointer; }
+.draft-btn:disabled { opacity: .5; cursor: not-allowed; }
+.time-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+@media (max-width: 900px) { .main-layout, .time-grid { grid-template-columns: 1fr; } }
 </style>

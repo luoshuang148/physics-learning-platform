@@ -2,11 +2,6 @@
   <AppShell :subtitle="`用户管理 · ${auth.user?.realName ?? ''}`" :links="links">
     <div class="user-page ops-typography">
       <section class="user-hero">
-        <div class="hero-copy">
-          <span class="hero-kicker">用户管理</span>
-          <h2 class="hero-title">用户管理</h2>
-          <p class="hero-desc">把筛选、编辑与状态维护收敛在同一工作台里，减少重复跳转，方便教师快速完成账号治理。</p>
-        </div>
         <div class="hero-stats">
           <div class="stat-card cyan">
             <span class="stat-num">{{ users.length }}</span>
@@ -94,7 +89,7 @@
               <div>
                 <div class="panel-kicker">编辑用户</div>
                 <div class="editor-title">编辑用户 #{{ selectedUser.id }}</div>
-                <div class="editor-sub">集中维护姓名、班级、身份与启停状态</div>
+
               </div>
               <button class="ghost-btn" @click="reloadSelected">同步最新信息</button>
             </div>
@@ -122,7 +117,7 @@
 
               <label class="field-block">
                 <span class="field-label">班级</span>
-                <input v-model="form.className" class="field-input" placeholder="未分班可留空" />
+                <input v-model="form.className" class="field-input"  />
               </label>
 
               <label class="field-block">

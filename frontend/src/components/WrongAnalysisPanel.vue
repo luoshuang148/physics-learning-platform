@@ -2,7 +2,7 @@
   <div class="wap-wrap">
     <button v-if="!started" class="wap-trigger" @click="start">
       <span>AI 解惑</span>
-      <span class="wap-trigger-sub">点击获取本题思路分析、讲解与学习建议</span>
+
     </button>
 
     <div v-else class="wap-panel">
@@ -35,7 +35,7 @@
             <pre v-if="item.role === 'user'" class="wap-user-text">{{ item.content }}</pre>
             <div v-else class="wap-ai-answer">
               <details v-if="item.reasoning" class="wap-reasoning">
-                <summary>查看 AI 思考过程</summary>
+                <summary>思考过程</summary>
                 <div class="wap-reasoning-text" v-html="renderMixedContent(item.reasoning)"></div>
               </details>
               <div class="wap-content" v-html="renderMixedContent(item.content)" />
@@ -46,7 +46,7 @@
             <div class="wap-chat-role">AI 分析</div>
             <div v-if="reasoning || content" class="wap-ai-answer">
               <details v-if="reasoning" class="wap-reasoning" :open="streamingReasoningOpen">
-                <summary>{{ content ? '查看 AI 思考过程' : 'AI 正在思考...' }}</summary>
+                <summary>{{ content ? '思考过程' : 'AI 正在思考' }}</summary>
                 <div class="wap-reasoning-text" v-html="renderMixedContent(reasoning)"></div>
               </details>
               <div
@@ -73,16 +73,15 @@
           v-model="followupQuestion"
           class="wap-input"
           rows="3"
-          placeholder="继续追问这道题，例如：这道题的关键突破口是什么？如果我已经做对了，还能怎样更稳地判断？"
+          placeholder="继续追问"
         />
         <div class="wap-composer-actions">
-          <span class="wap-composer-tip">可以围绕思路、知识点、易错点和举一反三继续深入追问</span>
+
           <button class="wap-send-btn" :disabled="loading || !followupQuestion.trim()" @click="askFollowup">发送追问</button>
         </div>
       </div>
 
       <div v-else class="wap-initial-actions">
-        <span class="wap-composer-tip">首次分析由系统预设提示词发起，生成完成后才能继续追问</span>
         <button class="wap-send-btn" :disabled="loading" @click="start">
           {{ loading ? '分析中…' : 'AI解惑' }}
         </button>

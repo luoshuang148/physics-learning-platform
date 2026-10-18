@@ -4,7 +4,6 @@
     <div v-if="loading" class="page-loading">加载数据中…</div>
     <div v-else-if="summary.length === 0" class="page-empty">
       <p>暂无题目分析数据</p>
-      <p class="empty-sub">学生答题后将在此显示错误统计</p>
     </div>
 
     <div v-else class="error-layout">
@@ -132,7 +131,7 @@
         <div class="ai-dialog-head">
           <div>
             <div class="ai-dialog-title">题目 AI 分析</div>
-            <div class="ai-dialog-sub">题目 #{{ aiTarget?.questionId }} · 基于错误统计、选项分布与学生作答情况继续追问</div>
+
           </div>
           <button class="close-btn" @click="closeAIAnalysis">✕</button>
         </div>
@@ -211,7 +210,7 @@
                 ref="aiQuestionInputRef"
                 class="ai-textarea"
                 rows="4"
-                placeholder="例如：请结合当前错误率和选项分布，分析学生最可能的知识误区，并给出课堂纠错建议"
+                placeholder="输入分析问题"
               />
               <div class="ai-actions">
                 <div class="ai-tool-row" v-if="aiMessages.length">

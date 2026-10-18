@@ -24,7 +24,6 @@
         <div class="ai-drawer-body">
           <div class="ai-response-box" ref="scrollContainer">
             <div v-if="!messages.length && !state.loading" class="ai-empty">
-              <p>你好！我是智学物理 AI 助手，有什么物理问题可以问我～</p>
             </div>
 
             <div v-for="item in messages" :key="item.id" class="ai-message" :class="item.role">
@@ -39,7 +38,7 @@
 
               <div v-if="item.role === 'assistant' && item.reasoning" class="ai-reasoning-card">
                 <details>
-                  <summary>查看 AI 思考过程</summary>
+                  <summary>思考过程</summary>
                   <div class="reasoning-text markdown-body" v-html="renderMarkdown(item.reasoning)"></div>
                 </details>
               </div>
@@ -92,7 +91,7 @@
                 v-model="question"
                 class="ai-textarea"
                 rows="3"
-                placeholder="输入物理问题…按 Ctrl+Enter 发送"
+                placeholder="输入问题"
                 @keydown.ctrl.enter="askRealtime"
                 @paste="onPasteImage"
               />
@@ -101,7 +100,7 @@
                 <img class="ai-image-preview" :src="pendingImageBase64" alt="待发送图片" />
                 <div class="ai-image-preview-meta">
                   <span class="ai-image-preview-title">已附加图片</span>
-                  <span class="ai-image-preview-sub">发送前可继续修改文字内容</span>
+
                 </div>
                 <button class="ai-mini-btn danger" type="button" @click="clearPendingImage">移除</button>
               </div>

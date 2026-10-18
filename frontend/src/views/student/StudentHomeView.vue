@@ -8,9 +8,6 @@
     <template v-else>
       <section class="overview-card" :class="{ idle: !task }">
         <div class="overview-main">
-          <div class="overview-kicker">学习概览</div>
-          <h1 class="overview-title">当前学习</h1>
-
           <div v-if="task" class="overview-task-meta">
             <span class="task-live-badge">当前任务</span>
             <span class="task-meta">{{ task.teacherName }} · {{ task.dueAt ? '截止 ' + formatTime(task.dueAt) : '不限截止' }}</span>
@@ -57,7 +54,6 @@
             <div class="panel-head">
               <div>
                 <h3 class="panel-title">最近错题</h3>
-                <p class="panel-subtitle">优先复习最近暴露的问题</p>
               </div>
               <router-link to="/student/wrong-book" class="panel-link">进入错题本 →</router-link>
             </div>
@@ -73,7 +69,6 @@
           <div v-else class="panel-card empty-card">
             <div>
               <h3 class="panel-title">暂无错题</h3>
-              <p class="panel-subtitle">继续保持，完成任务后可再查看学习报告。</p>
             </div>
           </div>
         </div>
@@ -88,28 +83,24 @@
               <router-link v-if="task" to="/student/question" class="step-item step-item-disabled" @click.prevent="enterTask">
                 <div class="step-body">
                   <span class="step-title">开始当前任务</span>
-                  <span class="step-desc">直接完成教师发布的题目</span>
                 </div>
               </router-link>
 
               <router-link to="/student/experiments" class="step-item">
                 <div class="step-body">
                   <span class="step-title">自由探索 3D 实验</span>
-                  <span class="step-desc">不绑定任务，自由切换实验操作</span>
                 </div>
               </router-link>
 
               <router-link to="/student/wrong-book" class="step-item">
                 <div class="step-body">
                   <span class="step-title">复习错题</span>
-                  <span class="step-desc">查看历史错误与解析</span>
                 </div>
               </router-link>
 
               <router-link to="/student/report" class="step-item">
                 <div class="step-body">
                   <span class="step-title">查看学习报告</span>
-                  <span class="step-desc">生成本阶段学习总结</span>
                 </div>
               </router-link>
             </div>

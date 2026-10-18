@@ -89,7 +89,7 @@
             <div v-if="form.imageBase64" class="image-preview-card">
               <img :src="form.imageBase64" alt="题目图片预览" class="image-preview" />
               <div class="image-preview-actions">
-                <span class="image-preview-tip">已加载题目图片</span>
+
                 <button class="image-remove-btn" type="button" @click="clearImage">移除图片</button>
               </div>
             </div>
@@ -112,7 +112,6 @@
                 <span v-if="form.correctOption === key" class="opt-correct-mark">✓</span>
               </div>
             </div>
-            <div class="form-hint">点击字母按钮设置正确答案</div>
           </div>
 
           <div class="form-section">

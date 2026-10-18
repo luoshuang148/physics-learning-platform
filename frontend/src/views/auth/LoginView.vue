@@ -1,7 +1,7 @@
 <template>
   <AuthLayout>
     <h2 class="auth-title">欢迎回来</h2>
-    <p class="auth-sub">进入智学物理的 AI 教学空间</p>
+
 
     <form class="form" @submit.prevent="onSubmit">
       <label>用户名</label>

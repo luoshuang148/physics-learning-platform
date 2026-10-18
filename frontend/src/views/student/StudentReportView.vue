@@ -2,11 +2,6 @@
   <AppShell :subtitle="`学习报告 · ${auth.user?.realName ?? ''}`" :links="links">
     <div class="report-page student-font">
       <section class="report-hero">
-        <div class="report-hero-main">
-          <span class="report-kicker">学习报告</span>
-          <h1 class="report-title">学习报告</h1>
-          <p class="report-summary">查看当前任务的原始作答与补练情况。AI 建议需教师核实。</p>
-        </div>
         <div class="report-actions">
           <button
             class="generate-btn"
@@ -26,7 +21,6 @@
       </section>
 
       <p v-if="!reportsAvailable">AI 报告暂不可用。</p>
-      <p v-if="evidence.model">模型：{{ evidence.model }} · 生成时间：{{ evidence.generatedAt }} · 输入摘要：{{ String(evidence.inputSha256).slice(0,12) }}</p>
       <section class="report-stats">
         <div class="stat-card">
           <span class="stat-label">当前状态</span>
@@ -61,7 +55,6 @@
       <section v-else class="report-empty">
         <div>
           <h3>还没有生成学习报告</h3>
-          <p>点击上方按钮后，系统会基于当前学习数据生成总结。</p>
         </div>
       </section>
     </div>

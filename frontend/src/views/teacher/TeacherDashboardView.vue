@@ -3,12 +3,6 @@
     <div class="dashboard-page teacher-font">
       <p v-if="dashboardError" role="alert">{{ dashboardError }} <button @click="loadDashboard">重试</button></p>
       <section class="dashboard-hero">
-        <div class="hero-copy">
-          <span class="hero-kicker">教学概览</span>
-          <h1 class="hero-title">教学运行概况</h1>
-          <p class="hero-summary">本平台用于单班共享教学。任务成绩按首次作答计算，补练单独统计掌握状态；进度人数按当前启用学生范围计算。</p>
-        </div>
-
         <div class="hero-visuals">
           <div class="hero-donut-card">
             <div class="hero-donut-head">

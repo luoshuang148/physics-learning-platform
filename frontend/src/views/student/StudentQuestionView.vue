@@ -2,7 +2,6 @@
   <AppShell :subtitle="`学生答题 · ${auth.user?.realName ?? ''}`" :links="links">
     <div class="q-page">
       <!-- 顶部：任务标题 + 圆点导航 -->
-      <p v-if="currentQuestion?.snapshotOrigin && currentQuestion.snapshotOrigin !== 'PUBLISHED'" role="note">历史内容在升级时重建；原题缺失的条目无法补练。</p>
       <div class="q-header">
         <span class="q-task-label" v-if="activeTaskTitle">{{ activeTaskTitle }}</span>
         <div class="q-dots">
@@ -88,7 +87,6 @@
             <div class="result-box">
               <p>{{ isPersistingAnswer ? '正在由服务端保存并判分…' : '作答尚未保存' }}</p>
               <p>你的答案：{{ currentPendingAnswer.userAnswer }}</p>
-              <p v-if="!isPersistingAnswer">答案与解析会在服务端确认首次作答后开放。</p>
             </div>
             <div class="q-submit-row q-submit-row-pending">
               <button class="neon-btn primary" :disabled="isPersistingAnswer" @click="submitPendingAnswer">

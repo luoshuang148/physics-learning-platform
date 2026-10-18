@@ -2,11 +2,6 @@
   <AppShell :subtitle="`答题记录管理 · ${auth.user?.realName ?? ''}`" :links="links">
     <div class="record-page ops-typography">
       <section class="record-hero">
-        <div class="hero-copy">
-          <span class="hero-kicker">答题记录</span>
-          <h2 class="hero-title">答题记录</h2>
-          <p class="hero-desc">把会话检索、错题排查与清理操作合并到一条工作流里，方便教师快速定位异常答题轨迹。</p>
-        </div>
         <div class="hero-stats">
           <div class="stat-card cyan">
             <span class="stat-num">{{ totalCountText }}</span>
@@ -23,7 +18,6 @@
         </div>
       </section>
 
-      <p v-if="taskFilter">正在查看所选教学任务的记录 <button @click="taskRouter.replace({query:{}})">查看全部任务</button></p>
       <section class="toolbar">
         <div class="toolbar-left">
           <button class="mode-btn" :class="{ active: mode === 'all' }" @click="switchMode('all')">全部记录</button>
@@ -31,7 +25,8 @@
           <input v-model="searchText" class="toolbar-search" placeholder="搜索本页姓名 / 题目 / 作答…" />
         </div>
         <div class="toolbar-right">
-          <button class="ghost-btn" :disabled="loading" @click="reloadCurrent">刷新当前结果</button>
+          <button v-if="taskFilter" class="ghost-btn" @click="taskRouter.replace({query:{}})">全部任务</button>
+          <button class="ghost-btn" :disabled="loading" @click="reloadCurrent">刷新</button>
         </div>
       </section>
 
