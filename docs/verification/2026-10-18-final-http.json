@@ -13,22 +13,22 @@
   },
   "requests": 400,
   "concurrency": 8,
-  "durationSeconds": 2.365,
+  "durationSeconds": 2.262,
   "successfulRequests": 400,
-  "requestsPerSecond": 169.14,
+  "requestsPerSecond": 176.85,
   "endpoints": {
     "page": {
       "samples": 200,
-      "p50Ms": 48.62,
-      "p95Ms": 92.07,
-      "p99Ms": 225.97,
+      "p50Ms": 49.01,
+      "p95Ms": 86.29,
+      "p99Ms": 100.52,
       "meanResponseBytes": 9315
     },
     "summary": {
       "samples": 200,
-      "p50Ms": 34.73,
-      "p95Ms": 59.8,
-      "p99Ms": 68.97,
+      "p50Ms": 34.88,
+      "p95Ms": 55.73,
+      "p99Ms": 66.41,
       "meanResponseBytes": 381
     }
   }

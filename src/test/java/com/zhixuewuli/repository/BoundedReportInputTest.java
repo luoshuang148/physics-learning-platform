@@ -10,6 +10,7 @@ import static org.assertj.core.api.Assertions.*;
 @Tag("integration-repository")
 @TestPropertySource(properties="spring.jpa.properties.hibernate.generate_statistics=true")
 class BoundedReportInputTest extends BaseIntegrationTest {
+ @Autowired AnswerRecordRepository answers;
  @Autowired ReportInputRepository inputs;@Autowired UserRepository users;@Autowired QuestionRepository questions;
  Long userId,questionId;
  @BeforeEach void fixture(){
@@ -39,6 +40,17 @@ class BoundedReportInputTest extends BaseIntegrationTest {
  @Test void combinedTextInputIsBoundedBeforePreparingAProviderPrompt(){
   rows(50,"x".repeat(3000));
   assertThatThrownBy(()->inputs.student(userId,"bounded",null)).isInstanceOf(com.zhixuewuli.common.exception.BusinessException.class);
+ }
+
+ @Test void absentOriginalExplanationDoesNotAcquireEditedBankExplanation(){
+  rows(1,"original without explanation");
+  jdbcTemplate.update("UPDATE questions SET explanation='new explanation added after assignment' WHERE id=?",questionId);
+  var input=inputs.student(userId,"bounded",null).getFirst();
+  var page=answers.findTeacherPage(false,"%",null,org.springframework.data.domain.PageRequest.of(0,10));
+  org.assertj.core.api.SoftAssertions.assertSoftly(check->{
+   check.assertThat(input.getAnalysisSnapshot()).as("report keeps absent original explanation").isNull();
+   check.assertThat(page.getContent().getFirst().analysis()).as("teacher page keeps absent original explanation").isNull();
+  });
  }
 
 }

@@ -59,6 +59,9 @@ class MySqlSchemaIntegrationTest {
         assertThat(input.getFirst().getContentSnapshot()).isEqualTo("MySQL projection fixture");
         assertThat(input.getFirst().getQuestionSnapshot()).isNull();
         assertThat(input.getFirst().isTimestampUtc()).isTrue();
+        jdbc.update("UPDATE questions SET explanation='edited after assignment' WHERE id=?", question.getId());
+        assertThat(reportInputs.student(student.getId(), "mysql-session", eventId).getFirst().getAnalysisSnapshot()).isNull();
+        assertThat(service.getTeacherAnswerPage(teacher.getId(), 1, 10, true, "mysql_student").getRecords().getFirst().getQuestionAnalysis()).isNull();
         teaching.deleteCurrentEvent(teacher.getId());
         assertThat(answers.count()).isEqualTo(1);
         assertThat(events.findById(eventId).orElseThrow().getIsGlobal()).isFalse();

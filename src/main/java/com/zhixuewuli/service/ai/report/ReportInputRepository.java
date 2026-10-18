@@ -38,10 +38,10 @@ public class ReportInputRepository {
                  a.practice,a.attempt_order,a.answered_at,a.timestamp_utc,
                  LEFT(a.error_reason,4097) AS reason,
                  LEFT(COALESCE(a.content_snapshot,q.content),4097) AS content,
-                 LEFT(COALESCE(a.options_snapshot,q.options),4097) AS options_text,
-                 LEFT(COALESCE(a.correct_snapshot,q.correct_option),4097) AS reference_answer,
-                 LEFT(COALESCE(a.analysis_snapshot,q.explanation),4097) AS explanation,
-                 COALESCE(a.difficulty_snapshot,q.difficulty) AS difficulty,
+                 LEFT(CASE WHEN a.content_snapshot IS NULL THEN q.options ELSE a.options_snapshot END,4097) AS options_text,
+                 LEFT(CASE WHEN a.content_snapshot IS NULL THEN q.correct_option ELSE a.correct_snapshot END,4097) AS reference_answer,
+                 LEFT(CASE WHEN a.content_snapshot IS NULL THEN q.explanation ELSE a.analysis_snapshot END,4097) AS explanation,
+                 CASE WHEN a.content_snapshot IS NULL THEN q.difficulty ELSE a.difficulty_snapshot END AS difficulty,
                  (a.content_snapshot IS NULL) AS legacy_fallback,
                  (a.content_snapshot IS NULL AND a.question_snapshot IS NOT NULL) AS requires_repair
                 FROM answer_records a LEFT JOIN questions q ON q.id=a.question_id WHERE
