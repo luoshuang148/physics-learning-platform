@@ -129,7 +129,6 @@
             <strong>{{ event.eventTitle }}</strong>
             <span>{{ event.questionIds?.length ?? 0 }} 题 · {{ formatDate(event.eventTimestamp) }}</span>
           </div>
-          <RouterLink :to="{ path: '/teacher/records', query: { eventId: event.id } }">查看作答</RouterLink>
         </div>
         <div class="archive-pager">
           <button :disabled="historyPage <= 1" @click="changeHistoryPage(-1)">上一页</button>

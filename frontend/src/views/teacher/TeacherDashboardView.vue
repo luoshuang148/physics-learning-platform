@@ -154,7 +154,6 @@ const links = teacherNavLinks;
 
 const shortcuts = [
   { label: '用户管理', to: '/teacher/users' },
-  { label: '答题记录', to: '/teacher/records' },
   { label: '学生学情', to: '/teacher/student-analysis' },
   { label: '题库管理', to: '/teacher/questions' },
   { label: '任务管理', to: '/teacher/event-manage' },

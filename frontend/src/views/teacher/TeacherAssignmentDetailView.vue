@@ -14,7 +14,6 @@
           </div>
         </div>
         <div class="detail-actions">
-          <RouterLink :to="{ path: '/teacher/records', query: { eventId: data.taskId } }" class="ghost-btn">查看原始记录</RouterLink>
           <button class="ghost-btn" @click="exportCsv">导出 CSV</button>
         </div>
       </section>
@@ -41,7 +40,7 @@
         </div>
         <div class="table-wrap">
           <table class="detail-table">
-            <thead><tr><th>学生</th><th>账号</th><th>班级</th><th>状态</th><th>已答</th><th>正确</th><th>未答</th><th>最后作答</th><th></th></tr></thead>
+            <thead><tr><th>学生</th><th>账号</th><th>班级</th><th>状态</th><th>已答</th><th>正确</th><th>未答</th><th>最后作答</th></tr></thead>
             <tbody>
               <tr v-for="student in filteredStudents" :key="student.userId">
                 <td><strong>{{ student.realName }}</strong></td>
@@ -52,7 +51,7 @@
                 <td>{{ student.correctQuestions }}</td>
                 <td>{{ student.missingQuestions }}</td>
                 <td>{{ student.lastAnsweredAt ? formatDate(student.lastAnsweredAt) : '—' }}</td>
-                <td><RouterLink :to="{ path: '/teacher/records', query: { eventId: data.taskId, studentName: student.realName } }" class="table-link">记录</RouterLink></td>
+
               </tr>
               <tr v-if="filteredStudents.length === 0"><td colspan="9" class="table-empty">当前筛选下没有学生</td></tr>
             </tbody>

@@ -7,11 +7,6 @@ export interface AnswerRecordSubmitPayload {
   answeredAt?: string;
 }
 
-export interface RecordBatchDeletePayload {
-  startTime: string;
-  endTime: string;
-}
-
 export interface AnswerRecordResponse {
   eventId: number | null;
   practice?: boolean;

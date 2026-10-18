@@ -1,6 +1,6 @@
 import request from '@/utils/request';
 import type { ApiResponse, PageResult } from '@/types/common';
-import type { AnswerRecordBatchResponse, AnswerRecordResponse, AnswerRecordSubmitPayload, RecordBatchDeletePayload, AnswerStatsResponse, AnswerRecordSummary, StudentAnswerSummary } from '@/types/answer-record';
+import type { AnswerRecordBatchResponse, AnswerRecordResponse, AnswerRecordSubmitPayload, AnswerStatsResponse, AnswerRecordSummary, StudentAnswerSummary } from '@/types/answer-record';
 
 export const submitAnswerApi = async (payload: AnswerRecordSubmitPayload): Promise<AnswerRecordResponse> => {
   const { data } = await request.post<ApiResponse<AnswerRecordResponse>>('/answer-records/student/submit', payload);
@@ -47,14 +47,6 @@ export const getStudentLatestSessionRecordsApi = async (studentId: number): Prom
   return data.data;
 };
 
-export const deleteAnswerRecordApi = async (recordId: string): Promise<void> => {
-  await request.delete<ApiResponse<void>>(`/answer-records/teacher/${recordId}`);
-};
-
-export const batchDeleteAnswerRecordsApi = async (payload: RecordBatchDeletePayload): Promise<void> => {
-  await request.delete<ApiResponse<void>>('/answer-records/teacher/batch', { data: payload });
-};
-
 export const getTotalAnswerCountApi = async (): Promise<number> => {
   const { data } = await request.get<ApiResponse<number>>('/answer-records/teacher/count');
   return data.data;
@@ -65,12 +57,6 @@ export const getAnswerStatsApi = async (): Promise<AnswerStatsResponse> => {
   return data.data;
 };
 
-
-export const getAnswerRecordPageApi = async (params: { page: number; size: number; wrongOnly: boolean; studentName: string; eventId?: number }) => {
-  const { data } = await request.get<ApiResponse<import('@/types/common').PageResult<AnswerRecordResponse>>>(
-    '/answer-records/teacher/page', { params });
-  return data.data;
-};
 
 export const getMyAnswerPageApi = async (params: { page: number; size: number; wrongOnly?: boolean; keyword?: string }): Promise<PageResult<AnswerRecordSummary>> => {
   const { data } = await request.get<ApiResponse<PageResult<AnswerRecordSummary>>>('/answer-records/student/history', { params });
