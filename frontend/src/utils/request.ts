@@ -38,6 +38,9 @@ request.interceptors.response.use(
     return response;
   },
   (error: AxiosError<any>) => {
+    if(error.response?.status===401 && !error.config?.url?.includes('/auth/login')) {
+      localStorage.removeItem('zhixue_token');window.dispatchEvent(new Event('auth-expired'));
+    }
     if (error?.response?.data?.code === 4508) {
       resetSessionId();
     }

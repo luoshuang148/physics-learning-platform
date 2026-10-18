@@ -12,6 +12,10 @@ import java.util.List;
 @Repository
 public interface UserRepository extends JpaRepository<User, Long> {
     long countByUserTypeAndActiveTrue(UserType role);
+    @org.springframework.data.jpa.repository.Modifying(flushAutomatically=true,clearAutomatically=true)
+    @org.springframework.transaction.annotation.Transactional
+    @Query("update User u set u.tokenVersion=u.tokenVersion+1 where u.id=:id")
+    int incrementTokenVersion(@org.springframework.data.repository.query.Param("id") Long id);
     @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
     @Query("select u from User u where u.id=:id")
     Optional<User> lockById(@org.springframework.data.repository.query.Param("id") Long id);

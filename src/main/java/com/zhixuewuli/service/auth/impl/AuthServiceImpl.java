@@ -101,7 +101,7 @@ public class AuthServiceImpl implements AuthService {
         user.setLastLogin(java.time.LocalDateTime.now());
         userRepository.save(user);
 
-        log.info("用户登录成功，登录标识: {}, 实际用户名: {}", loginId, user.getUsername());
+        log.debug("用户登录成功，登录标识: {}, 实际用户名: {}", loginId, user.getUsername());
         return user;
     }
 
@@ -114,7 +114,7 @@ public class AuthServiceImpl implements AuthService {
             throw new IllegalArgumentException("用户对象不能为空");
         }
 
-        return jwtUtil.generateToken(user.getId(), user.getUsername());
+        return jwtUtil.generateToken(user.getId(), user.getUsername(),user.getTokenVersion()==null?0L:user.getTokenVersion());
     }
 
     /**
@@ -127,7 +127,7 @@ public class AuthServiceImpl implements AuthService {
             throw new com.zhixuewuli.common.exception.InsufficientPermissionException(
                     "公开注册仅允许学生账号，教师身份须由已授权教师在用户管理中授予");
         }
-        log.info("开始处理用户注册请求，用户名: {}", request.getUsername());
+        log.debug("开始处理用户注册请求，用户名: {}", request.getUsername());
 
         // 验证用户名唯一性
         if (userRepository.existsByUsername(request.getUsername())) {
@@ -153,8 +153,10 @@ public class AuthServiceImpl implements AuthService {
         // 保存用户
         User savedUser = userRepository.save(newUser);
 
-        log.info("用户注册成功，用户ID: {}, 用户名: {}", savedUser.getId(), savedUser.getUsername());
+        log.debug("用户注册成功，用户ID: {}, 用户名: {}", savedUser.getId(), savedUser.getUsername());
 
         return savedUser;
     }
+    @Override @Transactional
+    public void logout(Long userId){userRepository.incrementTokenVersion(userId);}
 }

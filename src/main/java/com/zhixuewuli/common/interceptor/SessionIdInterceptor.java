@@ -117,7 +117,7 @@ public class SessionIdInterceptor implements HandlerInterceptor {
 
         // 记录会话使用情况和性能信息
         if (sessionId != null) {
-            log.info("会话请求处理完成 - 会话ID: {}, URI: {}, Status: {}",
+            log.debug("会话请求处理完成 - 会话ID: {}, URI: {}, Status: {}",
                     sessionId,
                     request.getRequestURI(),
                     response.getStatus());

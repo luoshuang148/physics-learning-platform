@@ -65,14 +65,22 @@ public class SecurityConfig {
      * @implSpec 生产环境应启用JWT认证和适当的权限控制
      */
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain filterChain(HttpSecurity http,com.zhixuewuli.common.util.JwtUtil jwt,com.zhixuewuli.repository.UserRepository users) throws Exception {
         http
                 // 禁用CSRF保护（开发阶段）
                 .csrf(AbstractHttpConfigurer::disable)
                 // 配置请求授权规则
                 .authorizeHttpRequests(authz -> authz
                         // 允许所有请求匿名访问
+                        .requestMatchers("/actuator/health").permitAll()
+                        .requestMatchers("/actuator/**").hasRole("TEACHER")
                         .anyRequest().permitAll())
+                .addFilterBefore(new com.zhixuewuli.common.security.ActuatorTokenFilter(jwt,users),org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter.class)
+                .exceptionHandling(errors->errors.authenticationEntryPoint((request,response,error)->{
+                    response.setStatus(401);response.setContentType("application/json;charset=UTF-8");response.getWriter().write("{\"code\":401,\"message\":\"请先登录\"}");
+                }).accessDeniedHandler((request,response,error)->{
+                    response.setStatus(403);response.setContentType("application/json;charset=UTF-8");response.getWriter().write("{\"code\":403,\"message\":\"权限不足\"}");
+                }))
                 // 允许同源 iframe，供学生实验页嵌入实验组件
                 .headers(headers -> headers.frameOptions(HeadersConfigurer.FrameOptionsConfig::sameOrigin))
                 // 禁用表单登录

@@ -87,6 +87,11 @@ import java.util.stream.Collectors;
 @Slf4j
 public class GlobalExceptionHandler {
 
+    @ExceptionHandler(com.zhixuewuli.common.security.LoginAttemptLimiter.LoginThrottledException.class)
+    public ResponseEntity<Result<?>> loginThrottled(RuntimeException error){
+        return ResponseEntity.status(429).header("Retry-After","60").body(Result.error(ResultCode.BUSINESS_ERROR,"登录尝试过多，请一分钟后重试"));
+    }
+
     // ==================== 验证相关异常处理（最优先） ====================
 
     /**
@@ -391,7 +396,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(QuestionBusinessException.class)
     public ResponseEntity<Result<?>> handleQuestionBusinessException(QuestionBusinessException e) {
         log.warn("题目业务异常兜底: {} - {}", e.getCode(), e.getMessage());
-        Result<?> result = Result.error(e.getCode(), e.getMessage());
+        Result<?> result = Result.error(e.getCode(), null);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(result);
     }
 
@@ -434,7 +439,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(AnswerRecordBusinessException.class)
     public ResponseEntity<Result<?>> handleAnswerRecordBusinessException(AnswerRecordBusinessException e) {
         log.warn("答题记录业务异常: {} - {}", e.getCode(), e.getMessage());
-        Result<?> result = Result.error(e.getCode(), e.getMessage());
+        Result<?> result = Result.error(e.getCode(), null);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(result);
     }
 
@@ -559,7 +564,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(TeacherEventBusinessException.class)
     public ResponseEntity<Result<?>> handleTeacherEventBusinessException(TeacherEventBusinessException e) {
         log.warn("教师事件业务异常: {} - {}", e.getCode(), e.getMessage());
-        Result<?> result = Result.error(e.getCode(), e.getMessage());
+        Result<?> result = Result.error(e.getCode(), null);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(result);
     }
 
@@ -574,7 +579,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(SegmentationException.class)
     public ResponseEntity<Result<?>> handleSegmentationException(SegmentationException e) {
         log.warn("分词异常: {}", e.getMessage());
-        Result<?> result = Result.error(e.getCode(), e.getMessage());
+        Result<?> result = Result.error(e.getCode(), null);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(result);
     }
 
@@ -587,7 +592,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(WordCloudAnalysisException.class)
     public ResponseEntity<Result<?>> handleWordCloudAnalysisException(WordCloudAnalysisException e) {
         log.warn("词云分析异常: {}", e.getMessage());
-        Result<?> result = Result.error(e.getCode(), e.getMessage());
+        Result<?> result = Result.error(e.getCode(), null);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(result);
     }
 
@@ -600,7 +605,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(QuestionErrorAnalysisException.class)
     public ResponseEntity<Result<?>> handleQuestionErrorAnalysisException(QuestionErrorAnalysisException e) {
         log.warn("错题分析业务异常: {} - {}", e.getCode(), e.getMessage());
-        Result<?> result = Result.error(e.getCode(), e.getMessage());
+        Result<?> result = Result.error(e.getCode(), null);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(result);
     }
 
@@ -685,7 +690,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(AIResponseParseException.class)
     public ResponseEntity<Result<?>> handleAIResponseParseException(AIResponseParseException e) {
         log.error("AI响应解析异常: {}", e.getMessage(), e);
-        Result<?> result = Result.errorWithMessageAndReason(e.getCode(), "AI响应解析失败", e.getMessage());
+        Result<?> result = Result.errorWithMessageAndReason(e.getCode(), "AI响应解析失败", null);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(result);
     }
 
@@ -698,7 +703,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(SessionManagementException.class)
     public ResponseEntity<Result<?>> handleSessionManagementException(SessionManagementException e) {
         log.error("会话管理异常: {}", e.getMessage(), e);
-        Result<?> result = Result.errorWithMessageAndReason(e.getCode(), "会话管理失败", e.getMessage());
+        Result<?> result = Result.errorWithMessageAndReason(e.getCode(), "会话管理失败", null);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(result);
     }
 
@@ -712,7 +717,7 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Result<?>> handleSessionOperationException(SessionOperationException e) {
         log.error("会话操作异常: {}", e.getMessage(), e);
         Result<?> result = Result.errorWithMessageAndReason(e.getCode(), "会话操作失败",
-                e.getMessage());
+                null);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(result);
     }
 
@@ -739,7 +744,7 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Result<?>> handleTokenCalculationException(TokenCalculationException e) {
         log.error("令牌计算异常: {}", e.getMessage(), e);
         Result<?> result = Result.errorWithMessageAndReason(e.getCode(), "令牌计算失败",
-                e.getMessage());
+                null);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(result);
     }
 
@@ -752,7 +757,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(AITechnicalException.class)
     public ResponseEntity<Result<?>> handleAITechnicalException(AITechnicalException e) {
         log.error("AI技术异常: {} - {}", e.getCode(), e.getMessage(), e);
-        Result<?> result = Result.errorWithMessageAndReason(e.getCode(), "AI技术服务异常，请稍后重试", e.getMessage());
+        Result<?> result = Result.errorWithMessageAndReason(e.getCode(), "AI技术服务异常，请稍后重试", null);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(result);
     }
 
@@ -773,7 +778,7 @@ public class GlobalExceptionHandler {
                 constraintInfo.getDuplicateValue(),
                 constraintInfo.getConstraintType()) : null;
         Result<?> result = Result.errorWithMessageAndReason(ResultCode.DATABASE_CONSTRAINT_VIOLATION,
-                constraintInfo.getFriendlyMessage(), reason);
+                constraintInfo.getFriendlyMessage(), null);
         return ResponseEntity.status(HttpStatus.CONFLICT).body(result);
     }
 
@@ -787,7 +792,7 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Result<?>> handleDataAccessException(DataAccessException e) {
         log.error("数据库访问异常: ", e);
         Result<?> result = Result.errorWithMessageAndReason(ResultCode.DATABASE_ACCESS_FAILED, "数据库连接失败，请稍后重试",
-                e.getMessage());
+                null);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(result);
     }
 
@@ -819,7 +824,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(TechnicalException.class)
     public ResponseEntity<Result<?>> handleGenericTechnicalException(TechnicalException e) {
         log.error("通用技术异常兜底: {} - {}", e.getCode(), e.getMessage(), e);
-        Result<?> result = Result.errorWithMessageAndReason(e.getCode(), "系统繁忙，请稍后重试", e.getMessage());
+        Result<?> result = Result.errorWithMessageAndReason(e.getCode(), "系统繁忙，请稍后重试", null);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(result);
     }
 
@@ -836,7 +841,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Result<?>> handleUnknownException(Exception e) {
         log.error("系统未知异常: ", e);
-        Result<?> result = Result.errorWithMessageAndReason(ResultCode.TECHNICAL_ERROR, "系统繁忙，请稍后重试", e.getMessage());
+        Result<?> result = Result.errorWithMessageAndReason(ResultCode.TECHNICAL_ERROR, "系统繁忙，请稍后重试", null);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(result);
     }
 }

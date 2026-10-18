@@ -25,6 +25,7 @@ COLLATE = utf8mb4_unicode_ci;
 -- 1. 用户表 (users) - 存储用户基本信息
 -- ====================================================================
 CREATE TABLE IF NOT EXISTS users (
+    token_version BIGINT NOT NULL DEFAULT 0,
     id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '用户ID',
     username VARCHAR(50) NOT NULL UNIQUE COMMENT '用户名（学号/工号）',
     password_hash VARCHAR(255) NOT NULL COMMENT '加密密码',

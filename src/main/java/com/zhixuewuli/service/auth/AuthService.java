@@ -34,6 +34,7 @@ import com.zhixuewuli.entity.User;
  * @see RegisterRequest 注册请求DTO
  */
 public interface AuthService {
+    void logout(Long userId);
 
     /**
      * 用户认证 - 验证用户名和密码

@@ -90,8 +90,7 @@ public class WebConfig implements WebMvcConfigurer {
     public void addInterceptors(InterceptorRegistry registry) {
         // 用户ID拦截器（需要认证的接口）
         registry.addInterceptor(userIdInterceptor)
-                .addPathPatterns("/**")
-                .excludePathPatterns(securityProperties.getAuthExcludePaths());
+                .addPathPatterns("/**");
 
         // 会话ID拦截器（所有接口，除文档外）
         registry.addInterceptor(sessionIdInterceptor)

@@ -55,6 +55,7 @@ import org.springframework.web.bind.annotation.*;
 public class AuthController {
 
     private final AuthService authService;
+    private final com.zhixuewuli.common.security.LoginAttemptLimiter limiter;
 
     /**
      * 用户登录接口
@@ -80,11 +81,14 @@ public class AuthController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "账户已被禁用")
         }
     )
-    public Result<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
-        log.info("用户登录请求，用户名: {}", request.getUsername());
+    public Result<LoginResponse> login(@Valid @RequestBody LoginRequest request,jakarta.servlet.http.HttpServletRequest servletRequest) {
+        log.debug("用户登录请求，用户名: {}", request.getUsername());
 
         // 执行用户认证
-        User user = authService.authenticate(request.getUsername(), request.getPassword());
+        String peer=servletRequest.getRemoteAddr();limiter.check(peer,request.getUsername());
+        User user;
+        try {user=authService.authenticate(request.getUsername(),request.getPassword());limiter.succeeded(peer,request.getUsername());}
+        catch(com.zhixuewuli.common.exception.auth.AuthenticationException failure){throw new com.zhixuewuli.common.exception.auth.InvalidCredentialsException();}
 
         // 生成JWT访问令牌
         String token = authService.generateAccessToken(user);
@@ -97,7 +101,7 @@ public class AuthController {
         response.setUserType(user.getUserType().name());
         response.setRealName(user.getRealName());
 
-        log.info("用户登录成功，用户ID: {}, 用户名: {}", user.getId(), user.getUsername());
+        log.debug("用户登录成功，用户ID: {}, 用户名: {}", user.getId(), user.getUsername());
 
         return Result.success(response);
     }
@@ -126,7 +130,7 @@ public class AuthController {
     )
     @ResponseStatus(HttpStatus.CREATED)
     public Result<RegisterResponse> register(@Valid @RequestBody RegisterRequest request) {
-        log.info("收到用户注册请求，用户名: {}", request.getUsername());
+        log.debug("收到用户注册请求，用户名: {}", request.getUsername());
 
         // 执行用户注册
         User registeredUser = authService.registerUser(request);
@@ -136,7 +140,7 @@ public class AuthController {
                 registeredUser.getUsername(),
                 registeredUser.getUserType().name());
 
-        log.info("用户注册成功，用户ID: {}, 用户名: {}",
+        log.debug("用户注册成功，用户ID: {}, 用户名: {}",
                 registeredUser.getId(), registeredUser.getUsername());
 
         return Result.created(response);
@@ -161,10 +165,11 @@ public class AuthController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "登出成功")
         }
     )
-    public Result<String> logout() {
+    public Result<String> logout(jakarta.servlet.http.HttpServletRequest request) {
+        authService.logout((Long)request.getAttribute("userId"));
         // 在JWT无状态模式下，服务器端不需要特殊处理
         // 客户端应负责删除本地存储的令牌
-        log.info("用户登出请求");
+        log.debug("用户登出请求");
         return Result.success("登出成功");
     }
 }

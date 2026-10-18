@@ -458,6 +458,9 @@ const submitProfileEditor = async () => {
       realName: profileForm.realName.trim(),
       className: profileForm.className.trim() || null,
     });
+    if(profileForm.password.trim()) {
+      await auth.clearAuth();profileModalOpen.value=false;await router.replace('/auth/login');return;
+    }
     auth.user = updatedUser;
     profileModalOpen.value = false;
 

@@ -71,13 +71,15 @@ public class JwtUtil {
      * @throws IllegalArgumentException 当参数为空或无效时抛出
      * @throws RuntimeException         当令牌生成失败时抛出
      */
-    public String generateToken(Long userId, String username) {
+    public String generateToken(Long userId,String username){return generateToken(userId,username,0L);}
+    public String generateToken(Long userId, String username,long tokenVersion) {
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + securityProperties.getJwtExpirationMs());
 
         return Jwts.builder()
                 .subject(username)
                 .claim("userId", userId)
+                .claim("tokenVersion",tokenVersion)
                 .issuedAt(now)
                 .expiration(expiryDate)
                 .signWith(getSigningKey())
@@ -150,5 +152,9 @@ public class JwtUtil {
                 .parseSignedClaims(token)
                 .getPayload();
         return claims.getSubject();
+    }
+    public long getTokenVersion(String token){
+        var claims=Jwts.parser().verifyWith(getSigningKey()).build().parseSignedClaims(token).getPayload();
+        Number version=(Number)claims.get("tokenVersion");return version==null?0:version.longValue();
     }
 }

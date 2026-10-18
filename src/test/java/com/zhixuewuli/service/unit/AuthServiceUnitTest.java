@@ -239,14 +239,14 @@ class AuthServiceUnitTest extends BaseUnitTest {
     void generateAccessToken_shouldReturnJwtString() {
         // Given
         String expectedToken = "mock.jwt.token.string";
-        when(jwtUtil.generateToken(mockUser.getId(), mockUser.getUsername())).thenReturn(expectedToken);
+        when(jwtUtil.generateToken(mockUser.getId(), mockUser.getUsername(),mockUser.getTokenVersion())).thenReturn(expectedToken);
 
         // When
         String result = authService.generateAccessToken(mockUser);
 
         // Then
         assertThat(result).isEqualTo(expectedToken);
-        verify(jwtUtil).generateToken(mockUser.getId(), mockUser.getUsername());
+        verify(jwtUtil).generateToken(mockUser.getId(), mockUser.getUsername(),mockUser.getTokenVersion());
     }
 
     @Test

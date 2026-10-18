@@ -50,6 +50,8 @@ import java.util.List;
 @Data
 @EqualsAndHashCode(callSuper = false)
 public class User extends BaseTimeEntity {
+    @Column(name="token_version",nullable=false,columnDefinition="BIGINT DEFAULT 0")
+    private Long tokenVersion=0L;
 
     /**
      * 用户唯一标识符，主键自增长

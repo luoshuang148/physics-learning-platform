@@ -83,7 +83,9 @@ public class UserServiceImpl implements UserService {
         }
 
 
-        return userRepository.save(user);
+        User saved=userRepository.save(user);
+        if(request.getPassword()!=null&&!request.getPassword().isEmpty()) userRepository.incrementTokenVersion(currentUserId);
+        return saved;
     }
 
     @Override
@@ -139,7 +141,9 @@ public class UserServiceImpl implements UserService {
             targetUser.setUserType(request.getUserType());
         }
 
-        return userRepository.save(targetUser);
+        User saved=userRepository.save(targetUser);
+        if(request.getUserType()!=null || request.getActive()!=null) userRepository.incrementTokenVersion(userId);
+        return saved;
     }
 
     @Override

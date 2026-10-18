@@ -88,39 +88,42 @@ public class UserIdInterceptor implements HandlerInterceptor {
      * @implSpec 提取并存储用户上下文信息
      * @implSpec 未认证请求返回401状态码
      */
+    @org.springframework.beans.factory.annotation.Value("${springdoc.api-docs.enabled:true}")
+    private boolean docsEnabled=true;
+
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler)
             throws Exception {
 
-        log.info("=== UserIdInterceptor.preHandle 开始执行 ===");
-        log.info("请求URI: {}", request.getRequestURI());
-        log.info("请求方法: {}", request.getMethod());
-        log.info("Handler类型: {}", handler.getClass().getSimpleName());
+        log.debug("=== UserIdInterceptor.preHandle 开始执行 ===");
+        log.debug("请求URI: {}", request.getRequestURI());
+        log.debug("请求方法: {}", request.getMethod());
+        log.debug("Handler类型: {}", handler.getClass().getSimpleName());
 
         // 只处理Controller方法
         if (!(handler instanceof HandlerMethod)) {
-            log.info("不是Controller方法，跳过处理");
+            log.debug("不是Controller方法，跳过处理");
             return true;
         }
 
         HandlerMethod handlerMethod = (HandlerMethod) handler;
-        log.info("处理的方法: {}.{}",
+        log.debug("处理的方法: {}.{}",
                 handlerMethod.getBeanType().getSimpleName(),
                 handlerMethod.getMethod().getName());
 
         // 检查是否需要跳过认证
         if (shouldSkipAuthentication(request)) {
             log.debug("跳过认证检查，路径: {}", request.getRequestURI());
-            log.info("=== UserIdInterceptor.preHandle 结束(跳过) ===");
+            log.debug("=== UserIdInterceptor.preHandle 结束(跳过) ===");
             return true;
         }
 
         try {
-            log.info("开始JWT令牌验证流程");
+            log.debug("开始JWT令牌验证流程");
 
             // 提取并验证JWT令牌
             String token = extractToken(request);
-            log.info("提取到的令牌: {}", token != null ? "[存在]" : "[不存在]");
+            log.debug("提取到的令牌: {}", token != null ? "[存在]" : "[不存在]");
 
             if (token == null) {
                 log.warn("未找到有效的JWT令牌");
@@ -128,20 +131,20 @@ public class UserIdInterceptor implements HandlerInterceptor {
             }
 
             // 验证JWT令牌有效性
-            log.info("开始验证JWT令牌");
+            log.debug("开始验证JWT令牌");
             if (!jwtUtil.validateToken(token)) {
                 log.warn("JWT令牌验证失败");
                 throw new InvalidTokenException();
             }
-            log.info("JWT令牌验证成功");
+            log.debug("JWT令牌验证成功");
 
             // 从令牌中提取用户ID并查询用户信息
-            log.info("开始提取用户ID");
+            log.debug("开始提取用户ID");
             Long userId = jwtUtil.getUserIdFromToken(token);
-            log.info("提取到的用户ID: {}", userId);
+            log.debug("提取到的用户ID: {}", userId);
 
             // 根据用户ID查询用户信息
-            log.info("开始查询用户信息");
+            log.debug("开始查询用户信息");
             Optional<User> userOpt = userRepository.findById(userId);
             if (userOpt.isEmpty()) {
                 log.warn("用户不存在，ID: {}", userId);
@@ -149,7 +152,14 @@ public class UserIdInterceptor implements HandlerInterceptor {
             }
 
             User user = userOpt.get();
-            log.info("查询到用户: {} ({})", user.getUsername(), user.getUserType());
+            if(jwtUtil.getTokenVersion(token)!=(user.getTokenVersion()==null?0L:user.getTokenVersion())) throw new InvalidTokenException();
+            String apiPath=com.zhixuewuli.common.security.PublicEndpointPolicy.path(request);
+            if(com.zhixuewuli.common.security.PublicEndpointPolicy.isMonitoring(apiPath) && user.getUserType()!=User.UserType.TEACHER) {
+                response.setStatus(403);response.setContentType("application/json;charset=UTF-8");
+                response.getWriter().write("{\"code\":403,\"message\":\"仅教师可查看运行指标\",\"data\":null}");return false;
+            }
+
+            log.debug("查询到用户: {} ({})", user.getUsername(), user.getUserType());
 
             // 检查用户账户状态
             if (!Boolean.TRUE.equals(user.getActive())) {
@@ -163,12 +173,12 @@ public class UserIdInterceptor implements HandlerInterceptor {
             request.setAttribute("username", user.getUsername());
             request.setAttribute("userType", user.getUserType());
 
-            log.info("设置请求属性 - userId: {}, username: {}, userType: {}",
+            log.debug("设置请求属性 - userId: {}, username: {}, userType: {}",
                     userId, user.getUsername(), user.getUserType());
 
             log.debug("用户认证成功，用户ID: {}, 用户名: {}, 路径: {}",
                     userId, user.getUsername(), request.getRequestURI());
-            log.info("=== UserIdInterceptor.preHandle 成功结束 ===");
+            log.debug("=== UserIdInterceptor.preHandle 成功结束 ===");
 
             return true;
 
@@ -177,18 +187,18 @@ public class UserIdInterceptor implements HandlerInterceptor {
 
             // 处理认证异常，直接返回401状态码
             if (e instanceof com.zhixuewuli.common.exception.auth.AuthenticationException) {
-                log.info("认证失败: {}", e.getMessage());
+                log.debug("认证失败: {}", e.getMessage());
                 response.setStatus(SC_UNAUTHORIZED);
                 response.setContentType("application/json;charset=UTF-8");
                 try {
                     String jsonResponse = "{\"code\":401,\"message\":\"认证失败: " + e.getMessage()
                             + "\",\"data\":null,\"timestamp\":" + System.currentTimeMillis() + "}";
                     response.getWriter().write(jsonResponse);
-                    log.info("已发送401响应");
+                    log.debug("已发送401响应");
                 } catch (Exception ioException) {
                     log.error("写入响应失败", ioException);
                 }
-                log.info("=== UserIdInterceptor.preHandle 失败结束 ===");
+                log.debug("=== UserIdInterceptor.preHandle 失败结束 ===");
                 return false;
             }
             // 其他未知异常转换为技术异常
@@ -210,24 +220,8 @@ public class UserIdInterceptor implements HandlerInterceptor {
      * @implSpec 包含健康检查路径
      */
     private boolean shouldSkipAuthentication(HttpServletRequest request) {
-        String uri = request.getRequestURI();
-    
-        // 白名单路径 - 不需要认证
-        // 使用精确路径匹配，与 WebConfig 中的配置保持一致
-        return "/auth/login".equals(uri) ||
-                "/auth/register".equals(uri) ||
-                uri.startsWith("/videos/") ||
-                (uri.startsWith("/questions/teacher/get/") && !uri.equals("/questions/teacher/get/all")) || // 允许访问题目详情接口（公开），但排除获取所有题目
-                // Swagger/OpenAPI文档相关路径（考虑 context-path）
-                uri.contains("/swagger") ||
-                uri.contains("/v3/api-docs") ||
-                uri.contains("/webjars/") ||
-                // Actuator 监控端点
-                uri.contains("/actuator") ||
-                // 健康检查和视频相关公开接口
-                "/answers/health".equals(uri) ||
-                "/answers/next-video".equals(uri) ||
-                "/answers/submit-with-next-video".equals(uri);
+        String path=com.zhixuewuli.common.security.PublicEndpointPolicy.path(request);
+        return com.zhixuewuli.common.security.PublicEndpointPolicy.isPublic(path,docsEnabled);
     }
 
     /**
@@ -278,7 +272,7 @@ public class UserIdInterceptor implements HandlerInterceptor {
 
         // 记录请求处理的完整信息
         if (userId != null) {
-            log.info("用户请求处理完成 - 用户ID: {}, URI: {}, Status: {}",
+            log.debug("用户请求处理完成 - 用户ID: {}, URI: {}, Status: {}",
                     userId,
                     request.getRequestURI(),
                     response.getStatus());

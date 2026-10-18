@@ -20,15 +20,15 @@ spring:
 
 springdoc:
   api-docs:
-    enabled: false
+    enabled: ${API_DOCS_ENABLED:false}
   swagger-ui:
-    enabled: false
+    enabled: ${API_DOCS_ENABLED:false}
 
 management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,metrics
   endpoint:
     health:
       show-details: never

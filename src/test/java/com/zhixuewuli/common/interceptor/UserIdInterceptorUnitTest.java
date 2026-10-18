@@ -204,7 +204,7 @@ class UserIdInterceptorUnitTest extends BaseUnitTest {
      */
     @Test
     @DisplayName("TC-UI-05: 白名单路径 /questions/teacher/get/123 - 跳过认证")
-    void testPreHandle_WhitelistQuestionDetail_ShouldSkip() throws Exception {
+    void testPreHandle_QuestionDetailRequiresAuthentication() throws Exception {
         // Given
         when(request.getRequestURI()).thenReturn("/questions/teacher/get/123");
         when(handlerMethod.getBeanType()).thenReturn((Class) Object.class);
@@ -214,7 +214,8 @@ class UserIdInterceptorUnitTest extends BaseUnitTest {
         boolean result = interceptor.preHandle(request, response, handlerMethod);
 
         // Then
-        assertThat(result).isTrue();
+        assertThat(result).isFalse();
+        verify(response).setStatus(401);
         verify(jwtUtil, never()).validateToken(anyString());
     }
 
@@ -452,19 +453,23 @@ class UserIdInterceptorUnitTest extends BaseUnitTest {
 
         String[] whitelistPaths = {
                 "/auth/login",
+                "/actuator/health",
                 "/auth/register",
-                "/questions/teacher/get/123",
-                "/questions/teacher/get/abc",
                 "/swagger-ui.html",
-                "/swagger-resources",
                 "/v3/api-docs/swagger-config",
                 "/webjars/springfox-swagger-ui/swagger-ui.css",
-                "/answers/health",
-                "/answers/next-video",
-                "/answers/submit-with-next-video"
         };
 
         String[] requireAuthPaths = {
+                "/questions/teacher/get/123",
+                "/questions/teacher/get/abc",
+                "/swagger-resources",
+                "/answers/health",
+                "/answers/next-video",
+                "/answers/submit-with-next-video",
+                "/actuator/metrics",
+                "/not-actuator/health",
+
                 "/questions/teacher/get/all",
                 "/api/users",
                 "/auth/login/extra",

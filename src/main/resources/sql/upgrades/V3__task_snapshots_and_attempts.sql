@@ -38,3 +38,6 @@ UPDATE answer_records SET practice=TRUE WHERE event_id IS NULL;
 
 ALTER TABLE answer_records ADD COLUMN content_snapshot LONGTEXT NULL, ADD COLUMN options_snapshot LONGTEXT NULL,
  ADD COLUMN correct_snapshot VARCHAR(1) NULL, ADD COLUMN analysis_snapshot LONGTEXT NULL, ADD COLUMN difficulty_snapshot INT NULL;
+
+-- Invalidate tokens issued by releases without persistent version claims.
+ALTER TABLE users ADD COLUMN token_version BIGINT NOT NULL DEFAULT 1;
