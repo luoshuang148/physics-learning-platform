@@ -46,6 +46,7 @@ public class TaskQuestionService {
  }
  public List<Long> ids(Long eventId) {return snapshots.findQuestionIdsByEventId(eventId);}
  public long count(Long eventId) {return snapshots.countByEventId(eventId);}
+ public java.util.List<com.zhixuewuli.repository.TeacherEventQuestionRepository.TaskQuestionCountRow> countByEventIds(java.util.Collection<Long> eventIds) {return snapshots.countByEventIds(eventIds);}
  public Question get(Long eventId,Long questionId) {
   var row=snapshots.findByEventIdAndQuestionId(eventId,questionId).orElseThrow(()->new IllegalArgumentException("题目不属于该任务"));
   if("MISSING".equals(row.getSnapshotOrigin())) throw new IllegalArgumentException("升级前题目已缺失，无法恢复原题");

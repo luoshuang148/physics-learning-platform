@@ -9,6 +9,9 @@ public interface TeacherEventQuestionRepository extends JpaRepository<TeacherEve
  List<Long> findQuestionIdsByEventId(@org.springframework.data.repository.query.Param("id") Long id);
  List<TeacherEventQuestion> findByEventIdOrderByPositionNumberAsc(Long eventId);
  Optional<TeacherEventQuestion> findByEventIdAndQuestionId(Long eventId,Long questionId);
+ interface TaskQuestionCountRow { Long getEventId(); Long getQuestionCount(); }
+ @org.springframework.data.jpa.repository.Query("select q.eventId as eventId, count(q) as questionCount from TeacherEventQuestion q where q.eventId in :eventIds group by q.eventId")
+ List<TaskQuestionCountRow> countByEventIds(@org.springframework.data.repository.query.Param("eventIds") java.util.Collection<Long> eventIds);
  @org.springframework.data.jpa.repository.Modifying
  @org.springframework.data.jpa.repository.Query("delete from TeacherEventQuestion q where q.eventId=:eventId")
  void deleteByEventId(@org.springframework.data.repository.query.Param("eventId") Long eventId);

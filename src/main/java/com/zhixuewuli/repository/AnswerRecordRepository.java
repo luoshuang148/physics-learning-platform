@@ -67,6 +67,19 @@ public interface AnswerRecordRepository extends JpaRepository<AnswerRecord, Stri
                 "from AnswerRecord a join a.user u where a.eventId=:eventId and a.practice=false " +
                 "and u.active=true and u.userType=com.zhixuewuli.entity.User.UserType.STUDENT group by a.questionId")
         List<TaskQuestionStatsRow> findTaskQuestionStats(@Param("eventId") Long eventId);
+
+        interface TaskOverviewStatsRow {
+            Long getEventId();
+            Long getAnsweredQuestions();
+            Long getCorrectQuestions();
+        }
+
+        @Query("select a.eventId as eventId, count(distinct a.questionId) as answeredQuestions, " +
+                "coalesce(sum(case when a.correct=true then 1 else 0 end),0) as correctQuestions " +
+                "from AnswerRecord a join a.user u where a.eventId in :eventIds and a.practice=false " +
+                "and u.active=true and u.userType=com.zhixuewuli.entity.User.UserType.STUDENT " +
+                "group by a.eventId, a.userId")
+        List<TaskOverviewStatsRow> findTaskOverviewStats(@Param("eventIds") java.util.Collection<Long> eventIds);
         @Query("select count(a) from AnswerRecord a where (:eventId is null or a.eventId=:eventId) and a.correct=true "+
           "and not exists(select b.id from AnswerRecord b where b.userId=a.userId and b.questionId=a.questionId "+
           "and (b.eventId=a.eventId or (b.eventId is null and a.eventId is null)) and b.attemptOrder>a.attemptOrder)")

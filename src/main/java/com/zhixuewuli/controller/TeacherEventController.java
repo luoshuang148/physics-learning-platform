@@ -170,6 +170,12 @@ public class TeacherEventController {
         return Result.success(response);
     }
 
+    @GetMapping("/overview")
+    @Operation(summary = "教师总览任务组合", description = "批量返回各任务完成率、正确率、未交人数与截止信息")
+    public Result<java.util.List<com.zhixuewuli.dto.response.TaskOverviewResponse>> overview(HttpServletRequest request) {
+        return Result.success(teacherEventService.getTaskOverview((Long) request.getAttribute("userId")));
+    }
+
     @GetMapping("/all")
     @Operation(summary = "教师任务列表", description = "返回当前教师所有未归档任务，支持并行任务管理")
     public Result<java.util.List<TeacherEventResponse>> allTasks(HttpServletRequest request) {

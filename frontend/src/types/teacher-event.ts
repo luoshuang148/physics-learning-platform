@@ -71,3 +71,20 @@ export interface TaskDetailResponse {
   students: TaskStudentRow[];
   questions: TaskQuestionRow[];
 }
+export interface TaskOverviewRow {
+  taskId: number;
+  title: string;
+  status: TeacherEventStatus;
+  availability: string;
+  startAt: string | null;
+  dueAt: string | null;
+  questionCount: number;
+  totalStudents: number;
+  participatedStudents: number;
+  completedStudents: number;
+  notStartedStudents: number;
+  completionRate: number;
+  accuracy: number;
+  answeredQuestions: number;
+  correctQuestions: number;
+}

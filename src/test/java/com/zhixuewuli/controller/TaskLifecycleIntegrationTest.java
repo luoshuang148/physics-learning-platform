@@ -83,6 +83,26 @@ class TaskLifecycleIntegrationTest extends BaseControllerIntegrationTest {
     }
 
     @Test
+    void overviewReturnsOneRowPerTaskWithIndependentMetrics() {
+        Question q1 = question("overview one");
+        Question q2 = question("overview two");
+        var done = tasks.publishEvent(request("Overview done", TeacherEvent.Status.PUBLISHED, q1), 2001L);
+        var pending = tasks.publishEvent(request("Overview pending", TeacherEvent.Status.PUBLISHED, q2), 2001L);
+        var submit = new AnswerRecordSubmitRequest();
+        submit.setQuestionId(q1.getId()); submit.setUserAnswer("A"); submit.setIntent("ASSIGNMENT");
+        submit.setEventId(done.getId()); submit.setRequestId("overview-answer");
+        answers.submitAnswerRecord(submit, 1001L, "overview-session");
+
+        var overview = tasks.getTaskOverview(2001L);
+        var doneRow = overview.stream().filter(row -> row.getTaskId().equals(done.getId())).findFirst().orElseThrow();
+        var pendingRow = overview.stream().filter(row -> row.getTaskId().equals(pending.getId())).findFirst().orElseThrow();
+        assertThat(doneRow.getCompletedStudents()).isEqualTo(1);
+        assertThat(doneRow.getAccuracy()).isEqualTo(100.0);
+        assertThat(pendingRow.getNotStartedStudents()).isEqualTo(1);
+        assertThat(pendingRow.getAccuracy()).isZero();
+    }
+
+    @Test
     void multiplePublishedTasksCoexistAndCloseRemovesStudentVisibility() {
         Question q1 = question("parallel one");
         Question q2 = question("parallel two");

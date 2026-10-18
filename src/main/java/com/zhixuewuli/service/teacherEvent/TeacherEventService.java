@@ -33,6 +33,8 @@ public interface TeacherEventService {
 
     com.zhixuewuli.dto.response.TaskDetailResponse getTaskDetail(Long id, Long userId);
 
+    java.util.List<com.zhixuewuli.dto.response.TaskOverviewResponse> getTaskOverview(Long userId);
+
     TeacherEventResponse updateDraft(Long id, TeacherEventCreateRequest request, Long userId);
 
     TeacherEventResponse publishTask(Long id, Long userId);

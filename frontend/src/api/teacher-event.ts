@@ -7,6 +7,11 @@ export const getTeacherEventApi = async (): Promise<TeacherEventResponse | null>
   return data.data;
 };
 
+export const getTeacherTaskOverviewApi = async (): Promise<import('@/types/teacher-event').TaskOverviewRow[]> => {
+  const { data } = await request.get<ApiResponse<import('@/types/teacher-event').TaskOverviewRow[]>>('/teacher/events/overview');
+  return data.data;
+};
+
 export const getTeacherTasksApi = async (): Promise<TeacherEventResponse[]> => {
   const { data } = await request.get<ApiResponse<TeacherEventResponse[]>>('/teacher/events/all');
   return data.data;

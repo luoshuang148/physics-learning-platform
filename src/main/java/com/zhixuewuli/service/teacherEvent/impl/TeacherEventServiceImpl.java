@@ -9,6 +9,7 @@ import com.zhixuewuli.dto.request.TeacherEventCreateRequest;
 import com.zhixuewuli.dto.response.QuestionResponse;
 import com.zhixuewuli.dto.response.TeacherEventResponse;
 import com.zhixuewuli.dto.response.TaskDetailResponse;
+import com.zhixuewuli.dto.response.TaskOverviewResponse;
 import com.zhixuewuli.entity.TeacherEvent;
 import com.zhixuewuli.entity.User;
 import com.zhixuewuli.repository.AnswerRecordRepository;
@@ -210,6 +211,81 @@ public class TeacherEventServiceImpl implements TeacherEventService {
                 .stream().map(this::convertToResponse).toList();
     }
 
+
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<TaskOverviewResponse> getTaskOverview(Long userId) {
+        userPermissionUtil.checkTeacherPermission(userId);
+        List<TeacherEvent> tasks = teacherEventRepository.findByStatusNotOrderByCreatedAtDesc(TeacherEvent.Status.ARCHIVED);
+        if (tasks.isEmpty()) return List.of();
+        List<Long> taskIds = tasks.stream().map(TeacherEvent::getId).toList();
+        long totalStudents = userRepository.countByUserTypeAndActiveTrue(User.UserType.STUDENT);
+
+        Map<Long, Long> questionCounts = new HashMap<>();
+        for (var row : taskQuestions.countByEventIds(taskIds)) {
+            questionCounts.put(row.getEventId(), row.getQuestionCount());
+        }
+        Map<Long, List<AnswerRecordRepository.TaskOverviewStatsRow>> statsByTask = new HashMap<>();
+        for (var row : answerRecordRepository.findTaskOverviewStats(taskIds)) {
+            statsByTask.computeIfAbsent(row.getEventId(), ignored -> new ArrayList<>()).add(row);
+        }
+
+        List<TaskOverviewResponse> result = new ArrayList<>();
+        LocalDateTime now = now();
+        for (TeacherEvent task : tasks) {
+            int questionCount = questionCounts.getOrDefault(task.getId(), 0L).intValue();
+            List<AnswerRecordRepository.TaskOverviewStatsRow> rows = statsByTask.getOrDefault(task.getId(), List.of());
+            long participated = rows.size();
+            long completed = rows.stream().filter(row -> row.getAnsweredQuestions() != null
+                    && row.getAnsweredQuestions() >= questionCount && questionCount > 0).count();
+            long answered = rows.stream().mapToLong(row -> row.getAnsweredQuestions() == null ? 0 : row.getAnsweredQuestions()).sum();
+            long correct = rows.stream().mapToLong(row -> row.getCorrectQuestions() == null ? 0 : row.getCorrectQuestions()).sum();
+            result.add(TaskOverviewResponse.builder()
+                    .taskId(task.getId())
+                    .title(task.getEventTitle())
+                    .status(task.getStatus().name())
+                    .availability(availability(task, now))
+                    .startAt(task.getStartAt() == null ? null : com.zhixuewuli.common.util.LearningTimeWire.format(task.getStartAt(), task.isTimestampUtc()))
+                    .dueAt(task.getDueAt() == null ? null : com.zhixuewuli.common.util.LearningTimeWire.format(task.getDueAt(), task.isTimestampUtc()))
+                    .questionCount(questionCount)
+                    .totalStudents(totalStudents)
+                    .participatedStudents(participated)
+                    .completedStudents(completed)
+                    .notStartedStudents(Math.max(totalStudents - participated, 0))
+                    .completionRate(percent(completed, totalStudents))
+                    .accuracy(percent(correct, answered))
+                    .answeredQuestions(answered)
+                    .correctQuestions(correct)
+                    .build());
+        }
+        result.sort((a, b) -> {
+            int rank = Integer.compare(overviewRank(a), overviewRank(b));
+            if (rank != 0) return rank;
+            if (a.getDueAt() == null && b.getDueAt() != null) return 1;
+            if (a.getDueAt() != null && b.getDueAt() == null) return -1;
+            return a.getDueAt() == null ? 0 : a.getDueAt().compareTo(b.getDueAt());
+        });
+        return result;
+    }
+
+    private String availability(TeacherEvent task, LocalDateTime now) {
+        if (task.getStatus() == TeacherEvent.Status.DRAFT) return "DRAFT";
+        if (task.getStatus() == TeacherEvent.Status.CLOSED) return "CLOSED";
+        if (task.getStatus() == TeacherEvent.Status.PUBLISHED) {
+            if (task.isScheduledAt(now)) return "SCHEDULED";
+            if (task.isEndedAt(now)) return "ENDED";
+            return "OPEN";
+        }
+        return "ARCHIVED";
+    }
+
+    private int overviewRank(TaskOverviewResponse task) {
+        if ("OPEN".equals(task.getAvailability())) return 0;
+        if ("SCHEDULED".equals(task.getAvailability())) return 1;
+        if ("DRAFT".equals(task.getStatus())) return 2;
+        return 3;
+    }
 
     @Override
     @Transactional(readOnly = true)
