@@ -236,8 +236,10 @@ public class TeacherEventServiceImpl implements TeacherEventService {
     public List<TeacherEventResponse> listStudentTasks(Long userId) {
         if (userId == null) throw new IllegalArgumentException("用户未登录");
         var assigned=recipients.taskIds(userId);
+        var classId=classAccess.resolveForStudent(userId).getId();
         return teacherEventRepository.findByStatusOrderByStartAtAscCreatedAtDesc(TeacherEvent.Status.PUBLISHED)
-                .stream().filter(task->assigned.contains(task.getId())).map(this::convertToResponse).toList();
+                .stream().filter(task->classId.equals(task.getClassId()) && assigned.contains(task.getId()))
+                .map(this::convertToResponse).toList();
     }
 
     @Override
@@ -245,7 +247,9 @@ public class TeacherEventServiceImpl implements TeacherEventService {
     public List<StudentTaskResultResponse> listStudentTaskResults(Long userId) {
         if (userId == null) throw new IllegalArgumentException("用户未登录");
         var assigned=recipients.taskIds(userId);
-        var tasks = teacherEventRepository.findStudentReviewTasks(userId).stream().filter(task->assigned.contains(task.getId())).toList();
+        var classId=classAccess.resolveForStudent(userId).getId();
+        var tasks = teacherEventRepository.findStudentReviewTasks(userId).stream()
+                .filter(task->classId.equals(task.getClassId()) && assigned.contains(task.getId())).toList();
         if (tasks.isEmpty()) return List.of();
         Map<Long, AnswerRecordRepository.StudentTaskStatsRow> stats = new HashMap<>();
         for (var row : answerRecordRepository.findStudentTaskStats(userId, tasks.stream().map(TeacherEvent::getId).toList())) {
