@@ -17,9 +17,9 @@
           <button class="ghost-btn" :disabled="loadingTasks" @click="loadTasks">刷新任务</button>
         </div>
         <div v-if="loadingTasks" class="empty-hint">加载任务中…</div>
-        <div v-else-if="tasks.length === 0" class="empty-hint">暂无任务</div>
+        <div v-else-if="scopedTasks.length === 0" class="empty-hint">暂无任务</div>
         <div v-else class="task-table">
-          <article v-for="task in tasks" :key="task.id" class="task-row">
+          <article v-for="task in scopedTasks" :key="task.id" class="task-row">
             <div class="task-row-main">
               <div class="task-row-title">
                 <strong>{{ task.eventTitle }}</strong>
@@ -147,6 +147,7 @@ import AppShell from '@/layouts/AppShell.vue';
 import LatexText from '@/components/LatexText.vue';
 import AppToast from '@/components/AppToast.vue';
 import { useAuthStore } from '@/stores/auth';
+import { useClassroomStore } from '@/stores/classroom';
 import { taskAvailabilityText } from '@/utils/assignmentProgress';
 import { useToast } from '@/composables/useToast';
 import {
@@ -164,6 +165,7 @@ import type { QuestionCatalogRow } from '@/types/question';
 import type { TeacherEventResponse } from '@/types/teacher-event';
 
 const auth = useAuthStore();
+const classroom = useClassroomStore();
 const { visible, type, message, show } = useToast();
 
 const { rows: allQuestions, loading: loadingQuestions, page: questionPage, total: questionTotal, pages: questionPages, search: searchText, load: loadQuestions, changePage: changeQuestionPage } = useQuestionCatalog(show);
@@ -182,12 +184,13 @@ const historyTotal = ref(0);
 const historyPages = ref(0);
 
 const questionMap = computed<Record<number, Pick<QuestionCatalogRow, 'id' | 'content'>>>(() => ({ ...selectedQuestions.value, ...Object.fromEntries(allQuestions.value.map(q => [q.id, q])) }));
-const draftTasks = computed(() => tasks.value.filter(task => task.status === 'DRAFT'));
-const openTasks = computed(() => tasks.value.filter(task => task.status === 'PUBLISHED' && task.availability === 'OPEN'));
-const closedTasks = computed(() => tasks.value.filter(task => task.status === 'CLOSED' || task.availability === 'ENDED'));
+const scopedTasks = computed(() => tasks.value.filter(task => task.classId === classroom.activeClassId));
+const draftTasks = computed(() => scopedTasks.value.filter(task => task.status === 'DRAFT'));
+const openTasks = computed(() => scopedTasks.value.filter(task => task.status === 'PUBLISHED' && task.availability === 'OPEN'));
+const closedTasks = computed(() => scopedTasks.value.filter(task => task.status === 'CLOSED' || task.availability === 'ENDED'));
 const latestOpenTask = computed(() => openTasks.value[0] ?? null);
-const canPublish = computed(() => Boolean(taskTitle.value.trim()) && selectedIds.value.length > 0);
-const canSaveDraft = computed(() => Boolean(taskTitle.value.trim()));
+const canPublish = computed(() => Boolean(classroom.activeClassId) && Boolean(taskTitle.value.trim()) && selectedIds.value.length > 0);
+const canSaveDraft = computed(() => Boolean(classroom.activeClassId) && Boolean(taskTitle.value.trim()));
 
 const statusText = (task: TeacherEventResponse) => taskAvailabilityText(task.availability ?? task.status);
 const formatDate = (value: string) => new Date(value).toLocaleString('zh-CN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
@@ -262,6 +265,7 @@ const payload = (status: 'DRAFT' | 'PUBLISHED') => ({
   eventTitle: taskTitle.value.trim(),
   questionIds: [...selectedIds.value],
   eventTimestamp: new Date().toISOString().slice(0, 19),
+  classId: classroom.activeClassId,
   status,
   startAt: toUtcIso(startAt.value),
   dueAt: toUtcIso(dueAt.value),
@@ -308,7 +312,10 @@ const archiveTask = async (task: TeacherEventResponse) => {
     show('任务已归档，历史作答已保留', 'success');
   } catch (error: any) { show(error?.response?.data?.message ?? '归档失败，请重试', 'error'); }
 };
-onMounted(async () => { await Promise.all([loadTasks(), loadHistory()]); });
+onMounted(async () => {
+  if (!classroom.classes.length) await classroom.loadClasses().catch(() => {});
+  await Promise.all([loadTasks(), loadHistory()]);
+});
 </script>
 
 <style scoped>

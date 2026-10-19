@@ -7,6 +7,13 @@
           <span><strong>智学物理</strong><small>PHYSICS LAB</small></span>
         </RouterLink>
         <AppNavigation placement="top" :role="role" />
+        <label v-if="role === 'TEACHER'" class="class-switcher">
+          <span>班级</span>
+          <select :value="classroom.activeClassId ?? ''" @change="switchClass">
+            <option v-if="!classroom.classes.length" value="">未加入班级</option>
+            <option v-for="item in classroom.classes" :key="item.id" :value="item.id">{{ item.name }}</option>
+          </select>
+        </label>
         <div ref="avatarRef" class="app-account">
           <button class="app-account-button" :class="{ open: menuOpen }" aria-label="个人菜单" :aria-expanded="menuOpen" @click="toggleUserMenu">
             <span class="app-avatar">{{ avatarLetter }}</span>
@@ -116,6 +123,7 @@ import { computed, reactive, ref, onMounted, onBeforeUnmount, nextTick, watch } 
 import { useAuthStore } from '@/stores/auth';
 import { useRoute, useRouter } from 'vue-router';
 import { updateCurrentUserApi } from '@/api/user';
+import { useClassroomStore } from '@/stores/classroom';
 import AppNavigation from '@/components/AppNavigation.vue';
 import AppIcon from '@/components/AppIcon.vue';
 
@@ -127,6 +135,7 @@ const DEFAULT_FONT_SIZE = 15;
 const props = defineProps<{ subtitle: string }>();
 
 const auth = useAuthStore();
+const classroom = useClassroomStore();
 const router = useRouter();
 const route = useRoute();
 const role = computed(() => auth.isTeacher ? 'TEACHER' : 'STUDENT');
@@ -155,6 +164,11 @@ const avatarLetter = computed(() => {
 const fontSizeLabel = computed(() => `${fontSize.value}px`);
 
 const showBackButton = computed(() => route.path !== homePath.value);
+
+const switchClass = (event: Event) => {
+  const value = (event.target as HTMLSelectElement).value;
+  classroom.setActiveClass(value ? Number(value) : null);
+};
 
 const goBack = () => {
   if (window.history.length > 1) router.back();
@@ -292,6 +306,7 @@ onMounted(() => {
   document.addEventListener('click', handleClickOutside);
   window.addEventListener('resize', handleWindowChange);
   window.addEventListener('scroll', handleWindowChange, true);
+  if (role.value === 'TEACHER') classroom.loadClasses().catch(() => {});
 });
 
 onBeforeUnmount(() => {
@@ -372,4 +387,8 @@ onBeforeUnmount(() => {
   .app-page-heading h1 { font-size: 1.5rem; }
   .app-back { font-size: .75rem; }
 }
+
+.class-switcher { display: inline-flex; align-items: center; gap: 6px; color: #64748b; font-size: 11px; white-space: nowrap; }
+.class-switcher select { max-width: 150px; padding: 6px 8px; border: 1px solid #dbe3ec; border-radius: 6px; background: #fff; color: #172033; font: inherit; }
+@media (max-width: 760px) { .class-switcher span { display: none; } .class-switcher select { max-width: 104px; } }
 </style>

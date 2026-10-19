@@ -61,12 +61,12 @@ public class ClassAccessService {
         if (classId != null) {
             target = requireClass(classId);
             requireTeacher(classId, teacherId);
-        } else {
-            var owned = classesForTeacher(teacherId);
-            target = owned.isEmpty() ? defaultClass() : owned.getFirst();
-            if (!teachers.existsByClassIdAndTeacherId(target.getId(), teacherId)) {
-                addTeacher(target.getId(), teacherId, ClassTeacher.Role.OWNER);
-            }
+            return target;
+        }
+        var owned = classesForTeacher(teacherId);
+        target = owned.isEmpty() ? defaultClass() : owned.getFirst();
+        if (!teachers.existsByClassIdAndTeacherId(target.getId(), teacherId)) {
+            addTeacher(target.getId(), teacherId, ClassTeacher.Role.OWNER);
         }
         ensureClassDefaults(target.getId());
         return target;

@@ -32,9 +32,9 @@
           <RouterLink to="/teacher/event-manage" class="ghost-btn">任务管理</RouterLink>
         </div>
         <div v-if="loading" class="panel-empty">加载任务概览…</div>
-        <div v-else-if="tasks.length === 0" class="panel-empty">暂无任务</div>
+        <div v-else-if="visibleTasks.length === 0" class="panel-empty">暂无任务</div>
         <div v-else class="task-list">
-          <article v-for="task in tasks" :key="task.taskId" class="task-card" :class="statusClass(task)">
+          <article v-for="task in visibleTasks" :key="task.taskId" class="task-card" :class="statusClass(task)">
             <div class="task-main">
               <div class="task-head">
                 <h3>{{ task.title }}</h3>
@@ -67,22 +67,25 @@
 import { computed, onMounted, ref } from 'vue';
 import AppShell from '@/layouts/AppShell.vue';
 import { useAuthStore } from '@/stores/auth';
+import { useClassroomStore } from '@/stores/classroom';
 import { getTeacherTaskOverviewApi } from '@/api/teacher-event';
 import type { TaskOverviewRow } from '@/types/teacher-event';
 import { studentProgressText, taskAvailabilityText } from '@/utils/assignmentProgress';
 
 const auth = useAuthStore();
+const classroom = useClassroomStore();
 const loading = ref(true);
 const dashboardError = ref('');
 const tasks = ref<TaskOverviewRow[]>([]);
 
-const activeTasks = computed(() => tasks.value.filter(task => task.status === 'PUBLISHED' && task.availability === 'OPEN'));
-const draftCount = computed(() => tasks.value.filter(task => task.status === 'DRAFT').length);
-const closedCount = computed(() => tasks.value.filter(task => task.status === 'CLOSED' || task.availability === 'ENDED').length);
+const visibleTasks = computed(() => tasks.value.filter(task => task.classId === classroom.activeClassId));
+const activeTasks = computed(() => visibleTasks.value.filter(task => task.status === 'PUBLISHED' && task.availability === 'OPEN'));
+const draftCount = computed(() => visibleTasks.value.filter(task => task.status === 'DRAFT').length);
+const closedCount = computed(() => visibleTasks.value.filter(task => task.status === 'CLOSED' || task.availability === 'ENDED').length);
 const pendingCount = computed(() => activeTasks.value.reduce((sum, task) => sum + Math.max(0, task.totalStudents - task.completedStudents), 0));
-const totalStudents = computed(() => Math.max(0, ...tasks.value.map(task => task.totalStudents)));
-const totalAnswered = computed(() => tasks.value.reduce((sum, task) => sum + task.answeredQuestions, 0));
-const totalCorrect = computed(() => tasks.value.reduce((sum, task) => sum + task.correctQuestions, 0));
+const totalStudents = computed(() => Math.max(0, ...visibleTasks.value.map(task => task.totalStudents)));
+const totalAnswered = computed(() => visibleTasks.value.reduce((sum, task) => sum + task.answeredQuestions, 0));
+const totalCorrect = computed(() => visibleTasks.value.reduce((sum, task) => sum + task.correctQuestions, 0));
 const overallAccuracy = computed(() => totalAnswered.value ? Math.round(totalCorrect.value / totalAnswered.value * 1000) / 10 : 0);
 const statusText = (task: TaskOverviewRow) => taskAvailabilityText(task.availability ?? task.status);
 const statusClass = (task: TaskOverviewRow) => ({
@@ -97,6 +100,7 @@ const loadDashboard = async () => {
   loading.value = true; dashboardError.value = '';
   try {
     tasks.value = await getTeacherTaskOverviewApi();
+    if (!classroom.classes.length) await classroom.loadClasses();
   } catch { dashboardError.value = '统计加载失败'; }
   finally { loading.value = false; }
 };

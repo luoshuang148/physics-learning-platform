@@ -6,6 +6,7 @@ export interface TeacherEventCreatePayload {
   eventDescription?: string;
   questionIds?: number[];
   eventTimestamp: string;
+  classId?: number | null;
   status?: TeacherEventStatus;
   startAt?: string | null;
   dueAt?: string | null;
@@ -14,6 +15,7 @@ export interface TeacherEventCreatePayload {
 export interface TeacherEventResponse {
   id: number;
   teacherId: number;
+  classId: number | null;
   questionIds: number[];
   questionCount?: number;
   isGlobal: boolean;
@@ -53,6 +55,7 @@ export interface TaskQuestionRow {
 export interface TaskDetailResponse {
   legacyRoster?: boolean;
   taskId: number;
+  classId: number | null;
   title: string;
   status: TeacherEventStatus;
   availability: string;
@@ -74,6 +77,7 @@ export interface TaskDetailResponse {
 }
 export interface TaskOverviewRow {
   taskId: number;
+  classId: number | null;
   title: string;
   status: TeacherEventStatus;
   availability: string;

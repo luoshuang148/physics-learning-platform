@@ -1,5 +1,5 @@
 <template>
-  <AppShell :subtitle="`学生名册 · ${auth.user?.realName ?? ''}`">
+  <AppShell :subtitle="`学生名册 · ${classroom.activeClass?.name ?? auth.user?.realName ?? ''}`">
     <div class="user-page ops-typography">
       <section class="user-hero">
         <div class="hero-stats">
@@ -140,15 +140,18 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue';
+import { computed, onMounted, reactive, ref, watch } from 'vue';
 import AppShell from '@/layouts/AppShell.vue';
 import AppToast from '@/components/AppToast.vue';
 import { useToast } from '@/composables/useToast';
 import { useAuthStore } from '@/stores/auth';
+import { useClassroomStore } from '@/stores/classroom';
+import { getClassStudentsApi } from '@/api/classroom';
 import { deleteUserByAdminApi, getAllUsersApi, getUserByIdApi, updateUserByAdminApi } from '@/api/user';
 import type { UserAdminUpdateRequest, UserResponse } from '@/types/user';
 
 const auth = useAuthStore();
+const classroom = useClassroomStore();
 const { visible, type, message, show } = useToast();
 
 
@@ -201,7 +204,10 @@ const formatDate = (date: string) => new Date(date).toLocaleString('zh-CN', {
 const loadUsers = async () => {
   loading.value = true;
   try {
-    users.value = (await getAllUsersApi()).filter(user => user.userType === 'STUDENT');
+    const classId = classroom.activeClassId;
+    if (!classId) { users.value = []; return; }
+    const memberIds = new Set((await getClassStudentsApi(classId)).map(row => row.userId));
+    users.value = (await getAllUsersApi()).filter(user => user.userType === 'STUDENT' && memberIds.has(user.id));
     if (selectedUser.value) {
       const matched = users.value.find(user => user.id === selectedUser.value?.id);
       if (matched) {
@@ -291,7 +297,11 @@ const deleteUser = async () => {
   }
 };
 
-onMounted(loadUsers);
+watch(() => classroom.activeClassId, () => { loadUsers().catch(() => {}); });
+onMounted(async () => {
+  if (!classroom.classes.length) await classroom.loadClasses().catch(() => {});
+  await loadUsers();
+});
 </script>
 
 <style scoped>
