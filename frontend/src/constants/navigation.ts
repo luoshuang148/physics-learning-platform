@@ -12,7 +12,7 @@ export const studentNavLinks: AppShellLink[] = [
 
 export const teacherNavLinks: AppShellLink[] = [
   { label: '总览', to: '/teacher/dashboard' },
-  { label: '班级管理', to: '/teacher/classes' },
+  { label: '班级管理', to: '/teacher/classroom' },
   { label: '学生名册', to: '/teacher/users' },
   { label: '题库管理', to: '/teacher/questions' },
   { label: '学生学情', to: '/teacher/student-analysis' },

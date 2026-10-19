@@ -40,6 +40,8 @@ public interface TeacherEventRepository extends JpaRepository<TeacherEvent, Long
 
     Page<TeacherEvent> findByStatusAndClassIdIn(TeacherEvent.Status status, java.util.Collection<Long> classIds, Pageable page);
 
+    Page<TeacherEvent> findByStatusAndClassIdIsNull(TeacherEvent.Status status, Pageable page);
+
     List<TeacherEvent> findByStatusNotOrderByCreatedAtDesc(TeacherEvent.Status status);
 
     List<TeacherEvent> findByStatusOrderByCreatedAtDesc(TeacherEvent.Status status);

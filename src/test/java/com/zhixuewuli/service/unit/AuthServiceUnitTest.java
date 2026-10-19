@@ -43,6 +43,7 @@ import static org.mockito.Mockito.when;
  */
 class AuthServiceUnitTest extends BaseUnitTest {
     @Mock private com.zhixuewuli.service.user.ClassroomGuard classroomGuard;
+    @Mock private com.zhixuewuli.service.classroom.ClassAccessService classAccess;
     @Mock private com.zhixuewuli.service.teacherEvent.TaskRosterService roster;
 
 
@@ -72,6 +73,9 @@ class AuthServiceUnitTest extends BaseUnitTest {
         mockUser.setPasswordHash("$2a$10$example_bcrypt_hash");
         mockUser.setActive(true);
         mockUser.setLastLogin(null);
+        var defaultClass = new com.zhixuewuli.entity.TeachingClass();
+        defaultClass.setId(1L);
+        org.mockito.Mockito.lenient().when(classAccess.defaultClass()).thenReturn(defaultClass);
     }
 
     // ==================== authenticate 测试 ====================

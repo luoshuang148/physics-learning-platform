@@ -225,6 +225,8 @@ import StreamOutput from '@/components/StreamOutput.vue';
 import AppToast from '@/components/AppToast.vue';
 import { useToast } from '@/composables/useToast';
 import { useAuthStore } from '@/stores/auth';
+import { useClassroomStore } from '@/stores/classroom';
+import { getClassStudentsApi } from '@/api/classroom';
 import { getAllUsersApi } from '@/api/user';
 import { getUserAnswerPageApi, getAnswerRecordDetailApi, getStudentAnswerStatsApi } from '@/api/answer-record';
 import { getStudentLatestReportApi } from '@/api/ai';
@@ -239,10 +241,11 @@ interface StudentInsightRow extends UserResponse {
 }
 
 const auth = useAuthStore();
+const classroom = useClassroomStore();
 const { visible, type, message, show } = useToast();
 
 
-const loading = ref(true);
+const loading = ref(false);
 const recordsLoading = ref(false);
 const reportLoading = ref(false);
 const searchText = ref('');
@@ -399,26 +402,31 @@ watch(recordMode, () => {
   void loadStudentRecords(selectedStudent.value.id, ++selectionVersion);
 });
 
-onMounted(async () => {
+const loadInsights = async () => {
+  if (loading.value) return;
   loading.value = true;
   try {
-    const [users, statistics] = await Promise.all([getAllUsersApi(), getStudentAnswerStatsApi()]);
+    if (!classroom.classes.length) await classroom.loadClasses();
+    const classId = classroom.activeClassId;
+    if (!classId) { studentRows.value = []; return; }
+    const [members, users, statistics] = await Promise.all([
+      getClassStudentsApi(classId), getAllUsersApi(), getStudentAnswerStatsApi(),
+    ]);
+    const memberIds = new Set(members.map(row => row.userId));
     const byUser = new Map(statistics.map(row => [row.userId, row]));
-    studentRows.value = users.filter(user => user.userType === 'STUDENT').map(student => {
+    studentRows.value = users.filter(user => user.userType === 'STUDENT' && memberIds.has(user.id)).map(student => {
       const { totalCount = 0, wrongCount = 0 } = byUser.get(student.id) ?? {};
       const errorRate = totalCount ? wrongCount / totalCount * 100 : 0;
       return { ...student, totalCount, wrongCount, errorRate, errorRateText: `${errorRate.toFixed(1)}%` };
     });
-    loading.value = false;
-    if (studentRows.value.length) {
-      await selectStudent(studentRows.value[0]);
-    }
+    if (studentRows.value.length) await selectStudent(studentRows.value[0]);
   } catch (error: any) {
     show(error?.response?.data?.message ?? '加载学生列表失败', 'error');
-  } finally {
-    loading.value = false;
-  }
-});
+  } finally { loading.value = false; }
+};
+
+watch(() => classroom.activeClassId, () => { loadInsights().catch(() => {}); });
+onMounted(loadInsights);
 </script>
 
 <style scoped>

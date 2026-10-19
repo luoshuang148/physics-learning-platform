@@ -33,6 +33,8 @@ async function setup(page: Page, delayedStudent?: { gate: Promise<void>; fail: b
     const history = path.match(/^\/answer-records\/user\/(\d+)\/history$/);
     const answerDetail = path.match(/^\/answer-records\/(\d+-\d+)$/);
     if (path === '/user/me') data = { ...students[0], id: 99, userType: 'TEACHER', realName: '教师' };
+    else if (path === '/teacher/classes') data = [{ id: 1, name: '一班', grade: null, status: 'ACTIVE', studentCount: 3, teacherCount: 1, role: 'OWNER' }];
+    else if (path === '/teacher/classes/1/students') data = students.map(student => ({ userId: student.id, username: student.username, realName: student.realName, className: student.className, active: true }));
     else if (path === '/user/teacher/all') data = students;
     else if (path === '/answer-records/teacher/student-stats') data = [
       { userId: 1, totalCount: 3, wrongCount: 1 }, { userId: 2, totalCount: 3, wrongCount: 1 },

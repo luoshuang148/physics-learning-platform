@@ -34,6 +34,7 @@ import static org.mockito.Mockito.*;
 @Tag("unit")
 class TeacherEventServiceUnitTest {
     @Mock private com.zhixuewuli.service.user.ClassroomGuard classroomGuard;
+    @Mock private com.zhixuewuli.service.classroom.ClassAccessService classAccess;
     @Mock private com.zhixuewuli.service.teacherEvent.TaskRosterService roster;
     @Mock private com.zhixuewuli.repository.TaskRecipientRepository recipients;
     @Mock private com.zhixuewuli.service.ai.report.SavedReportReader savedReports;
@@ -89,6 +90,9 @@ class TeacherEventServiceUnitTest {
         createRequest.setEventTitle("新学期开始");
         createRequest.setEventDescription("2026 年春季学期正式开始");
         createRequest.setEventTimestamp(LocalDateTime.of(2026, 3, 1, 8, 0, 0));
+        var teachingClass = new com.zhixuewuli.entity.TeachingClass();
+        teachingClass.setId(1L);
+        lenient().when(classAccess.resolveForTask(nullable(Long.class), anyLong())).thenReturn(teachingClass);
     }
 
     @Test

@@ -488,11 +488,11 @@ public class TeacherEventServiceImpl implements TeacherEventService {
     public com.zhixuewuli.common.result.PageResult<TeacherEventResponse> getEventHistory(int page, int size, Long teacherId) {
         if (page < 1 || size < 1 || size > 100) throw new IllegalArgumentException("分页参数不合法");
         var classIds = classIds(teacherId);
-        if (classIds.isEmpty()) return com.zhixuewuli.common.result.PageResult.<TeacherEventResponse>builder()
-                .records(List.of()).total(0).pages(0).currentPage(page).pageSize(size).build();
-        var result = teacherEventRepository.findByStatusAndClassIdIn(TeacherEvent.Status.ARCHIVED, classIds,
-                org.springframework.data.domain.PageRequest.of(page - 1, size,
-                        org.springframework.data.domain.Sort.by("updatedAt", "id").descending()));
+        var pageable = org.springframework.data.domain.PageRequest.of(page - 1, size,
+                org.springframework.data.domain.Sort.by("updatedAt", "id").descending());
+        var result = classIds.isEmpty()
+                ? teacherEventRepository.findByStatusAndClassIdIsNull(TeacherEvent.Status.ARCHIVED, pageable)
+                : teacherEventRepository.findByStatusAndClassIdIn(TeacherEvent.Status.ARCHIVED, classIds, pageable);
         return com.zhixuewuli.common.result.PageResult.<TeacherEventResponse>builder()
                 .records(result.map(this::convertToResponse).getContent()).total(result.getTotalElements())
                 .pages(result.getTotalPages()).currentPage(page).pageSize(size).build();

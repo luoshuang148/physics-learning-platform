@@ -142,7 +142,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import AppShell from '@/layouts/AppShell.vue';
 import LatexText from '@/components/LatexText.vue';
 import AppToast from '@/components/AppToast.vue';
@@ -312,6 +312,11 @@ const archiveTask = async (task: TeacherEventResponse) => {
     show('任务已归档，历史作答已保留', 'success');
   } catch (error: any) { show(error?.response?.data?.message ?? '归档失败，请重试', 'error'); }
 };
+watch(() => classroom.activeClassId, () => {
+  resetForm();
+  loadTasks().catch(() => {});
+});
+
 onMounted(async () => {
   if (!classroom.classes.length) await classroom.loadClasses().catch(() => {});
   await Promise.all([loadTasks(), loadHistory()]);

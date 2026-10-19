@@ -45,7 +45,7 @@ const router = createRouter({
 
 
     { path: '/teacher/dashboard', component: TeacherDashboardView, meta: { requiresAuth: true, role: 'TEACHER', sidebarDefault: 'expanded' } },
-    { path: '/teacher/classes', component: TeacherClassView, meta: { requiresAuth: true, role: 'TEACHER', sidebarDefault: 'expanded' } },
+    { path: '/teacher/classroom', component: TeacherClassView, meta: { requiresAuth: true, role: 'TEACHER', sidebarDefault: 'expanded' } },
     { path: '/teacher/users', component: TeacherUserManageView, meta: { requiresAuth: true, role: 'TEACHER', sidebarDefault: 'expanded' } },
     { path: '/teacher/questions', component: TeacherQuestionManageView, meta: { requiresAuth: true, role: 'TEACHER', sidebarDefault: 'expanded' } },
     { path: '/teacher/student-analysis', component: TeacherStudentAnalysisView, meta: { requiresAuth: true, role: 'TEACHER', sidebarDefault: 'expanded' } },
