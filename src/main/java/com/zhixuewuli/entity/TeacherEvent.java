@@ -47,6 +47,9 @@ public class TeacherEvent extends BaseTimeEntity {
     @Size(max = 100, message = "教师姓名长度不能超过100字符")
     private String teacherName;
 
+    @Column(name = "class_id")
+    private Long classId;
+
     @Column(name = "event_title", nullable = false, length = 20)
     @NotBlank(message = "任务标题不能为空")
     @Size(max = 20, message = "任务标题长度不能超过20字符")
