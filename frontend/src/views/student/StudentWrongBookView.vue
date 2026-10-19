@@ -1,5 +1,5 @@
 <template>
-  <AppShell :subtitle="`错题本 · ${auth.user?.realName ?? ''}`" :links="links">
+  <AppShell :subtitle="`错题本 · ${auth.user?.realName ?? ''}`">
     <div class="wb-page student-font">
       <section class="wb-hero">
         <div class="wb-tools">
@@ -262,12 +262,6 @@ const practice = (item: Pick<AnswerRecordSummary, 'eventId' | 'questionId'>) => 
 const auth = useAuthStore();
 const { state: aiState, reset: resetAIState } = useAIStreamState();
 
-const links = [
-  { label: '首页', to: '/student/home' },
-  { label: '作业', to: '/student/task' },
-  { label: '错题本', to: '/student/wrong-book' },
-  { label: '学习报告', to: '/student/report' },
-];
 
 const loading = ref(false);
 const loadingMore = ref(false);

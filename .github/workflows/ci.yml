@@ -62,7 +62,7 @@ jobs:
         run: docker exec -i ${{ job.services.mysql.id }} mysql -uroot -ptest-root-password < src/main/resources/sql/schema_init.sql
       - name: Verify fresh schema against MySQL 8.4
         run: ./mvnw -B test -Dgroups=mysql -DexcludedGroups=external-api
-      - name: Verify preserved legacy fixture and upgrade through V3
+      - name: Verify preserved legacy fixture and upgrade through V7
         env:
           CONFIRM_ISOLATED_DATABASE: '1'
           MYSQL_CONTAINER: ${{ job.services.mysql.id }}
@@ -108,6 +108,8 @@ jobs:
       - run: npx playwright install --with-deps chromium
         working-directory: frontend
       - name: Browser learning lifecycle and security regression
+        env:
+          E2E_ALLOW_WRITES: '1'
         run: npm run test:e2e
         working-directory: frontend
       - name: Synthetic MySQL HTTP benchmark

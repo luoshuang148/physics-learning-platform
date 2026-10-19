@@ -1,5 +1,5 @@
 <template>
-  <AppShell :subtitle="`教师总览 · ${auth.user?.realName ?? ''}`" :links="links">
+  <AppShell :subtitle="`教师总览 · ${auth.user?.realName ?? ''}`">
     <div class="dashboard-page">
       <p v-if="dashboardError" role="alert" class="dashboard-error">{{ dashboardError }} <button @click="loadDashboard">重试</button></p>
 
@@ -10,14 +10,14 @@
           <small>草稿 {{ draftCount }} · 已截止 {{ closedCount }}</small>
         </div>
         <div class="summary-card">
-          <span>应交学生</span>
+          <span>作业最多参与人数</span>
           <strong>{{ totalStudents }}</strong>
-          <small>当前启用</small>
+          <small>按各作业应参与名单统计</small>
         </div>
         <div class="summary-card">
-          <span>未交人次</span>
+          <span>待完成人次</span>
           <strong>{{ pendingCount }}</strong>
-          <small>按任务累计</small>
+          <small>开放作业中尚未答完</small>
         </div>
         <div class="summary-card">
           <span>首次正确率</span>
@@ -52,7 +52,7 @@
             <div class="task-numbers">
               <span>完成率 {{ task.completionRate }}%</span>
               <span>正确率 {{ task.accuracy }}%</span>
-              <span>未交 {{ task.status === 'DRAFT' ? '—' : task.notStartedStudents }}</span>
+              <span v-if="task.status !== 'DRAFT'">{{ studentProgressText('NOT_STARTED', task.availability) }} {{ task.notStartedStudents }}</span>
             </div>
             <RouterLink :to="'/teacher/assignments/' + task.taskId" class="ghost-btn">作业详情</RouterLink>
           </article>
@@ -68,11 +68,10 @@ import { computed, onMounted, ref } from 'vue';
 import AppShell from '@/layouts/AppShell.vue';
 import { useAuthStore } from '@/stores/auth';
 import { getTeacherTaskOverviewApi } from '@/api/teacher-event';
-import { teacherNavLinks } from '@/constants/navigation';
 import type { TaskOverviewRow } from '@/types/teacher-event';
+import { studentProgressText, taskAvailabilityText } from '@/utils/assignmentProgress';
 
 const auth = useAuthStore();
-const links = teacherNavLinks;
 const loading = ref(true);
 const dashboardError = ref('');
 const tasks = ref<TaskOverviewRow[]>([]);
@@ -80,17 +79,12 @@ const tasks = ref<TaskOverviewRow[]>([]);
 const activeTasks = computed(() => tasks.value.filter(task => task.status === 'PUBLISHED' && task.availability === 'OPEN'));
 const draftCount = computed(() => tasks.value.filter(task => task.status === 'DRAFT').length);
 const closedCount = computed(() => tasks.value.filter(task => task.status === 'CLOSED' || task.availability === 'ENDED').length);
-const pendingCount = computed(() => tasks.value.filter(task => task.status === 'PUBLISHED').reduce((sum, task) => sum + task.notStartedStudents, 0));
+const pendingCount = computed(() => activeTasks.value.reduce((sum, task) => sum + Math.max(0, task.totalStudents - task.completedStudents), 0));
 const totalStudents = computed(() => Math.max(0, ...tasks.value.map(task => task.totalStudents)));
 const totalAnswered = computed(() => tasks.value.reduce((sum, task) => sum + task.answeredQuestions, 0));
 const totalCorrect = computed(() => tasks.value.reduce((sum, task) => sum + task.correctQuestions, 0));
 const overallAccuracy = computed(() => totalAnswered.value ? Math.round(totalCorrect.value / totalAnswered.value * 1000) / 10 : 0);
-const statusText = (task: TaskOverviewRow) => {
-  if (task.status === 'DRAFT') return '草稿';
-  if (task.availability === 'SCHEDULED') return '未开始';
-  if (task.status === 'CLOSED' || task.availability === 'ENDED') return '已截止';
-  return '进行中';
-};
+const statusText = (task: TaskOverviewRow) => taskAvailabilityText(task.availability ?? task.status);
 const statusClass = (task: TaskOverviewRow) => ({
   draft: task.status === 'DRAFT',
   scheduled: task.availability === 'SCHEDULED',

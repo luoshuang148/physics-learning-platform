@@ -135,7 +135,7 @@ A: 编辑 `fast-test.bat`，修改以下变量：
 
 ### 测试分组策略
 
-项目使用 TestNG 的 groups 功能对测试进行分类：
+项目使用 JUnit 5 的 @Tag 和 Maven Surefire 的 groups/excludedGroups 进行测试筛选：
 
 - **unit**: 纯单元测试
 - **ai-sync**: AI 同步服务测试

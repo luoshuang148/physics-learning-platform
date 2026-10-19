@@ -2,12 +2,12 @@ package com.zhixuewuli.service.user.impl;
 
 import com.zhixuewuli.common.exception.InsufficientPermissionException;
 import com.zhixuewuli.common.exception.auth.*;
-import com.zhixuewuli.common.util.UserPermissionUtil;
 import com.zhixuewuli.dto.request.UserAdminUpdateRequest;
 import com.zhixuewuli.dto.request.UserSelfUpdateRequest;
 import com.zhixuewuli.entity.User;
 import com.zhixuewuli.repository.UserRepository;
 import com.zhixuewuli.service.user.UserService;
+import com.zhixuewuli.service.user.ClassroomGuard;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -34,9 +34,11 @@ import java.util.List;
 public class UserServiceImpl implements UserService {
 
     private final UserRepository userRepository;
+    private final ClassroomGuard classroomGuard;
+    private final com.zhixuewuli.service.teacherEvent.TaskRosterService roster;
+    private final com.zhixuewuli.repository.TaskRecipientRepository recipients;
     private final com.zhixuewuli.repository.TeacherEventRepository teacherEventRepository;
     private final PasswordEncoder passwordEncoder;
-    private final UserPermissionUtil userPermissionUtil;
 
     @Override
     @Transactional(readOnly = true)
@@ -79,7 +81,6 @@ public class UserServiceImpl implements UserService {
             user.setClassName(request.getClassName());
         }
 
-
         User saved;
         try {
             saved=userRepository.saveAndFlush(user);
@@ -93,8 +94,7 @@ public class UserServiceImpl implements UserService {
 
     @Override
     @Transactional(readOnly = true)
-    public User getUserById(Long userId, Long currentUserId) {
-        userPermissionUtil.checkTeacherPermission(currentUserId);
+    public User getUserById(Long userId) {
         log.info("根据ID获取用户信息，用户ID: {}", userId);
         return userRepository.findById(userId)
                 .orElseThrow(() -> new UserNotFoundException("用户不存在"));
@@ -102,8 +102,7 @@ public class UserServiceImpl implements UserService {
 
     @Override
     @Transactional(readOnly = true)
-    public User getUserByRealName(String realName, Long currentUserId) {
-        userPermissionUtil.checkTeacherPermission(currentUserId);
+    public User getUserByRealName(String realName) {
         log.info("根据真实姓名获取用户信息，真实姓名: {}", realName);
         return userRepository.findByRealName(realName)
                 .orElseThrow(() -> new UserNotFoundException("用户不存在"));
@@ -111,8 +110,7 @@ public class UserServiceImpl implements UserService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<User> getAllUsers(Long currentUserId) {
-        userPermissionUtil.checkTeacherPermission(currentUserId);
+    public List<User> getAllUsers() {
         log.info("获取所有用户列表");
         return userRepository.findAll();
     }
@@ -122,8 +120,10 @@ public class UserServiceImpl implements UserService {
         Long userId = request.getUserId();
         log.info("管理员更新用户信息，目标用户ID: {}, 操作者ID: {}", userId, currentUserId);
 
-        userPermissionUtil.checkTeacherPermission(currentUserId);
-
+        var activeTeachers=classroomGuard.lock();
+        boolean removesTeacher=Boolean.FALSE.equals(request.getActive()) || request.getUserType()==User.UserType.STUDENT;
+        if (removesTeacher && activeTeachers.size()==1 && activeTeachers.contains(userId))
+            throw new com.zhixuewuli.common.exception.BusinessException("不能停用或降级最后一位可用教师");
         User targetUser = userRepository.findById(userId)
                 .orElseThrow(() -> new UserNotFoundException("用户不存在"));
 
@@ -146,6 +146,7 @@ public class UserServiceImpl implements UserService {
 
         User saved=userRepository.save(targetUser);
         if(request.getUserType()!=null || request.getActive()!=null) userRepository.incrementTokenVersion(userId);
+        roster.enroll(saved);
         return saved;
     }
 
@@ -153,15 +154,13 @@ public class UserServiceImpl implements UserService {
     public void deleteUser(Long userId, Long currentUserId) {
         log.info("删除用户，目标用户ID: {}, 操作者ID: {}", userId, currentUserId);
 
-        User currentUser = getCurrentUser(currentUserId);
-        if (currentUser.getUserType() != User.UserType.TEACHER) {
-            throw new InsufficientPermissionException("仅教师可以执行此操作");
-        }
-
+        var activeTeachers=classroomGuard.lock();
+        if (activeTeachers.size()==1 && activeTeachers.contains(userId))
+            throw new com.zhixuewuli.common.exception.BusinessException("不能删除最后一位可用教师");
         User targetUser = userRepository.findById(userId)
                 .orElseThrow(() -> new UserNotFoundException("用户不存在"));
 
-        if (teacherEventRepository.existsByTeacherId(userId)) {
+        if (teacherEventRepository.existsByTeacherId(userId) || recipients.existsByUserId(userId)) {
             throw new com.zhixuewuli.common.exception.BusinessException("该用户有关联教学任务，请保留账号并停用以保留历史数据");
         }
         userRepository.delete(targetUser);

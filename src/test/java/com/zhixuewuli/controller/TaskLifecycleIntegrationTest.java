@@ -26,6 +26,19 @@ class TaskLifecycleIntegrationTest extends BaseControllerIntegrationTest {
     @Autowired QuestionRepository questions;
     @Autowired AnswerRecordService answers;
 
+    @Test
+    void explicitPublicationRejectsOmittedAndEmptyQuestionLists() {
+        var request = new TeacherEventCreateRequest();
+        request.setEventTitle("Missing questions");
+        request.setEventTimestamp(LocalDateTime.now(ZoneOffset.UTC));
+        request.setStatus(TeacherEvent.Status.PUBLISHED);
+        assertThatThrownBy(() -> tasks.publishEvent(request, 2001L)).isInstanceOf(IllegalArgumentException.class);
+        request.setEventDescription("ordinary description");
+        assertThatThrownBy(() -> tasks.publishEvent(request, 2001L)).isInstanceOf(IllegalArgumentException.class);
+        request.setQuestionIds(List.of());
+        assertThatThrownBy(() -> tasks.publishEvent(request, 2001L)).isInstanceOf(IllegalArgumentException.class);
+    }
+
     private Question question(String title) {
         Question q = new Question();
         q.setContent(title);
@@ -52,8 +65,8 @@ class TaskLifecycleIntegrationTest extends BaseControllerIntegrationTest {
         assertThat(tasks.listStudentTasks(1001L)).noneMatch(task -> task.getId().equals(draft.getId()));
         assertThatThrownBy(() -> tasks.getEvent(draft.getId(), 1001L)).isInstanceOf(RuntimeException.class);
 
-        tasks.updateDraft(draft.getId(), request("Draft A edited", TeacherEvent.Status.DRAFT, q), 2001L);
-        var published = tasks.publishTask(draft.getId(), 2001L);
+        tasks.updateDraft(draft.getId(), request("Draft A edited", TeacherEvent.Status.DRAFT, q));
+        var published = tasks.publishTask(draft.getId());
         assertThat(published.getStatus()).isEqualTo(TeacherEvent.Status.PUBLISHED);
         assertThat(published.getAvailability()).isEqualTo("OPEN");
         assertThat(tasks.listStudentTasks(1001L)).anyMatch(task -> task.getId().equals(draft.getId()));
@@ -93,7 +106,7 @@ class TaskLifecycleIntegrationTest extends BaseControllerIntegrationTest {
         submit.setEventId(done.getId()); submit.setRequestId("overview-answer");
         answers.submitAnswerRecord(submit, 1001L, "overview-session");
 
-        var overview = tasks.getTaskOverview(2001L);
+        var overview = tasks.getTaskOverview();
         var doneRow = overview.stream().filter(row -> row.getTaskId().equals(done.getId())).findFirst().orElseThrow();
         var pendingRow = overview.stream().filter(row -> row.getTaskId().equals(pending.getId())).findFirst().orElseThrow();
         assertThat(doneRow.getCompletedStudents()).isEqualTo(1);
@@ -111,9 +124,9 @@ class TaskLifecycleIntegrationTest extends BaseControllerIntegrationTest {
 
         assertThat(first.getId()).isNotEqualTo(second.getId());
         assertThat(tasks.listStudentTasks(1001L)).extracting("id").contains(first.getId(), second.getId());
-        assertThat(tasks.listTeacherTasks(2001L)).extracting("id").contains(first.getId(), second.getId());
+        assertThat(tasks.listTeacherTasks()).extracting("id").contains(first.getId(), second.getId());
 
-        tasks.closeTask(first.getId(), 2001L);
+        tasks.closeTask(first.getId());
         assertThat(tasks.getEvent(first.getId()).getStatus()).isEqualTo(TeacherEvent.Status.CLOSED);
         assertThat(tasks.listStudentTasks(1001L)).noneMatch(task -> task.getId().equals(first.getId()));
         assertThat(tasks.listStudentTasks(1001L)).anyMatch(task -> task.getId().equals(second.getId()));
@@ -163,11 +176,11 @@ class TaskLifecycleIntegrationTest extends BaseControllerIntegrationTest {
         request.setEventTimestamp(LocalDateTime.now(ZoneOffset.UTC));
         request.setStatus(TeacherEvent.Status.DRAFT);
         var draft = tasks.publishEvent(request, 2001L);
-        assertThatThrownBy(() -> tasks.publishTask(draft.getId(), 2001L))
+        assertThatThrownBy(() -> tasks.publishTask(draft.getId()))
                 .isInstanceOf(IllegalArgumentException.class);
 
-        tasks.archiveEvent(draft.getId(), 2001L);
-        assertThat(tasks.listTeacherTasks(2001L)).noneMatch(task -> task.getId().equals(draft.getId()));
+        tasks.archiveEvent(draft.getId());
+        assertThat(tasks.listTeacherTasks()).noneMatch(task -> task.getId().equals(draft.getId()));
         assertThat(events.findById(draft.getId()).orElseThrow().getStatus()).isEqualTo(TeacherEvent.Status.ARCHIVED);
     }
 }

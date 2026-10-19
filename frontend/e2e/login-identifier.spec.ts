@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './support/isolatedTest';
 
 const base = process.env.E2E_BASE_URL ?? 'http://127.0.0.1:18080/api/v1/';
 const url = (path: string) => new URL(path, base).toString();

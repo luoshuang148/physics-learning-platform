@@ -24,3 +24,11 @@ export interface QuestionResponse {
   updatedAt: string;
 }
 
+export interface QuestionCatalogRow {
+  id: number;
+  content: string;
+  correctOption: 'A' | 'B' | 'C' | 'D';
+  difficulty: number | null;
+  hasImage: boolean;
+}
+

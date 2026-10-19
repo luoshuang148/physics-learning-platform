@@ -1,5 +1,8 @@
 package com.zhixuewuli.controller;
 
+import com.zhixuewuli.common.security.TeacherOnly;
+import com.zhixuewuli.common.security.AuthenticatedUser;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import com.zhixuewuli.common.mapstruct.UserMapper;
 import com.zhixuewuli.common.result.Result;
 import com.zhixuewuli.dto.request.UserAdminUpdateRequest;
@@ -59,10 +62,8 @@ public class UserController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "未认证")
         }
     )
-    public Result<UserResponse> getCurrentUser(HttpServletRequest request) {
-        Long currentUserId = (Long) request.getAttribute("userId");
-        User user = userService.getCurrentUser(currentUserId);
-        return Result.success(UserMapper.INSTANCE.toResponse(user));
+    public Result<UserResponse> getCurrentUser(@AuthenticationPrincipal AuthenticatedUser user) {
+        return Result.success(UserMapper.INSTANCE.toResponse(userService.getCurrentUser(user.id())));
     }
 
     /**
@@ -88,9 +89,9 @@ public class UserController {
         }
     )
     public Result<UserResponse> updateCurrentUser(
-            HttpServletRequest request,
+            @AuthenticationPrincipal AuthenticatedUser user,
             @io.swagger.v3.oas.annotations.Parameter(description = "用户自我更新请求参数", required = true) @Valid @RequestBody UserSelfUpdateRequest updateRequest) {
-        Long currentUserId = (Long) request.getAttribute("userId");
+        Long currentUserId = user.id();
         User updatedUser = userService.updateCurrentUser(currentUserId, updateRequest);
         return Result.success(UserMapper.INSTANCE.toResponse(updatedUser));
     }
@@ -109,17 +110,15 @@ public class UserController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "用户不存在")
         }
     )
+    @TeacherOnly
     public Result<UserResponse> getUserById(
-            @io.swagger.v3.oas.annotations.Parameter(description = "用户 ID", required = true) @PathVariable Long id,
-            HttpServletRequest request) {
-        Long currentUserId = (Long) request.getAttribute("userId");
-        User user = userService.getUserById(id, currentUserId); // 传递当前用户ID
+            @io.swagger.v3.oas.annotations.Parameter(description = "用户 ID", required = true) @PathVariable Long id) {
+        User user = userService.getUserById(id);
         return Result.success(UserMapper.INSTANCE.toResponse(user));
     }
 
     /**
      * 根据真实姓名获取用户信息（教师权限）
-     * 修改：增加HttpServletRequest参数，传递当前用户ID
      */
     @GetMapping("/teacher/realname/{realName}")
     @Operation(
@@ -132,11 +131,10 @@ public class UserController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "用户不存在")
         }
     )
+    @TeacherOnly
     public Result<UserResponse> getUserByRealName(
-            @io.swagger.v3.oas.annotations.Parameter(description = "学生真实姓名", required = true) @PathVariable String realName,
-            HttpServletRequest request) {
-        Long currentUserId = (Long) request.getAttribute("userId");
-        User user = userService.getUserByRealName(realName, currentUserId); // 传递当前用户ID
+            @io.swagger.v3.oas.annotations.Parameter(description = "学生真实姓名", required = true) @PathVariable String realName) {
+        User user = userService.getUserByRealName(realName);
         return Result.success(UserMapper.INSTANCE.toResponse(user));
     }
 
@@ -159,9 +157,9 @@ public class UserController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "权限不足（非教师身份）")
         }
     )
-    public Result<List<UserResponse>> getAllUsers(HttpServletRequest httpRequest) {
-        Long currentUserId = (Long) httpRequest.getAttribute("userId");
-        List<User> users = userService.getAllUsers(currentUserId);
+    @TeacherOnly
+    public Result<List<UserResponse>> getAllUsers() {
+        List<User> users = userService.getAllUsers();
         List<UserResponse> userResponses = UserMapper.INSTANCE.toResponseList(users);
         return Result.success(userResponses);
     }
@@ -191,10 +189,11 @@ public class UserController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "目标用户不存在")
         }
     )
+    @TeacherOnly
     public Result<UserResponse> updateUserByAdmin(
-            HttpServletRequest request,
+            @AuthenticationPrincipal AuthenticatedUser user,
             @io.swagger.v3.oas.annotations.Parameter(description = "管理员更新请求参数（包含目标用户 ID）", required = true) @Valid @RequestBody UserAdminUpdateRequest updateRequest) {
-        Long currentUserId = (Long) request.getAttribute("userId");
+        Long currentUserId = user.id();
         User updatedUser = userService.updateUserByAdmin(updateRequest, currentUserId);
         return Result.success(UserMapper.INSTANCE.toResponse(updatedUser));
     }
@@ -221,10 +220,11 @@ public class UserController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "用户不存在")
         }
     )
+    @TeacherOnly
     public Result<Void> deleteUser(
             @io.swagger.v3.oas.annotations.Parameter(description = "用户 ID", required = true) @PathVariable Long id,
-            HttpServletRequest request) {
-        Long currentUserId = (Long) request.getAttribute("userId");
+            @AuthenticationPrincipal AuthenticatedUser user) {
+        Long currentUserId = user.id();
         userService.deleteUser(id, currentUserId);
         return Result.success();
     }

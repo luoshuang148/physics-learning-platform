@@ -25,11 +25,11 @@ class ReportGenerationConcurrencyTest {
   });
   when(reports.save(any())).thenAnswer(i->{StudentReport row=i.getArgument(0);saved.add(row);return row;});
   try(var pool=Executors.newFixedThreadPool(2)){
-   var a=pool.submit(()->ReflectionTestUtils.invokeMethod(service,"saveStudentReport",1L,"same",null,"first"));
-   var b=pool.submit(()->ReflectionTestUtils.invokeMethod(service,"saveStudentReport",1L,"same",null,"second"));
+   var a=pool.submit(()->ReflectionTestUtils.invokeMethod(service,"saveStudentReport",1L,"same",null,"first","{}"));
+   var b=pool.submit(()->ReflectionTestUtils.invokeMethod(service,"saveStudentReport",1L,"same",null,"second","{}"));
    a.get(10,TimeUnit.SECONDS);b.get(10,TimeUnit.SECONDS);
   }
-  assertThatCode(()->ReflectionTestUtils.invokeMethod(service,"saveStudentReport",1L,"same",null,"third")).doesNotThrowAnyException();
+  assertThatCode(()->ReflectionTestUtils.invokeMethod(service,"saveStudentReport",1L,"same",null,"third","{}")).doesNotThrowAnyException();
   assertThat(saved).hasSize(3);assertThat(saved.stream().map(StudentReport::getReportContent)).containsExactlyInAnyOrder("first","second","third");
  }
 }

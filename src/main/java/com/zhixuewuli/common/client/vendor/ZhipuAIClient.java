@@ -2,6 +2,7 @@ package com.zhixuewuli.common.client.vendor;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.zhixuewuli.common.client.base.AbstractStreamingClient;
+import com.zhixuewuli.common.client.base.ThinkingContentSplitter;
 import com.zhixuewuli.common.client.callback.AIStreamCallback;
 import com.zhixuewuli.common.config.properties.AIBusinessProperties;
 import com.zhixuewuli.common.exception.ai.AIResponseParseException;
@@ -301,6 +302,7 @@ public class ZhipuAIClient extends AbstractStreamingClient {
         String line;
         JsonNode lastDataNode = null;
         boolean cancelled = false;
+        var contentSplitter = new ThinkingContentSplitter(callback);
 
         while ((line = reader.readLine()) != null) {
             // 实时检查取消信号，提前中断上游读取
@@ -341,7 +343,7 @@ public class ZhipuAIClient extends AbstractStreamingClient {
                     if (content != null && !content.isEmpty()) {
                         boolean isFinished = checkIfFinished(jsonNode);
                         try {
-                            callback.onContent(content, isFinished);
+                            contentSplitter.accept(content, isFinished);
                         } catch (Exception e) {
                             log.error("处理content内容时发生异常", e);
                             callback.onError(e);
@@ -361,6 +363,12 @@ public class ZhipuAIClient extends AbstractStreamingClient {
             return;
         }
 
+        try {
+            contentSplitter.finish();
+        } catch (Exception e) {
+            callback.onError(e);
+            return;
+        }
         extractTokenUsageAndComplete(lastDataNode, callback);
     }
 
@@ -375,7 +383,7 @@ public class ZhipuAIClient extends AbstractStreamingClient {
                 JsonNode delta = firstChoice.get("delta");
                 if (delta != null) {
                     JsonNode content = delta.get("content");
-                    if (content != null) {
+                    if (content != null && !content.isNull()) {
                         return content.asText();
                     }
                 }
@@ -396,7 +404,7 @@ public class ZhipuAIClient extends AbstractStreamingClient {
             if (choices != null && choices.isArray() && choices.size() > 0) {
                 JsonNode firstChoice = choices.get(0);
                 JsonNode delta = firstChoice.get("delta");
-                if (delta != null && delta.has("reasoning_content")) {
+                if (delta != null && delta.hasNonNull("reasoning_content")) {
                     return delta.get("reasoning_content").asText();
                 }
             }

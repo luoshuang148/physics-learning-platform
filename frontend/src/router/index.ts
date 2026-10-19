@@ -37,7 +37,10 @@ const router = createRouter({
     { path: '/student/question', component: StudentQuestionView, meta: { requiresAuth: true, role: 'STUDENT', sidebarDefault: 'collapsed' } },
     { path: '/student/wrong-book', component: StudentWrongBookView, meta: { requiresAuth: true, role: 'STUDENT', sidebarDefault: 'collapsed' } },
     { path: '/student/ai', component: StudentAIView, meta: { requiresAuth: true, role: 'STUDENT', sidebarDefault: 'collapsed' } },
-    { path: '/student/report', component: StudentReportView, meta: { requiresAuth: true, role: 'STUDENT', sidebarDefault: 'collapsed' } },
+    { path: '/student/report', component: StudentReportView, beforeEnter: to => {
+      const id = typeof to.query.eventId === 'string' ? Number(to.query.eventId) : NaN;
+      return Number.isSafeInteger(id) && id > 0 ? true : '/student/task';
+    }, meta: { requiresAuth: true, role: 'STUDENT' } },
 
 
     { path: '/teacher/dashboard', component: TeacherDashboardView, meta: { requiresAuth: true, role: 'TEACHER', sidebarDefault: 'expanded' } },

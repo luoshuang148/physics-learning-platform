@@ -1,5 +1,5 @@
 <template>
-  <AppShell :subtitle="`学生名册 · ${auth.user?.realName ?? ''}`" :links="links">
+  <AppShell :subtitle="`学生名册 · ${auth.user?.realName ?? ''}`">
     <div class="user-page ops-typography">
       <section class="user-hero">
         <div class="hero-stats">
@@ -145,14 +145,12 @@ import AppShell from '@/layouts/AppShell.vue';
 import AppToast from '@/components/AppToast.vue';
 import { useToast } from '@/composables/useToast';
 import { useAuthStore } from '@/stores/auth';
-import { teacherNavLinks } from '@/constants/navigation';
 import { deleteUserByAdminApi, getAllUsersApi, getUserByIdApi, updateUserByAdminApi } from '@/api/user';
 import type { UserAdminUpdateRequest, UserResponse } from '@/types/user';
 
 const auth = useAuthStore();
 const { visible, type, message, show } = useToast();
 
-const links = teacherNavLinks;
 
 const loading = ref(false);
 const saving = ref(false);

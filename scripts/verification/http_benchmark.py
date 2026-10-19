@@ -8,7 +8,7 @@ container=os.environ.get('MYSQL_CONTAINER')
 def sql(query):
     if container:cmd=['docker','exec','-i','-e','MYSQL_PWD',container,'mysql','-uroot']
     else:
-        cmd=[os.environ.get('MYSQL_BIN_DIR','')+'mysql','-u'+os.environ.get('MYSQL_USER','root')]
+        cmd=[str(pathlib.Path(os.environ['MYSQL_BIN_DIR'])/'mysql') if os.environ.get('MYSQL_BIN_DIR') else 'mysql','-u'+os.environ.get('MYSQL_USER','root')]
         cmd+=['--socket='+os.environ['MYSQL_SOCKET']] if os.environ.get('MYSQL_SOCKET') else ['-h127.0.0.1','-P'+os.environ.get('MYSQL_PORT','3306')]
     return subprocess.run(cmd+['--batch','--skip-column-names','zhixuewuli'],input=query,text=True,check=True,capture_output=True).stdout.strip()
 def http(path,token=None,data=None):
@@ -21,10 +21,11 @@ _,login,_=http('auth/login',data={'username':os.environ.get('E2E_TEACHER_USERNAM
 token=login['data']['token'];teacher_id=login['data']['userId']
 # Names and IDs are reserved only in the disposable fixture DB. No real user values are exported.
 event=880000;students=100;questions=50;rows=students*questions
-sql(f"DELETE FROM student_reports WHERE event_id={event};DELETE FROM conversation_history WHERE event_id={event};DELETE FROM answer_records WHERE event_id={event};DELETE FROM teacher_event_questions WHERE event_id={event};DELETE FROM teacher_events WHERE id={event};DELETE FROM questions WHERE id BETWEEN 880001 AND 880050;DELETE FROM users WHERE id BETWEEN 881001 AND 881100;")
+sql(f"DELETE FROM student_reports WHERE event_id={event};DELETE FROM conversation_history WHERE event_id={event};DELETE FROM answer_records WHERE event_id={event};DELETE FROM teacher_event_questions WHERE event_id={event};DELETE FROM task_recipients WHERE event_id={event};DELETE FROM teacher_events WHERE id={event};DELETE FROM questions WHERE id BETWEEN 880001 AND 880050;DELETE FROM users WHERE id BETWEEN 881001 AND 881100;")
 users=','.join(f"({881000+i},'bench_student_{i}','not-a-login-hash','Fixture {i}','STUDENT',true)" for i in range(1,students+1))
 qs=','.join(f"({880000+i},'Synthetic force problem {i}','bench-hash-{i}','{{\"A\":\"3m/s²\",\"B\":\"12m/s²\"}}','A',1)" for i in range(1,questions+1))
-sql(f"INSERT INTO users(id,username,password_hash,real_name,user_type,active) VALUES {users};INSERT INTO questions(id,content,content_hash,options,correct_option,difficulty) VALUES {qs};INSERT INTO teacher_events(id,teacher_id,teacher_name,event_title,event_timestamp,is_global) VALUES({event},{teacher_id},'Fixture','Synthetic benchmark',UTC_TIMESTAMP(),false);")
+sql(f"INSERT INTO users(id,username,password_hash,real_name,user_type,active) VALUES {users};INSERT INTO questions(id,content,content_hash,options,correct_option,difficulty) VALUES {qs};INSERT INTO teacher_events(id,teacher_id,teacher_name,event_title,event_timestamp,status) VALUES({event},{teacher_id},'Fixture','Synthetic benchmark',UTC_TIMESTAMP(),'CLOSED');")
+sql(f"INSERT INTO task_recipients(event_id,user_id,source) SELECT {event},id,'PUBLISHED' FROM users WHERE id BETWEEN 881001 AND 881100;")
 sql(f"INSERT INTO teacher_event_questions(event_id,question_id,bank_question_id,position_number,snapshot_json,snapshot_origin) SELECT {event},id,id,id-880001,JSON_OBJECT('id',id,'content',content,'options',CAST(options AS CHAR),'correctOption',correct_option,'difficulty',difficulty),'PUBLISHED' FROM questions WHERE id BETWEEN 880001 AND 880050;")
 # Batched fixture inserts preserve the same one original assignment per student/task/question contract.
 for start in range(0,rows,500):
@@ -38,6 +39,11 @@ sql('ANALYZE TABLE answer_records')
 paths={'page':f'answer-records/teacher/page?page=1&size=20&eventId={event}','summary':f'answer-records/teacher/summary?eventId={event}'}
 for path in paths.values():
     for _ in range(5):assert http(path,token)[0]==200
+# A fast response with an empty/mis-scoped aggregate must not count as a successful benchmark.
+_,summary,_=http(paths['summary'],token)
+expected={'totalAttempts':rows,'assignmentAnswers':rows,'eligibleStudents':students,
+          'participatingStudents':students,'completedStudents':students,'questionCount':questions}
+for key,value in expected.items():assert summary['data'][key]==value,(key,summary['data'][key],value)
 count=int(os.environ.get('BENCHMARK_REQUESTS','400'));workers=int(os.environ.get('BENCHMARK_CONCURRENCY','8'))
 if not 2<=count<=100000 or not 1<=workers<=64:raise SystemExit('requests must be 2..100000 and concurrency 1..64')
 def run(item):

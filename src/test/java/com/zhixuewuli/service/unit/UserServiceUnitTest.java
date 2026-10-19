@@ -6,7 +6,6 @@ import com.zhixuewuli.common.exception.auth.RealNameDuplicateException;
 import com.zhixuewuli.common.exception.auth.UserNotFoundException;
 import com.zhixuewuli.common.exception.auth.UserNameDuplicateException;
 import com.zhixuewuli.common.factory.TestDataFactory;
-import com.zhixuewuli.common.util.UserPermissionUtil;
 import com.zhixuewuli.dto.request.UserAdminUpdateRequest;
 import com.zhixuewuli.dto.request.UserSelfUpdateRequest;
 import com.zhixuewuli.entity.User;
@@ -45,6 +44,10 @@ import static org.mockito.Mockito.when;
  * 遵循Given-When-Then测试模式，使用Mockito进行依赖模拟
  */
 class UserServiceUnitTest extends BaseUnitTest {
+    @Mock private com.zhixuewuli.service.user.ClassroomGuard classroomGuard;
+    @Mock private com.zhixuewuli.service.teacherEvent.TaskRosterService roster;
+    @Mock private com.zhixuewuli.repository.TaskRecipientRepository recipients;
+
 
     @Mock
     private UserRepository userRepository;
@@ -52,8 +55,6 @@ class UserServiceUnitTest extends BaseUnitTest {
     @Mock
     private PasswordEncoder passwordEncoder;
 
-    @Mock
-    private UserPermissionUtil userPermissionUtil;
 
     @Mock
     private com.zhixuewuli.repository.TeacherEventRepository teacherEventRepository;
@@ -354,10 +355,9 @@ class UserServiceUnitTest extends BaseUnitTest {
         Long teacherId = 110L;
 
         when(userRepository.findById(userId)).thenReturn(Optional.of(mockStudent));
-        // userPermissionUtil.checkTeacherPermission 不抛出异常表示权限验证通过
 
         // When
-        User result = userService.getUserById(userId, teacherId);
+        User result = userService.getUserById(userId);
 
         // Then
         assertThat(result)
@@ -365,7 +365,6 @@ class UserServiceUnitTest extends BaseUnitTest {
                 .extracting(User::getId, User::getUsername)
                 .containsExactly(100L, "student001");
 
-        verify(userPermissionUtil).checkTeacherPermission(teacherId);
         verify(userRepository).findById(userId);
     }
 
@@ -378,11 +377,10 @@ class UserServiceUnitTest extends BaseUnitTest {
         when(userRepository.findById(userId)).thenReturn(Optional.empty());
 
         // When & Then
-        assertThatThrownBy(() -> userService.getUserById(userId, teacherId))
+        assertThatThrownBy(() -> userService.getUserById(userId))
                 .isInstanceOf(UserNotFoundException.class)
                 .hasMessage("用户不存在");
 
-        verify(userPermissionUtil).checkTeacherPermission(teacherId);
         verify(userRepository).findById(userId);
     }
 
@@ -397,7 +395,7 @@ class UserServiceUnitTest extends BaseUnitTest {
         when(userRepository.findByRealName(realName)).thenReturn(Optional.of(mockStudent));
 
         // When
-        User result = userService.getUserByRealName(realName, teacherId);
+        User result = userService.getUserByRealName(realName);
 
         // Then
         assertThat(result)
@@ -405,7 +403,6 @@ class UserServiceUnitTest extends BaseUnitTest {
                 .extracting(User::getRealName, User::getUserType)
                 .containsExactly("学生一号", User.UserType.STUDENT);
 
-        verify(userPermissionUtil).checkTeacherPermission(teacherId);
         verify(userRepository).findByRealName(realName);
     }
 
@@ -418,11 +415,10 @@ class UserServiceUnitTest extends BaseUnitTest {
         when(userRepository.findByRealName(realName)).thenReturn(Optional.empty());
 
         // When & Then
-        assertThatThrownBy(() -> userService.getUserByRealName(realName, teacherId))
+        assertThatThrownBy(() -> userService.getUserByRealName(realName))
                 .isInstanceOf(UserNotFoundException.class)
                 .hasMessage("用户不存在");
 
-        verify(userPermissionUtil).checkTeacherPermission(teacherId);
         verify(userRepository).findByRealName(realName);
     }
 
@@ -437,7 +433,7 @@ class UserServiceUnitTest extends BaseUnitTest {
         when(userRepository.findAll()).thenReturn(mockUsers);
 
         // When
-        List<User> result = userService.getAllUsers(teacherId);
+        List<User> result = userService.getAllUsers();
 
         // Then
         assertThat(result)
@@ -445,24 +441,9 @@ class UserServiceUnitTest extends BaseUnitTest {
                 .extracting(User::getId)
                 .containsExactly(100L, 110L);
 
-        verify(userPermissionUtil).checkTeacherPermission(teacherId);
         verify(userRepository).findAll();
     }
 
-    @Test
-    void getAllUsers_shouldThrowInsufficientPermissionException_whenPermissionDenied() {
-        // Given
-        Long studentId = 100L;
-        doThrow(new InsufficientPermissionException("仅教师可查看用户列表"))
-                .when(userPermissionUtil).checkTeacherPermission(studentId);
-
-        // When & Then
-        assertThatThrownBy(() -> userService.getAllUsers(studentId))
-                .isInstanceOf(InsufficientPermissionException.class);
-
-        verify(userPermissionUtil).checkTeacherPermission(studentId);
-        verify(userRepository, never()).findAll();
-    }
 
     // ==================== updateUserByAdmin 测试 ====================
 
@@ -482,7 +463,6 @@ class UserServiceUnitTest extends BaseUnitTest {
 
         // Then
         assertThat(result.getRealName()).isEqualTo("管理员修改的姓名");
-        verify(userPermissionUtil).checkTeacherPermission(110L);
         verify(userRepository).existsByRealName("管理员修改的姓名");
         verify(userRepository).save(mockStudent);
     }
@@ -502,7 +482,6 @@ class UserServiceUnitTest extends BaseUnitTest {
 
         // Then
         assertThat(result.getClassName()).isEqualTo("高三(3)班");
-        verify(userPermissionUtil).checkTeacherPermission(110L);
         verify(userRepository).save(mockStudent);
     }
 
@@ -521,7 +500,6 @@ class UserServiceUnitTest extends BaseUnitTest {
 
         // Then
         assertThat(result.getActive()).isFalse();
-        verify(userPermissionUtil).checkTeacherPermission(110L);
         verify(userRepository).save(mockStudent);
     }
 
@@ -540,7 +518,6 @@ class UserServiceUnitTest extends BaseUnitTest {
 
         // Then
         assertThat(result.getUserType()).isEqualTo(User.UserType.TEACHER);
-        verify(userPermissionUtil).checkTeacherPermission(110L);
         verify(userRepository).save(mockStudent);
     }
 
@@ -558,7 +535,6 @@ class UserServiceUnitTest extends BaseUnitTest {
                 .isInstanceOf(UserNotFoundException.class)
                 .hasMessage("用户不存在");
 
-        verify(userPermissionUtil).checkTeacherPermission(110L);
         verify(userRepository, never()).save(any(User.class));
     }
 
@@ -585,42 +561,19 @@ class UserServiceUnitTest extends BaseUnitTest {
     // ==================== deleteUser 测试 ====================
 
     @Test
-    void deleteUser_shouldDeleteUser_whenCallerIsTeacher() {
+    void deleteUser_shouldDeleteTargetUser() {
         // Given
         Long targetUserId = 100L;
         Long teacherId = 110L;
 
-        when(userRepository.findById(teacherId)).thenReturn(Optional.of(mockTeacher));
         when(userRepository.findById(targetUserId)).thenReturn(Optional.of(mockStudent));
 
         // When
         userService.deleteUser(targetUserId, teacherId);
 
         // Then
-        verify(userRepository).findById(teacherId);
         verify(userRepository).findById(targetUserId);
         verify(userRepository).delete(mockStudent);
-    }
-
-    @Test
-    void deleteUser_shouldThrowInsufficientPermissionException_whenCallerIsStudent() {
-        // Given
-        Long targetUserId = 100L;
-        Long studentId = 100L; // 学生试图删除用户
-
-        when(userRepository.findById(studentId)).thenReturn(Optional.of(mockStudent));
-
-        // When & Then
-        assertThatThrownBy(() -> userService.deleteUser(targetUserId, studentId))
-                .isInstanceOf(InsufficientPermissionException.class)
-                .hasMessage("仅教师可以执行此操作");
-
-        // 验证getCurrentUser被调用了一次
-        verify(userRepository, times(1)).findById(studentId);
-        // 验证没有调用findById来查找目标用户（因为权限验证失败）
-        // 注意：这里不能使用never()，因为在getCurrentUser中已经调用过findById
-        // 我们只需要验证delete方法没有被调用即可
-        verify(userRepository, never()).delete(any(User.class));
     }
 
     @Test
@@ -629,7 +582,6 @@ class UserServiceUnitTest extends BaseUnitTest {
         Long targetUserId = 999L;
         Long teacherId = 110L;
 
-        when(userRepository.findById(teacherId)).thenReturn(Optional.of(mockTeacher));
         when(userRepository.findById(targetUserId)).thenReturn(Optional.empty());
 
         // When & Then
@@ -637,7 +589,6 @@ class UserServiceUnitTest extends BaseUnitTest {
                 .isInstanceOf(UserNotFoundException.class)
                 .hasMessage("用户不存在");
 
-        verify(userRepository).findById(teacherId);
         verify(userRepository).findById(targetUserId);
         verify(userRepository, never()).delete(any(User.class));
     }

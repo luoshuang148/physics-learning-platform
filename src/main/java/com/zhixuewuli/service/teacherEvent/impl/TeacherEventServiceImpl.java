@@ -4,12 +4,12 @@ import com.zhixuewuli.common.exception.BusinessException;
 import com.zhixuewuli.common.exception.auth.UserNotFoundException;
 import com.zhixuewuli.common.exception.teacherevent.EventNotFoundException;
 import com.zhixuewuli.common.exception.teacherevent.TeacherEventBusinessException;
-import com.zhixuewuli.common.util.UserPermissionUtil;
 import com.zhixuewuli.dto.request.TeacherEventCreateRequest;
 import com.zhixuewuli.dto.response.QuestionResponse;
 import com.zhixuewuli.dto.response.TeacherEventResponse;
 import com.zhixuewuli.dto.response.TaskDetailResponse;
 import com.zhixuewuli.dto.response.TaskOverviewResponse;
+import com.zhixuewuli.dto.response.StudentTaskResultResponse;
 import com.zhixuewuli.entity.TeacherEvent;
 import com.zhixuewuli.entity.User;
 import com.zhixuewuli.repository.AnswerRecordRepository;
@@ -38,9 +38,12 @@ public class TeacherEventServiceImpl implements TeacherEventService {
     private final TeacherEventRepository teacherEventRepository;
     private final AnswerRecordRepository answerRecordRepository;
     private final UserRepository userRepository;
-    private final UserPermissionUtil userPermissionUtil;
     private final TaskQuestionService taskQuestions;
     private final AnswerAccessPolicy answerAccess;
+    private final com.zhixuewuli.service.user.ClassroomGuard classroomGuard;
+    private final com.zhixuewuli.service.teacherEvent.TaskRosterService roster;
+    private final com.zhixuewuli.repository.TaskRecipientRepository recipients;
+    private final com.zhixuewuli.service.ai.report.SavedReportReader savedReports;
 
     private LocalDateTime now() { return LocalDateTime.now(ZoneOffset.UTC).withNano(0); }
 
@@ -51,7 +54,7 @@ public class TeacherEventServiceImpl implements TeacherEventService {
     }
 
     private TeacherEventResponse createTask(TeacherEventCreateRequest request, Long userId) {
-        userPermissionUtil.checkTeacherPermission(userId);
+        classroomGuard.lock();
         TeacherEvent.Status status = request.getStatus() == null ? TeacherEvent.Status.PUBLISHED : request.getStatus();
         if (status != TeacherEvent.Status.DRAFT && status != TeacherEvent.Status.PUBLISHED) {
             throw new IllegalArgumentException("新建任务只能保存为草稿或直接发布");
@@ -75,14 +78,14 @@ public class TeacherEventServiceImpl implements TeacherEventService {
         event.setDueAt(request.getDueAt());
         TeacherEvent saved = teacherEventRepository.saveAndFlush(event);
         taskQuestions.capture(saved.getId(), orderedQuestions);
+        if (status == TeacherEvent.Status.PUBLISHED) roster.capture(saved.getId());
         log.info("教学任务已创建 - EventId: {}, Status: {}, UserId: {}", saved.getId(), status, userId);
         return convertToResponse(saved);
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public TeacherEventResponse updateDraft(Long id, TeacherEventCreateRequest request, Long userId) {
-        userPermissionUtil.checkTeacherPermission(userId);
+    public TeacherEventResponse updateDraft(Long id, TeacherEventCreateRequest request) {
         TeacherEvent event = teacherEventRepository.lockById(id).orElseThrow(EventNotFoundException::new);
         if (event.getStatus() != TeacherEvent.Status.DRAFT) {
             throw new TeacherEventBusinessException("只有草稿任务可以编辑");
@@ -100,8 +103,8 @@ public class TeacherEventServiceImpl implements TeacherEventService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public TeacherEventResponse publishTask(Long id, Long userId) {
-        userPermissionUtil.checkTeacherPermission(userId);
+    public TeacherEventResponse publishTask(Long id) {
+        classroomGuard.lock();
         TeacherEvent event = teacherEventRepository.lockById(id).orElseThrow(EventNotFoundException::new);
         if (event.getStatus() != TeacherEvent.Status.DRAFT) {
             throw new TeacherEventBusinessException("只有草稿任务可以发布");
@@ -113,13 +116,13 @@ public class TeacherEventServiceImpl implements TeacherEventService {
         event.setStatus(TeacherEvent.Status.PUBLISHED);
         if (event.getStartAt() == null) event.setStartAt(now());
         teacherEventRepository.saveAndFlush(event);
+        roster.capture(event.getId());
         return convertToResponse(event);
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public TeacherEventResponse closeTask(Long id, Long userId) {
-        userPermissionUtil.checkTeacherPermission(userId);
+    public TeacherEventResponse closeTask(Long id) {
         TeacherEvent event = teacherEventRepository.lockById(id).orElseThrow(EventNotFoundException::new);
         if (event.getStatus() != TeacherEvent.Status.PUBLISHED) {
             throw new TeacherEventBusinessException("只有已发布任务可以截止");
@@ -131,8 +134,7 @@ public class TeacherEventServiceImpl implements TeacherEventService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void deleteCurrentEvent(Long currentUserId) {
-        userPermissionUtil.checkTeacherPermission(currentUserId);
+    public void deleteCurrentEvent() {
         teacherEventRepository.findByIsGlobalTrue().ifPresent(event -> {
             event.setStatus(TeacherEvent.Status.ARCHIVED);
             teacherEventRepository.saveAndFlush(event);
@@ -141,8 +143,7 @@ public class TeacherEventServiceImpl implements TeacherEventService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void archiveEvent(Long expectedId, Long userId) {
-        userPermissionUtil.checkTeacherPermission(userId);
+    public void archiveEvent(Long expectedId) {
         TeacherEvent event = teacherEventRepository.lockById(expectedId).orElse(null);
         if (event == null || event.getStatus() == TeacherEvent.Status.ARCHIVED) return;
         event.setStatus(TeacherEvent.Status.ARCHIVED);
@@ -152,7 +153,7 @@ public class TeacherEventServiceImpl implements TeacherEventService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public TeacherEventResponse replaceEvent(Long expectedId, TeacherEventCreateRequest request, Long userId) {
-        userPermissionUtil.checkTeacherPermission(userId);
+        classroomGuard.lock();
         TeacherEvent event = teacherEventRepository.lockById(expectedId).orElseThrow(EventNotFoundException::new);
         taskQuestions.prepare(request);
         event.setStatus(TeacherEvent.Status.ARCHIVED);
@@ -197,8 +198,7 @@ public class TeacherEventServiceImpl implements TeacherEventService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<TeacherEventResponse> listTeacherTasks(Long userId) {
-        userPermissionUtil.checkTeacherPermission(userId);
+    public List<TeacherEventResponse> listTeacherTasks() {
         return teacherEventRepository.findByStatusNotOrderByCreatedAtDesc(TeacherEvent.Status.ARCHIVED)
                 .stream().map(this::convertToResponse).toList();
     }
@@ -207,20 +207,50 @@ public class TeacherEventServiceImpl implements TeacherEventService {
     @Transactional(readOnly = true)
     public List<TeacherEventResponse> listStudentTasks(Long userId) {
         if (userId == null) throw new IllegalArgumentException("用户未登录");
+        var assigned=recipients.taskIds(userId);
         return teacherEventRepository.findByStatusOrderByStartAtAscCreatedAtDesc(TeacherEvent.Status.PUBLISHED)
-                .stream().map(this::convertToResponse).toList();
+                .stream().filter(task->assigned.contains(task.getId())).map(this::convertToResponse).toList();
     }
-
-
 
     @Override
     @Transactional(readOnly = true)
-    public List<TaskOverviewResponse> getTaskOverview(Long userId) {
-        userPermissionUtil.checkTeacherPermission(userId);
+    public List<StudentTaskResultResponse> listStudentTaskResults(Long userId) {
+        if (userId == null) throw new IllegalArgumentException("用户未登录");
+        var assigned=recipients.taskIds(userId);
+        var tasks = teacherEventRepository.findStudentReviewTasks(userId).stream().filter(task->assigned.contains(task.getId())).toList();
+        if (tasks.isEmpty()) return List.of();
+        Map<Long, AnswerRecordRepository.StudentTaskStatsRow> stats = new HashMap<>();
+        for (var row : answerRecordRepository.findStudentTaskStats(userId, tasks.stream().map(TeacherEvent::getId).toList())) {
+            stats.put(row.getEventId(), row);
+        }
+        return tasks.stream().map(task -> studentResult(convertToResponse(task), stats.get(task.getId()))).toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public StudentTaskResultResponse getStudentTaskResult(Long id, Long userId) {
+        if (userId == null) throw new IllegalArgumentException("用户未登录");
+        var task = getEvent(id, userId);
+        if (task.getStatus() == TeacherEvent.Status.DRAFT) throw new EventNotFoundException();
+        var stats = answerRecordRepository.findStudentTaskStats(userId, List.of(id));
+        var result = studentResult(task, stats.isEmpty() ? null : stats.getFirst());
+        return new StudentTaskResultResponse(task,result.answeredQuestions(),result.correctQuestions(),result.answerRevision(),
+                savedReports.matching(userId,id,result.answerRevision()));
+    }
+
+    private StudentTaskResultResponse studentResult(TeacherEventResponse task, AnswerRecordRepository.StudentTaskStatsRow stats) {
+        return new StudentTaskResultResponse(task, stats == null ? 0 : stats.getAnsweredQuestions(),
+                stats == null ? 0 : stats.getCorrectQuestions(), stats == null ? "0" : String.valueOf(stats.getRevision()));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<TaskOverviewResponse> getTaskOverview() {
         List<TeacherEvent> tasks = teacherEventRepository.findByStatusNotOrderByCreatedAtDesc(TeacherEvent.Status.ARCHIVED);
         if (tasks.isEmpty()) return List.of();
         List<Long> taskIds = tasks.stream().map(TeacherEvent::getId).toList();
-        long totalStudents = userRepository.countByUserTypeAndActiveTrue(User.UserType.STUDENT);
+        Map<Long,Long> recipientCounts=new HashMap<>();
+        for(var row:recipients.counts(taskIds)) recipientCounts.put(row.getEventId(),row.getTotal());
 
         Map<Long, Long> questionCounts = new HashMap<>();
         for (var row : taskQuestions.countByEventIds(taskIds)) {
@@ -234,6 +264,7 @@ public class TeacherEventServiceImpl implements TeacherEventService {
         List<TaskOverviewResponse> result = new ArrayList<>();
         LocalDateTime now = now();
         for (TeacherEvent task : tasks) {
+            long totalStudents=recipientCounts.getOrDefault(task.getId(),0L);
             int questionCount = questionCounts.getOrDefault(task.getId(), 0L).intValue();
             List<AnswerRecordRepository.TaskOverviewStatsRow> rows = statsByTask.getOrDefault(task.getId(), List.of());
             long participated = rows.size();
@@ -290,7 +321,6 @@ public class TeacherEventServiceImpl implements TeacherEventService {
     @Override
     @Transactional(readOnly = true)
     public TaskDetailResponse getTaskDetail(Long id, Long userId) {
-        userPermissionUtil.checkTeacherPermission(userId);
         TeacherEvent event = teacherEventRepository.findById(id).orElseThrow(EventNotFoundException::new);
         List<Long> questionIds = taskQuestions.ids(id);
         List<QuestionResponse> questionResponses = taskQuestions.responses(id);
@@ -300,7 +330,7 @@ public class TeacherEventServiceImpl implements TeacherEventService {
             previews.put(question.getId(), content.length() > 80 ? content.substring(0, 80) + "…" : content);
         }
 
-        List<User> activeStudents = userRepository.findActiveStudents();
+        List<User> activeStudents = recipients.students(id);
         Map<Long, AnswerRecordRepository.TaskStudentStatsRow> studentStats = new HashMap<>();
         for (var row : answerRecordRepository.findTaskStudentStats(id)) {
             studentStats.put(row.getUserId(), row);
@@ -363,6 +393,7 @@ public class TeacherEventServiceImpl implements TeacherEventService {
 
         TeacherEventResponse meta = convertToResponse(event);
         return TaskDetailResponse.builder()
+                .legacyRoster(recipients.existsByEventIdAndSource(id,"MIGRATED"))
                 .taskId(event.getId())
                 .title(event.getEventTitle())
                 .status(event.getStatus().name())
@@ -398,8 +429,7 @@ public class TeacherEventServiceImpl implements TeacherEventService {
 
     @Override
     @Transactional(readOnly = true)
-    public com.zhixuewuli.common.result.PageResult<TeacherEventResponse> getEventHistory(Long userId, int page, int size) {
-        userPermissionUtil.checkTeacherPermission(userId);
+    public com.zhixuewuli.common.result.PageResult<TeacherEventResponse> getEventHistory(int page, int size) {
         if (page < 1 || size < 1 || size > 100 || (long) (page - 1) * size > Integer.MAX_VALUE) {
             throw new IllegalArgumentException("分页参数不合法");
         }

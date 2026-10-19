@@ -22,6 +22,24 @@ export const getStudentTasksApi = async (): Promise<TeacherEventResponse[]> => {
   return data.data;
 };
 
+export interface StudentTaskResult {
+  task: TeacherEventResponse;
+  answeredQuestions: number;
+  correctQuestions: number;
+  answerRevision: string;
+  savedReport?: { content: string; answerRevision: string; generatedAt: string } | null;
+}
+
+export const getStudentTaskResultsApi = async (): Promise<StudentTaskResult[]> => {
+  const { data } = await request.get<ApiResponse<StudentTaskResult[]>>('/teacher/events/student-tasks');
+  return data.data;
+};
+
+export const getStudentTaskResultApi = async (eventId: number): Promise<StudentTaskResult> => {
+  const { data } = await request.get<ApiResponse<StudentTaskResult>>(`/teacher/events/${eventId}/my-result`);
+  return data.data;
+};
+
 export const createTeacherEventApi = async (payload: TeacherEventCreatePayload): Promise<TeacherEventResponse> => {
   const { data } = await request.post<ApiResponse<TeacherEventResponse>>('/teacher/events', payload);
   return data.data;

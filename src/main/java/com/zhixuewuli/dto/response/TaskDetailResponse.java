@@ -12,6 +12,7 @@ import java.util.List;
 @AllArgsConstructor
 @NoArgsConstructor
 public class TaskDetailResponse {
+    private boolean legacyRoster;
     private Long taskId;
     private String title;
     private String status;

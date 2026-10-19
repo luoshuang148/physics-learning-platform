@@ -2,6 +2,11 @@ import request from '@/utils/request';
 import type { ApiResponse } from '@/types/common';
 import type { QuestionPayload, QuestionResponse, QuestionUpdatePayload } from '@/types/question';
 
+export const getQuestionCatalogApi = async (params: { page: number; size: number; search: string; difficulty?: number }) => {
+  const { data } = await request.get<ApiResponse<{ records: import('@/types/question').QuestionCatalogRow[]; total: number; pages: number }>>('/questions/teacher/page', { params });
+  return data.data;
+};
+
 export const createQuestionApi = async (payload: QuestionPayload): Promise<QuestionResponse> => {
   const { data } = await request.post<ApiResponse<QuestionResponse>>('/questions/teacher/create', payload);
   return data.data;

@@ -19,7 +19,7 @@ class TaskSnapshotLifecycleTest extends BaseControllerIntegrationTest {
  @Autowired QuestionRepository questions;
  private Question question() { Question q=new Question();q.setContent("immutable task question");q.setOptions("{\"A\":\"one\",\"B\":\"two\",\"C\":\"three\",\"D\":\"four\"}");q.setCorrectOption("A");q.setExplanation("解析");q.setDifficulty(1);return questions.saveAndFlush(q); }
  private long publish(Question q) throws Exception {
-  tasks.deleteCurrentEvent(2001L);
+  tasks.deleteCurrentEvent();
   var result=mockMvc.perform(post("/teacher/events").header("Authorization",createAuthHeader(2001L,"teacher_user"))
    .contentType(MediaType.APPLICATION_JSON).content("{\"eventTitle\":\"Task B\",\"eventTimestamp\":\"2026-10-18T10:00:00\",\"questionIds\":["+q.getId()+"]}"))
    .andExpect(status().isCreated()).andReturn();

@@ -26,6 +26,7 @@ class AnswerAccessPolicyTest extends BaseControllerIntegrationTest {
     @Autowired TeacherEventService tasks;
     @Autowired QuestionRepository questions;
     @Autowired ObjectMapper json;
+    @Autowired com.zhixuewuli.repository.TeacherEventRepository events;
     private Question question;
     private long taskId;
     private User second;
@@ -66,6 +67,33 @@ class AnswerAccessPolicyTest extends BaseControllerIntegrationTest {
                 .header("Authorization", createAuthHeader(2001L, "teacher_user")))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.data.correctOption").value("D"))
                 .andExpect(jsonPath("$.data.explanation").value("受保护解析"));
+    }
+
+    @Test
+    void scheduledTaskBlocksScopedAndFreePracticeBeforeOpening() throws Exception {
+        var task = events.findById(taskId).orElseThrow();
+        task.setStartAt(LocalDateTime.now(java.time.ZoneOffset.UTC).plusDays(1));
+        events.saveAndFlush(task);
+        practiceBypassBlocked("PRACTICE");
+        hiddenBank();
+    }
+
+    @Test
+    void archivedTaskCannotDiscloseAnUnattemptedQuestionInAnotherPublishedTask() throws Exception {
+        var request = new TeacherEventCreateRequest();
+        request.setEventTitle("Old task"); request.setEventTimestamp(LocalDateTime.now());
+        request.setQuestionIds(List.of(question.getId()));
+        long archivedId = tasks.publishEvent(request, 2001L).getId();
+        tasks.archiveEvent(archivedId);
+        mockMvc.perform(post("/answer-records/student/submit")
+                .header("Authorization", createAuthHeader(1001L, "student_user"))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"eventId\":" + archivedId + ",\"requestId\":\"other-task\",\"questionId\":"
+                        + question.getId() + ",\"userAnswer\":\"A\",\"intent\":\"PRACTICE\"}"))
+                .andExpect(status().isConflict());
+        submit(1001L, "first-before-practice", "ASSIGNMENT", 201);
+        tasks.archiveEvent(taskId);
+        submit(1001L, "practice-after-close", "PRACTICE", 201);
     }
 
     private void hiddenTask() throws Exception {

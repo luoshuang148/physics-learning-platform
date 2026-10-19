@@ -1,5 +1,5 @@
 <template>
-  <AppShell :subtitle="`题库管理 · ${auth.user?.realName ?? ''}`" :links="links">
+  <AppShell :subtitle="`题库管理 · ${auth.user?.realName ?? ''}`">
 
     <div class="qm-layout">
 
@@ -7,7 +7,7 @@
         <div class="qm-list-head">
           <div class="qm-list-head-top">
             <span class="qm-list-title">题目列表</span>
-            <span class="qm-list-count">{{ filteredQuestions.length }} / {{ questions.length }}</span>
+            <span class="qm-list-count">共 {{ total }} 道</span>
             <button class="new-btn" @click="openCreate">＋ 新建题目</button>
           </div>
           <div class="qm-list-filters">
@@ -24,12 +24,12 @@
         </div>
 
         <div v-if="loading" class="qm-loading">加载中…</div>
-        <div v-else-if="filteredQuestions.length === 0" class="qm-empty">
+        <div v-else-if="questions.length === 0" class="qm-empty">
           <p>{{ questions.length === 0 ? '题库暂无题目' : '无匹配题目' }}</p>
         </div>
         <div v-else class="qm-list">
           <div
-            v-for="q in filteredQuestions" :key="q.id"
+            v-for="q in questions" :key="q.id"
             class="qm-item"
             :class="{ active: editing?.id === q.id }"
             @click="openEdit(q)"
@@ -44,15 +44,10 @@
               </div>
             </div>
             <div class="qm-item-content"><LatexText :content="q.content?.slice(0,80) ?? ''" /></div>
-            <div v-if="q.imageBase64" class="qm-item-image-wrap">
-              <img :src="q.imageBase64" alt="题目图片" class="qm-item-image" />
-            </div>
-            <div class="qm-item-opts">
-              <span v-for="(_, key) in q.options" :key="key" class="qm-opt-chip" :class="{ correct: key === q.correctOption }">
-                {{ key }}</span>
-            </div>
+            <span v-if="q.hasImage" class="muted">含配图 · 编辑时查看</span>
           </div>
         </div>
+        <div class="catalog-pager"><button class="ghost-btn" :disabled="loading || page <= 1" @click="changePage(-1)">上一页</button><span>{{ page }} / {{ pages || 1 }}</span><button class="ghost-btn" :disabled="loading || page >= pages" @click="changePage(1)">下一页</button><button class="ghost-btn" :disabled="loading" @click="load">刷新</button></div>
       </div>
 
       <div v-if="showForm" class="qm-form-panel" :class="{ visible: showForm }">
@@ -160,33 +155,30 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue';
+import { reactive, ref } from 'vue';
 import AppShell from '@/layouts/AppShell.vue';
 import AppToast from '@/components/AppToast.vue';
 import LatexText from '@/components/LatexText.vue';
 import { useToast } from '@/composables/useToast';
 import { useAuthStore } from '@/stores/auth';
-import { createQuestionApi, deleteQuestionApi, getAllQuestionsApi, updateQuestionApi } from '@/api/question';
-import type { QuestionResponse } from '@/types/question';
-import { teacherNavLinks } from '@/constants/navigation';
+import { useQuestionCatalog } from '@/composables/useQuestionCatalog';
+import { createQuestionApi, deleteQuestionApi, getQuestionByIdApi, updateQuestionApi } from '@/api/question';
+import type { QuestionResponse, QuestionCatalogRow } from '@/types/question';
 
 const auth = useAuthStore();
 const { visible, type, message, show } = useToast();
 
-const links = teacherNavLinks;
 const optionKeys = ['A', 'B', 'C', 'D'] as const;
 type OptionKey = typeof optionKeys[number];
 
-const questions = ref<QuestionResponse[]>([]);
-const loading = ref(true);
+const { rows: questions, loading, page, total, pages, search: searchText, difficulty: diffFilter, load, changePage } = useQuestionCatalog(show);
+let editSequence = 0;
 const submitting = ref(false);
 const imageReading = ref(false);
 const isDragOver = ref(false);
 const showForm = ref(false);
 const editing = ref<QuestionResponse | null>(null);
 const deleteTargetId = ref<number | null>(null);
-const searchText = ref('');
-const diffFilter = ref(0);
 
 const form = reactive({
   content: '',
@@ -197,14 +189,6 @@ const form = reactive({
 });
 
 const optionInputs = reactive<Record<OptionKey, string>>({ A: '', B: '', C: '', D: '' });
-
-const filteredQuestions = computed(() => {
-  let list = [...questions.value].sort((a, b) => b.id - a.id);
-  if (diffFilter.value > 0) list = list.filter(q => q.difficulty === diffFilter.value);
-  const s = searchText.value.trim().toLowerCase();
-  if (s) list = list.filter(q => String(q.id).includes(s) || q.content?.toLowerCase().includes(s));
-  return list;
-});
 
 const diffClass = (d: number | null) => {
   if (!d) return '';
@@ -226,12 +210,17 @@ const resetForm = () => {
 };
 
 const openCreate = () => {
+  ++editSequence;
   editing.value = null;
   resetForm();
   showForm.value = true;
 };
 
-const openEdit = (q: QuestionResponse) => {
+const openEdit = async (row: QuestionCatalogRow) => {
+  const owner = ++editSequence;
+  try {
+  const q = await getQuestionByIdApi(row.id);
+  if (owner !== editSequence) return;
   editing.value = q;
   form.content = q.content;
   form.correctOption = q.correctOption;
@@ -243,9 +232,11 @@ const openEdit = (q: QuestionResponse) => {
   optionInputs.C = q.options?.C ?? '';
   optionInputs.D = q.options?.D ?? '';
   showForm.value = true;
+  } catch { if (owner === editSequence) show('题目详情加载失败，请重试', 'error'); }
 };
 
 const closeForm = () => {
+  ++editSequence;
   showForm.value = false;
   editing.value = null;
   resetForm();
@@ -355,22 +346,10 @@ const doDelete = async () => {
   }
 };
 
-const load = async () => {
-  loading.value = true;
-  try {
-    questions.value = await getAllQuestionsApi();
-  } catch (e: any) {
-    questions.value = [];
-    show(e?.response?.data?.message ?? '题目列表加载失败', 'error');
-  } finally {
-    loading.value = false;
-  }
-};
-
-onMounted(load);
 </script>
 
 <style scoped>
+.catalog-pager { display:flex; flex-wrap:wrap; align-items:center; justify-content:center; gap:12px; padding:18px; color:#64748b; font-size:12px; }
 .qm-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr);

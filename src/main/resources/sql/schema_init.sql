@@ -212,3 +212,13 @@ WHERE table_schema = 'zhixuewuli';
 
 -- 重新启用外键检查
 SET FOREIGN_KEY_CHECKS = 1;
+-- Durable task recipients (V7).
+CREATE TABLE task_recipients (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    event_id BIGINT NOT NULL,
+    user_id BIGINT NOT NULL,
+    source VARCHAR(20) NOT NULL,
+    CONSTRAINT uk_task_recipient UNIQUE(event_id,user_id),
+    CONSTRAINT fk_recipient_event FOREIGN KEY(event_id) REFERENCES teacher_events(id) ON DELETE RESTRICT,
+    CONSTRAINT fk_recipient_user FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

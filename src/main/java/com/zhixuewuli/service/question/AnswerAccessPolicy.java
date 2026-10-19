@@ -64,29 +64,23 @@ public class AnswerAccessPolicy {
     }
 
     /**
-     * A practice/free-practice request cannot be used to bypass the active task's first attempt.
-     * Archived tasks keep their historical practice behaviour.
+     * Practice in any scope must not disclose an unattempted question in an upcoming/open task.
+     * Ended tasks retain practice once no protected assignment uses the same question.
      */
     public boolean blocksPracticeBeforeAssignment(Long userId, Long eventId, Long questionId) {
         var now = java.time.LocalDateTime.now(java.time.ZoneOffset.UTC);
         if (eventId != null) {
-            var task = tasks.findById(eventId).filter(value -> value.isOpenAt(now)).orElse(null);
-            return task != null
-                    && taskQuestions.findByEventIdAndQuestionId(task.getId(), questionId).isPresent()
-                    && !answers.existsByUserIdAndEventIdAndQuestionIdAndPracticeFalse(userId, task.getId(), questionId);
+            var task = tasks.findById(eventId).orElse(null);
+            if (task != null && task.isScheduledAt(now)) return true;
         }
-        for (var task : openTasks()) {
+        for (var task : tasks.findPublishedTasks()) {
+            if (task.isEndedAt(now)) continue;
             if (taskQuestions.findByEventIdAndQuestionId(task.getId(), questionId).isPresent()
                     && !answers.existsByUserIdAndEventIdAndQuestionIdAndPracticeFalse(userId, task.getId(), questionId)) {
                 return true;
             }
         }
         return false;
-    }
-
-    private List<com.zhixuewuli.entity.TeacherEvent> openTasks() {
-        var now = java.time.LocalDateTime.now(java.time.ZoneOffset.UTC);
-        return tasks.findPublishedTasks().stream().filter(task -> task.isOpenAt(now)).toList();
     }
 
     private QuestionResponse protectedView(QuestionResponse source) {

@@ -14,7 +14,6 @@ import com.zhixuewuli.common.util.OptionMappingUtil;
 import com.zhixuewuli.common.util.QuestionErrorConverter;
 import com.zhixuewuli.common.util.StreamContentFixer;
 import com.zhixuewuli.common.util.StreamUtils;
-import com.zhixuewuli.common.util.UserPermissionUtil;
 import com.zhixuewuli.dto.internal.ConversationType;
 import com.zhixuewuli.dto.internal.SessionContextInternalDTO;
 import com.zhixuewuli.dto.request.AIAskRequest;
@@ -48,7 +47,6 @@ public class QuestionErrorAnalysisServiceImpl implements QuestionErrorAnalysisSe
     private final com.zhixuewuli.service.ai.report.ReportInputRepository reportInputs;
     private final AnswerRecordRepository answerRecordRepository;
     private final QuestionRepository questionRepository;
-    private final UserPermissionUtil userPermissionUtil;
     private final QuestionErrorConverter errorConverter;
     private final OptionMappingUtil optionMappingUtil;
     private final SessionManager sessionManager;
@@ -63,7 +61,6 @@ public class QuestionErrorAnalysisServiceImpl implements QuestionErrorAnalysisSe
     public List<QuestionErrorSummaryResponse> getAllQuestionErrorStatistics(Long teacherId) {
         log.info("开始查询题目错误统计 - TeacherId: {}", teacherId);
         try {
-            userPermissionUtil.checkTeacherPermission(teacherId);
             List<Object[]> statistics = answerRecordRepository.findQuestionErrorStatisticsOptimized();
             List<QuestionErrorSummaryResponse> result = errorConverter.convertQuestionErrorSummaries(statistics);
             log.info("题目错误统计查询完成 - 找到{}道有错误的题目", result.size());
@@ -89,8 +86,6 @@ public class QuestionErrorAnalysisServiceImpl implements QuestionErrorAnalysisSe
         log.info("获取题目错误详情 - QuestionId: {}, TeacherId: {}", questionId, teacherId);
 
         try {
-            // 1. 权限验证
-            userPermissionUtil.checkTeacherPermission(teacherId);
             log.info("权限验证通过");
 
             // 2. 验证题目存在
@@ -125,9 +120,6 @@ public class QuestionErrorAnalysisServiceImpl implements QuestionErrorAnalysisSe
             String sessionId) {
         AIStreamExecutor.executeStream("教师题目分析", teacherId, emitter, streamUtils, () -> {
             log.info("教师题目分析开始 - 教师ID: {}, 会话ID: {}, 题目ID: {}", teacherId, sessionId, request.getQuestionId());
-
-            // 1. 权限验证
-            userPermissionUtil.checkTeacherPermission(teacherId);
 
             // 2. 验证题目存在答题记录
             Long questionId = request.getQuestionId();

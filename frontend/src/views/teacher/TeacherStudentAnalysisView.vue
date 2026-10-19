@@ -1,5 +1,5 @@
 <template>
-  <AppShell :subtitle="`学生学情分析 · ${auth.user?.realName ?? ''}`" :links="links">
+  <AppShell :subtitle="`学生学情分析 · ${auth.user?.realName ?? ''}`">
     <div class="student-analysis-page teacher-font">
       <section class="analysis-hero">
         <div class="hero-stats">
@@ -219,7 +219,6 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
-import { teacherNavLinks } from '@/constants/navigation';
 import AppShell from '@/layouts/AppShell.vue';
 import LatexText from '@/components/LatexText.vue';
 import StreamOutput from '@/components/StreamOutput.vue';
@@ -242,7 +241,6 @@ interface StudentInsightRow extends UserResponse {
 const auth = useAuthStore();
 const { visible, type, message, show } = useToast();
 
-const links = teacherNavLinks;
 
 const loading = ref(true);
 const recordsLoading = ref(false);

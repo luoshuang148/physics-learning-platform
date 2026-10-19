@@ -1,4 +1,5 @@
-import { test, expect, type Page } from '@playwright/test';
+import { type Page } from '@playwright/test';
+import { test, expect } from './support/isolatedTest';
 
 const base = process.env.E2E_BASE_URL ?? 'http://127.0.0.1:18080/api/v1/';
 const teacherName = process.env.E2E_TEACHER_USERNAME ?? 'e2e_teacher';
@@ -24,10 +25,6 @@ test('publish → answer → archive → reuse → archived practice, and safe A
   expect(registration.ok()).toBeTruthy();
   await login(tp, teacherName, teacherPassword);
   const teacherHeaders = await headers(tp);
-  const existing = (await (await request.get(url('teacher/events/all'), { headers: teacherHeaders })).json()).data;
-  for (const task of existing) {
-    expect((await request.delete(url(`teacher/events/${task.id}`), { headers: teacherHeaders })).ok()).toBeTruthy();
-  }
   const content = `E2E immutable force fixture ${tag}`;
   const created = await request.post(url('questions/teacher/create'), { headers: teacherHeaders, data: {
     content, options: JSON.stringify({ A: '3m/s²', B: '12m/s²', C: '6m/s²', D: '0m/s²' }), correctOption: 'A', explanation: 'a=F/m', difficulty: 1,
@@ -40,12 +37,11 @@ test('publish → answer → archive → reuse → archived practice, and safe A
   await tp.locator('.bank-item').filter({ hasText: content }).getByRole('button', { name: '加入', exact: true }).click();
   await tp.locator('.publish-btn').click();
   await expect(tp.locator('.event-status-card')).toContainText('已发布');
-  let current = await request.get(url('teacher/events'), { headers: teacherHeaders });
-  const originalTask = (await current.json()).data;
+  const originalTask = (await (await request.get(url('teacher/events/all'), { headers: teacherHeaders })).json()).data.find((item: any) => item.questionIds.includes(question.id) && item.eventTitle === 'E2E task');
   expect(originalTask.questionIds).toContain(question.id);
 
   await login(sp, studentName, password);
-  await sp.goto(url('student/task')); await sp.getByRole('button', { name: '开始本次任务' }).click();
+  await sp.goto(url('student/task')); await sp.locator('.task-item').filter({ hasText: 'E2E task' }).getByRole('button', { name: '开始作答' }).click();
   await expect(sp).toHaveURL(/student\/question$/);
   await expect(sp.locator('.question-text')).toContainText(content);
   await sp.locator('label.option-row').filter({ hasText: '12m/s²' }).click();
@@ -57,8 +53,8 @@ test('publish → answer → archive → reuse → archived practice, and safe A
   let summary = await request.get(url(`answer-records/teacher/summary?eventId=${originalTask.id}`), { headers: teacherHeaders });
   expect((await summary.json()).data).toMatchObject({ assignmentAnswers: 1, assignmentCorrect: 0 });
 
-  await tp.getByRole('button', { name: '归档任务', exact: true }).click();
-  await expect(tp.locator('.event-status-card')).toContainText('未发布');
+  await tp.locator('.task-row').filter({ hasText: 'E2E task' }).getByRole('button', { name: '归档', exact: true }).click();
+  await expect(tp.locator('.task-row').filter({ hasText: 'E2E task' })).toHaveCount(0);
   // Edit the bank after archiving; the old task must keep the original text and answer.
   const changed = await request.put(url('questions/teacher/update'), { headers: teacherHeaders, data: {
     id: question.id, content: `${content} EDITED`, options: JSON.stringify({ A: '3m/s²', B: '12m/s²', C: '6m/s²', D: '0m/s²' }), correctOption: 'B', difficulty: 1,
@@ -69,10 +65,9 @@ test('publish → answer → archive → reuse → archived practice, and safe A
   await tp.locator('.bank-item').filter({ hasText: content }).getByRole('button', { name: '加入', exact: true }).click();
   await tp.locator('.publish-btn').click();
   await expect(tp.locator('.event-status-card')).toContainText('已发布');
-  current = await request.get(url('teacher/events'), { headers: teacherHeaders });
-  const reusedTask = (await current.json()).data;
+  const reusedTask = (await (await request.get(url('teacher/events/all'), { headers: teacherHeaders })).json()).data.find((item: any) => item.questionIds.includes(question.id) && item.eventTitle === 'E2E reused task');
   expect(reusedTask.id).not.toEqual(originalTask.id);
-  await sp.goto(url('student/task')); await sp.getByRole('button', { name: '开始本次任务' }).click();
+  await sp.goto(url('student/task')); await sp.locator('.task-item').filter({ hasText: 'E2E reused task' }).getByRole('button', { name: '开始作答' }).click();
   await expect(sp).toHaveURL(/student\/question$/);
   await expect(sp.locator('label.option-row')).toHaveCount(4);
   await expect(sp.locator('.q-dot.wrong')).toHaveCount(0);
@@ -81,6 +76,10 @@ test('publish → answer → archive → reuse → archived practice, and safe A
   const emptyReport = await request.get(url(`ai/student/report?eventId=${reusedTask.id}`), { headers: studentHeaders });
   expect(await emptyReport.text()).toContain('无答题记录');
 
+  // Finish the reused assignment before practicing its historical version.
+  await sp.locator('label.option-row').filter({ hasText: '12m/s²' }).click();
+  await sp.getByRole('button', { name: '提交答案', exact: true }).click();
+  await expect(sp.locator('.q-save-feedback')).toBeVisible();
   await sp.goto(url(`student/practice?eventId=${originalTask.id}&questionId=${question.id}`));
   await expect(sp.locator('.question-text')).toContainText(content);
   await expect(sp.locator('.question-text')).not.toContainText('EDITED');

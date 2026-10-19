@@ -54,6 +54,8 @@ import org.springframework.transaction.annotation.Transactional;
 public class AuthServiceImpl implements AuthService {
 
     private final UserRepository userRepository;
+    private final com.zhixuewuli.service.user.ClassroomGuard classroomGuard;
+    private final com.zhixuewuli.service.teacherEvent.TaskRosterService roster;
     private final PasswordUtil passwordUtil;
     private final JwtUtil jwtUtil;
 
@@ -121,6 +123,7 @@ public class AuthServiceImpl implements AuthService {
             throw new com.zhixuewuli.common.exception.InsufficientPermissionException(
                     "公开注册仅允许学生账号，教师身份须由已授权教师在用户管理中授予");
         }
+        classroomGuard.lock();
         log.debug("开始处理用户注册请求，用户名: {}", request.getUsername());
 
         // 用户名唯一性只由用户名字段和数据库唯一约束保障。
@@ -149,6 +152,7 @@ public class AuthServiceImpl implements AuthService {
             throw conflict;
         }
 
+        roster.enroll(savedUser);
         log.debug("用户注册成功，用户ID: {}, 用户名: {}", savedUser.getId(), savedUser.getUsername());
 
         return savedUser;

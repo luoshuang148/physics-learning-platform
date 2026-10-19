@@ -6,7 +6,6 @@ import com.zhixuewuli.common.exception.InsufficientPermissionException;
 import com.zhixuewuli.common.exception.TechnicalException;
 import com.zhixuewuli.common.factory.TestDataFactory;
 import com.zhixuewuli.common.util.QuestionErrorConverter;
-import com.zhixuewuli.common.util.UserPermissionUtil;
 import com.zhixuewuli.dto.request.AIAskRequest;
 import com.zhixuewuli.dto.response.QuestionErrorSummaryResponse;
 import com.zhixuewuli.entity.Question;
@@ -62,8 +61,6 @@ class QuestionErrorAnalysisServiceSyncTest extends BaseUnitTest {
     @Mock
     private QuestionRepository questionRepository;
 
-    @Mock
-    private UserPermissionUtil userPermissionUtil;
 
     @Mock
     private QuestionErrorConverter errorConverter;
@@ -136,7 +133,6 @@ class QuestionErrorAnalysisServiceSyncTest extends BaseUnitTest {
     @DisplayName("成功获取题目错误统计信息")
     void shouldReturnQuestionErrorStatisticsWhenValidTeacher() {
         // Given
-        doNothing().when(userPermissionUtil).checkTeacherPermission(teacherId);
         when(answerRecordRepository.findQuestionErrorStatisticsOptimized()).thenReturn(mockStatisticsData);
         when(errorConverter.convertQuestionErrorSummaries(mockStatisticsData)).thenReturn(mockSummaryResponses);
 
@@ -151,7 +147,6 @@ class QuestionErrorAnalysisServiceSyncTest extends BaseUnitTest {
         assertThat(result.get(0).getErrorCount()).isEqualTo(2L);
         assertThat(result.get(0).getErrorRate()).isEqualTo(0.4);
 
-        verify(userPermissionUtil).checkTeacherPermission(teacherId);
         verify(answerRecordRepository).findQuestionErrorStatisticsOptimized();
         verify(errorConverter).convertQuestionErrorSummaries(mockStatisticsData);
     }
@@ -160,7 +155,6 @@ class QuestionErrorAnalysisServiceSyncTest extends BaseUnitTest {
     @DisplayName("当没有错误记录时返回空列表")
     void shouldReturnEmptyListWhenNoErrorRecords() {
         // Given
-        doNothing().when(userPermissionUtil).checkTeacherPermission(teacherId);
         when(answerRecordRepository.findQuestionErrorStatisticsOptimized()).thenReturn(Collections.emptyList());
         when(errorConverter.convertQuestionErrorSummaries(Collections.emptyList())).thenReturn(Collections.emptyList());
 
@@ -175,31 +169,11 @@ class QuestionErrorAnalysisServiceSyncTest extends BaseUnitTest {
         verify(errorConverter).convertQuestionErrorSummaries(Collections.emptyList());
     }
 
-    @Test
-    @DisplayName("当用户不是教师时抛出权限异常")
-    void shouldThrowInsufficientPermissionExceptionWhenUserIsNotTeacher() {
-        // Given
-        User student = TestDataFactory.createUser();
-        student.setId(2001L);
-        student.setUserType(User.UserType.STUDENT);
-
-        doThrow(new InsufficientPermissionException("用户不是教师"))
-                .when(userPermissionUtil).checkTeacherPermission(teacherId);
-
-        // When & Then
-        assertThatThrownBy(() -> questionErrorAnalysisService.getAllQuestionErrorStatistics(teacherId))
-                .isInstanceOf(InsufficientPermissionException.class)
-                .hasMessage("用户不是教师");
-
-        verify(userPermissionUtil).checkTeacherPermission(teacherId);
-        verify(answerRecordRepository, never()).findQuestionErrorStatisticsOptimized();
-    }
 
     @Test
     @DisplayName("当数据库查询异常时抛出技术异常")
     void shouldThrowTechnicalExceptionWhenDatabaseQueryFails() {
         // Given
-        doNothing().when(userPermissionUtil).checkTeacherPermission(teacherId);
         when(answerRecordRepository.findQuestionErrorStatisticsOptimized())
                 .thenThrow(new RuntimeException("数据库连接失败"));
 

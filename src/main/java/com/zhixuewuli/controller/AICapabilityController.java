@@ -9,11 +9,14 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class AICapabilityController {
  private final AIBusinessProperties properties;
+ private final com.zhixuewuli.common.metrics.AIMetrics metrics;
  @GetMapping("/capabilities")
  public Result<Map<String,Object>> capabilities(){
   boolean reports=properties.isEnabled()&&present(properties.getAliyunApiKey());
   boolean tutoring=properties.isEnabled()&&present(properties.getZhipuApiKey());
-  return Result.success(Map.of("reports",reports,"tutoring",tutoring,"notice","AI 建议仅供学习参考，需核实。问题和作答会发送至模型服务，请勿填写个人敏感信息。"));
+  return Result.success(Map.of("reports",reports,"tutoring",tutoring,
+    "reportStatus",metrics.lastStatus("aliyun"),"tutoringStatus",metrics.lastStatus("zhipu"),
+    "notice","开关与密钥仅表示已配置；运行状态取自最近一次实际调用，不会为检查状态额外调用模型。AI 建议需核实，请勿填写敏感信息。"));
  }
  private boolean present(String key){return key!=null&&!key.isBlank();}
 }

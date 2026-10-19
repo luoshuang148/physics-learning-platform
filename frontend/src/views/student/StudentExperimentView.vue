@@ -1,5 +1,5 @@
 <template>
-  <AppShell :subtitle="`3D 实验 · ${auth.user?.realName ?? ''}`" :links="links">
+  <AppShell :subtitle="`3D 实验 · ${auth.user?.realName ?? ''}`">
     <div class="exp-page">
 
       <!-- 左：实验选择栏 -->
@@ -41,19 +41,15 @@
             type="button"
             @click="enterFullscreen"
           >全屏</button>
-          <button
-            v-if="activeExperiment"
-            class="mark-btn"
-            :class="{ done: doneMap[activeExperiment.id] }"
-            @click="toggleDone(activeExperiment.id)"
-          >
-            {{ doneMap[activeExperiment.id] ? '已标记完成' : '标记当前实验完成' }}
-          </button>
         </div>
       </div>
 
       <!-- 右：实验 iframe -->
-      <div class="exp-main" ref="fullscreenContainerRef">
+      <div
+        class="exp-main"
+        ref="fullscreenContainerRef"
+        :class="{ 'is-fullscreen-fallback': cssFullscreen }"
+      >
         <div v-if="!activeExperiment" class="exp-placeholder">
         </div>
         <iframe
@@ -79,7 +75,7 @@
 </template>
 
 <script setup lang="ts">
-import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import AppShell from '@/layouts/AppShell.vue';
 import AppToast from '@/components/AppToast.vue';
 import { useToast } from '@/composables/useToast';
@@ -93,12 +89,6 @@ const { visible, type, message, show } = useToast();
 
 const getExperimentStateKey = () => `${EXPERIMENT_STATE_KEY_PREFIX}_${auth.user?.id ?? 'anonymous'}`;
 
-const links = [
-  { label: '首页', to: '/student/home' },
-  { label: '作业', to: '/student/task' },
-  { label: '错题本', to: '/student/wrong-book' },
-  { label: '学习报告', to: '/student/report' },
-];
 
 const resolveStaticAssetUrl = (path: string) => {
   const base = (import.meta.env.BASE_URL || '/').replace(/\/+$/, '/');
@@ -127,6 +117,16 @@ type ExperimentItem = (typeof SERIES_EXPERIMENTS)[keyof typeof SERIES_EXPERIMENT
 type DisposableExperimentWindow = Window & {
   disposeExperiment?: () => void;
 };
+type VendorFullscreenElement = HTMLElement & {
+  webkitRequestFullscreen?: () => Promise<void> | void;
+  msRequestFullscreen?: () => Promise<void> | void;
+};
+type VendorFullscreenDocument = Document & {
+  webkitFullscreenElement?: Element | null;
+  msFullscreenElement?: Element | null;
+  webkitExitFullscreen?: () => Promise<void> | void;
+  msExitFullscreen?: () => Promise<void> | void;
+};
 type ExperimentLayoutMode = 'full' | 'normal' | 'compact';
 type ExperimentLayoutPayload = {
   type: 'zxwl-experiment-layout';
@@ -148,7 +148,9 @@ const activeExperiment = ref<ExperimentItem | null>(null);
 const doneMap = ref<Record<string, boolean>>({});
 const experimentFrameRef = ref<HTMLIFrameElement | null>(null);
 const fullscreenContainerRef = ref<HTMLElement | null>(null);
-const isFullscreen = ref(false);
+const nativeFullscreen = ref(false);
+const cssFullscreen = ref(false);
+const isFullscreen = computed(() => nativeFullscreen.value || cssFullscreen.value);
 const expMainWidth = ref(0);
 const layoutMode = ref<ExperimentLayoutMode>('normal');
 
@@ -297,8 +299,13 @@ const clearExperimentContainerObserver = () => {
   }
 };
 
+const getFullscreenElement = (): Element | null => {
+  const doc = document as VendorFullscreenDocument;
+  return doc.fullscreenElement ?? doc.webkitFullscreenElement ?? doc.msFullscreenElement ?? null;
+};
+
 const syncFullscreenState = () => {
-  isFullscreen.value = document.fullscreenElement === fullscreenContainerRef.value;
+  nativeFullscreen.value = getFullscreenElement() === fullscreenContainerRef.value;
   syncLayoutState();
 };
 
@@ -307,20 +314,46 @@ const handleFrameLoad = () => {
 };
 
 const enterFullscreen = async () => {
-  if (!fullscreenContainerRef.value) return;
+  const container = fullscreenContainerRef.value as VendorFullscreenElement | null;
+  if (!container) return;
+
+  const request = container.requestFullscreen
+    ?? container.webkitRequestFullscreen
+    ?? container.msRequestFullscreen;
+
+  if (typeof request !== 'function') {
+    // 浏览器不支持 Fullscreen API（如部分 Safari / 嵌入式 iframe），退化为 CSS 全屏。
+    cssFullscreen.value = true;
+    return;
+  }
+
   try {
-    await fullscreenContainerRef.value.requestFullscreen();
+    await Promise.resolve(request.call(container));
   } catch {
-    show('当前浏览器暂不支持全屏或全屏失败', 'error');
+    cssFullscreen.value = true;
   }
 };
 
 const exitFullscreen = async () => {
-  if (!document.fullscreenElement) return;
+  if (cssFullscreen.value) {
+    cssFullscreen.value = false;
+    return;
+  }
+
+  const doc = document as VendorFullscreenDocument;
+  const exit = doc.exitFullscreen ?? doc.webkitExitFullscreen ?? doc.msExitFullscreen;
+  if (typeof exit !== 'function') return;
+
   try {
-    await document.exitFullscreen();
+    await Promise.resolve(exit.call(doc));
   } catch {
     show('退出全屏失败，请重试', 'error');
+  }
+};
+
+const handleFullscreenKeydown = (event: KeyboardEvent) => {
+  if (event.key === 'Escape' && cssFullscreen.value) {
+    cssFullscreen.value = false;
   }
 };
 
@@ -345,6 +378,10 @@ watch(() => activeExperiment.value?.id, async () => {
   syncLayoutState();
 });
 
+watch(cssFullscreen, () => {
+  syncLayoutState();
+});
+
 const loadFreeExperiments = () => {
   const storedState = restoreExperimentState();
   const series = validSeries.includes(storedState?.currentSeries as keyof typeof SERIES_EXPERIMENTS)
@@ -358,19 +395,18 @@ const loadFreeExperiments = () => {
   persistExperimentState();
 };
 
-const toggleDone = (id: string) => {
-  doneMap.value[id] = !doneMap.value[id];
-  persistExperimentState();
-};
-
 onMounted(() => {
   document.addEventListener('fullscreenchange', syncFullscreenState);
+  document.addEventListener('webkitfullscreenchange', syncFullscreenState);
+  document.addEventListener('keydown', handleFullscreenKeydown);
   observeExperimentContainer();
   syncLayoutState();
   loadFreeExperiments();
 });
 onBeforeUnmount(() => {
   document.removeEventListener('fullscreenchange', syncFullscreenState);
+  document.removeEventListener('webkitfullscreenchange', syncFullscreenState);
+  document.removeEventListener('keydown', handleFullscreenKeydown);
   clearExperimentContainerObserver();
 
   const resetPayload: ExperimentLayoutPayload = {
@@ -528,25 +564,6 @@ onBeforeUnmount(() => {
   gap: 8px;
 }
 
-.mark-btn {
-  width: 100%;
-  padding: 11px 14px;
-  border-radius: 12px;
-  border: 1px solid rgba(90, 243, 211, 0.35);
-  background: rgba(90, 243, 211, 0.08);
-  color: var(--brand);
-  font-size: 13px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: all 0.18s ease;
-}
-
-.mark-btn.done {
-  border-color: rgba(80, 200, 140, 0.35);
-  background: rgba(80, 200, 140, 0.1);
-  color: var(--ok);
-}
-
 .action-hint {
   margin: 2px 2px 0;
   font-size: 11px;
@@ -560,6 +577,23 @@ onBeforeUnmount(() => {
   flex: 1;
   min-width: 0;
   background: rgba(6, 8, 18, 0.92);
+}
+
+.exp-main.is-fullscreen-fallback {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483000;
+  width: 100vw;
+  height: 100vh;
+  margin: 0;
+  border-radius: 0;
+  background: rgba(6, 8, 18, 0.98);
+}
+
+.exp-main:fullscreen .exp-frame,
+.exp-main.is-fullscreen-fallback .exp-frame {
+  min-height: 0;
+  height: 100%;
 }
 
 .exp-placeholder {

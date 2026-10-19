@@ -1,5 +1,8 @@
 package com.zhixuewuli.controller;
 
+import com.zhixuewuli.common.security.TeacherOnly;
+import com.zhixuewuli.common.security.AuthenticatedUser;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import com.zhixuewuli.common.exception.InsufficientPermissionException;
 import com.zhixuewuli.common.result.Result;
 import com.zhixuewuli.dto.request.TeacherEventCreateRequest;
@@ -8,7 +11,6 @@ import com.zhixuewuli.service.teacherEvent.TeacherEventService;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -50,10 +52,10 @@ public class TeacherEventController {
     private final TeacherEventService teacherEventService;
 
     @GetMapping("/history")
+    @TeacherOnly
     public Result<com.zhixuewuli.common.result.PageResult<TeacherEventResponse>> history(
-            @RequestParam(defaultValue = "1") int page, @RequestParam(defaultValue = "20") int size,
-            HttpServletRequest request) {
-        return Result.success(teacherEventService.getEventHistory((Long) request.getAttribute("userId"), page, size));
+            @RequestParam(defaultValue = "1") int page, @RequestParam(defaultValue = "20") int size) {
+        return Result.success(teacherEventService.getEventHistory(page, size));
     }
 
 
@@ -90,14 +92,15 @@ public class TeacherEventController {
         }
     )
     @ResponseStatus(HttpStatus.CREATED)
+    @TeacherOnly
     public Result<TeacherEventResponse> publishEvent(
             @io.swagger.v3.oas.annotations.Parameter(description = "事件创建请求参数", required = true) @RequestBody @Valid TeacherEventCreateRequest request,
-            HttpServletRequest httpRequest) {
+            @AuthenticationPrincipal AuthenticatedUser user) {
     
         log.info("收到创建教学任务请求");
     
         // 从请求属性中获取用户 ID（由拦截器解析 JWT 提供）
-        Long currentUserId = (Long) httpRequest.getAttribute("userId");
+        Long currentUserId = user.id();
     
         TeacherEventResponse response = teacherEventService.publishEvent(request, currentUserId);
         return Result.created("事件发布成功", response);
@@ -127,14 +130,10 @@ public class TeacherEventController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "权限不足（非教师身份）")
         }
     )
-    public Result<Void> deleteCurrentEvent(HttpServletRequest httpRequest, @RequestParam Long expectedEventId) {
-    
+    @TeacherOnly
+    public Result<Void> deleteCurrentEvent(@RequestParam Long expectedEventId) {
         log.info("收到归档任务请求");
-    
-        // 从请求属性中获取用户 ID（由拦截器解析 JWT 提供）
-        Long currentUserId = (Long) httpRequest.getAttribute("userId");
-    
-        teacherEventService.archiveEvent(expectedEventId,currentUserId);
+        teacherEventService.archiveEvent(expectedEventId);
         return Result.success();
     }
 
@@ -161,7 +160,7 @@ public class TeacherEventController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "未认证")
         }
     )
-    public Result<TeacherEventResponse> getCurrentEvent(HttpServletRequest httpRequest) {
+    public Result<TeacherEventResponse> getCurrentEvent() {
 
         log.info("收到查询最新任务请求");
 
@@ -172,58 +171,76 @@ public class TeacherEventController {
 
     @GetMapping("/overview")
     @Operation(summary = "教师总览任务组合", description = "批量返回各任务完成率、正确率、未交人数与截止信息")
-    public Result<java.util.List<com.zhixuewuli.dto.response.TaskOverviewResponse>> overview(HttpServletRequest request) {
-        return Result.success(teacherEventService.getTaskOverview((Long) request.getAttribute("userId")));
+    @TeacherOnly
+    public Result<java.util.List<com.zhixuewuli.dto.response.TaskOverviewResponse>> overview() {
+        return Result.success(teacherEventService.getTaskOverview());
     }
 
     @GetMapping("/all")
     @Operation(summary = "教师任务列表", description = "返回当前教师所有未归档任务，支持并行任务管理")
-    public Result<java.util.List<TeacherEventResponse>> allTasks(HttpServletRequest request) {
-        return Result.success(teacherEventService.listTeacherTasks((Long) request.getAttribute("userId")));
+    @TeacherOnly
+    public Result<java.util.List<TeacherEventResponse>> allTasks() {
+        return Result.success(teacherEventService.listTeacherTasks());
     }
 
     @GetMapping("/available")
     @Operation(summary = "学生可用任务列表", description = "返回已发布任务，包含未开始、进行中和已截止状态")
-    public Result<java.util.List<TeacherEventResponse>> availableTasks(HttpServletRequest request) {
-        return Result.success(teacherEventService.listStudentTasks((Long) request.getAttribute("userId")));
+    public Result<java.util.List<TeacherEventResponse>> availableTasks(@AuthenticationPrincipal AuthenticatedUser user) {
+        return Result.success(teacherEventService.listStudentTasks(user.id()));
+    }
+
+    @GetMapping("/student-tasks")
+    public Result<java.util.List<com.zhixuewuli.dto.response.StudentTaskResultResponse>> studentTaskResults(@AuthenticationPrincipal AuthenticatedUser user) {
+        return Result.success(teacherEventService.listStudentTaskResults(user.id()));
+    }
+
+    @GetMapping("/{id}/my-result")
+    public Result<com.zhixuewuli.dto.response.StudentTaskResultResponse> myTaskResult(@PathVariable Long id, @AuthenticationPrincipal AuthenticatedUser user) {
+        return Result.success(teacherEventService.getStudentTaskResult(id, user.id()));
     }
 
     @PutMapping("/{id}/draft")
-    public Result<TeacherEventResponse> updateDraft(@PathVariable Long id, @Valid @RequestBody TeacherEventCreateRequest payload,
-            HttpServletRequest request) {
-        return Result.success(teacherEventService.updateDraft(id, payload, (Long) request.getAttribute("userId")));
+    @TeacherOnly
+    public Result<TeacherEventResponse> updateDraft(@PathVariable Long id, @Valid @RequestBody TeacherEventCreateRequest payload) {
+        return Result.success(teacherEventService.updateDraft(id, payload));
     }
 
     @PostMapping("/{id}/publish")
-    public Result<TeacherEventResponse> publishDraft(@PathVariable Long id, HttpServletRequest request) {
-        return Result.success(teacherEventService.publishTask(id, (Long) request.getAttribute("userId")));
+    @TeacherOnly
+    public Result<TeacherEventResponse> publishDraft(@PathVariable Long id) {
+        return Result.success(teacherEventService.publishTask(id));
     }
 
     @PostMapping("/{id}/close")
-    public Result<TeacherEventResponse> closeTask(@PathVariable Long id, HttpServletRequest request) {
-        return Result.success(teacherEventService.closeTask(id, (Long) request.getAttribute("userId")));
+    @TeacherOnly
+    public Result<TeacherEventResponse> closeTask(@PathVariable Long id) {
+        return Result.success(teacherEventService.closeTask(id));
     }
 
     @GetMapping("/{id}/stats")
     @Operation(summary = "作业详情统计", description = "单次作业的参与/完成/未交、学生汇总和每题正确率")
-    public Result<com.zhixuewuli.dto.response.TaskDetailResponse> taskStats(@PathVariable Long id, HttpServletRequest request) {
-        return Result.success(teacherEventService.getTaskDetail(id, (Long) request.getAttribute("userId")));
+    @TeacherOnly
+    public Result<com.zhixuewuli.dto.response.TaskDetailResponse> taskStats(@PathVariable Long id, @AuthenticationPrincipal AuthenticatedUser user) {
+        return Result.success(teacherEventService.getTaskDetail(id, user.id()));
     }
 
     @GetMapping("/{id}")
-    public Result<TeacherEventResponse> getEvent(@PathVariable Long id, HttpServletRequest request){
-        return Result.success(teacherEventService.getEvent(id, (Long) request.getAttribute("userId")));
+    public Result<TeacherEventResponse> getEvent(@PathVariable Long id, @AuthenticationPrincipal AuthenticatedUser user){
+        return Result.success(teacherEventService.getEvent(id, user.id()));
     }
     @GetMapping("/{id}/questions")
-    public Result<java.util.List<com.zhixuewuli.dto.response.QuestionResponse>> getQuestions(@PathVariable Long id,HttpServletRequest request){
-        return Result.success(teacherEventService.getEventQuestions(id,(Long)request.getAttribute("userId")));
+    public Result<java.util.List<com.zhixuewuli.dto.response.QuestionResponse>> getQuestions(@PathVariable Long id,@AuthenticationPrincipal AuthenticatedUser user){
+        return Result.success(teacherEventService.getEventQuestions(id,user.id()));
     }
     @PutMapping("/{id}/replace")
-    public Result<TeacherEventResponse> replace(@PathVariable Long id,@Valid @RequestBody TeacherEventCreateRequest payload,HttpServletRequest request){
-        return Result.success(teacherEventService.replaceEvent(id,payload,(Long)request.getAttribute("userId")));
+    @TeacherOnly
+    public Result<TeacherEventResponse> replace(@PathVariable Long id,@Valid @RequestBody TeacherEventCreateRequest payload,@AuthenticationPrincipal AuthenticatedUser user){
+        return Result.success(teacherEventService.replaceEvent(id,payload,user.id()));
     }
     @DeleteMapping("/{id}")
-    public Result<Void> archive(@PathVariable Long id,HttpServletRequest request){
-        teacherEventService.archiveEvent(id,(Long)request.getAttribute("userId"));return Result.success();
+    @TeacherOnly
+    public Result<Void> archive(@PathVariable Long id) {
+        teacherEventService.archiveEvent(id);
+        return Result.success();
     }
 }

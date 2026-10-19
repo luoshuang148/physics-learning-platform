@@ -1,5 +1,5 @@
 <template>
-  <AppShell :subtitle="`任务管理 · ${auth.user?.realName ?? ''}`" :links="links">
+  <AppShell :subtitle="`任务管理 · ${auth.user?.realName ?? ''}`">
     <div class="event-page teacher-font">
       <section class="event-hero">
         <div class="event-status-card" :class="openTasks.length ? 'live' : 'idle'">
@@ -98,14 +98,14 @@
           <div class="panel-head">
             <div>
               <h2>题库</h2>
-              <span class="panel-data">共 {{ allQuestions.length }} 道题</span>
+              <span class="panel-data">共 {{ questionTotal }} 道题</span>
             </div>
             <input v-model="searchText" class="search-input" placeholder="搜索题目 ID 或内容…" />
           </div>
 
           <div v-if="loadingQuestions" class="empty-hint">加载题目中…</div>
           <div v-else class="bank-list">
-            <article v-for="question in filteredQuestions" :key="question.id" class="bank-item"
+            <article v-for="question in allQuestions" :key="question.id" class="bank-item"
               :class="{ added: selectedIds.includes(question.id) }">
               <div class="bank-main">
                 <span class="question-id">#{{ question.id }}</span>
@@ -113,12 +113,11 @@
                 <button class="add-btn" :disabled="selectedIds.includes(question.id) || selectedIds.length >= 200"
                   @click="addQuestion(question.id)">{{ selectedIds.includes(question.id) ? '已加入' : '加入' }}</button>
               </div>
-              <div v-if="question.imageBase64" class="image-wrap">
-                <img :src="question.imageBase64" alt="题目图片" />
-              </div>
+              <small v-if="question.hasImage" class="muted">含配图</small>
             </article>
-            <div v-if="filteredQuestions.length === 0" class="empty-hint"><p>没有匹配的题目</p></div>
+            <div v-if="allQuestions.length === 0" class="empty-hint"><p>没有匹配的题目</p></div>
           </div>
+          <div class="archive-pager"><button :disabled="loadingQuestions || questionPage <= 1" @click="changeQuestionPage(-1)">上一页</button><span>{{ questionPage }} / {{ questionPages || 1 }}</span><button :disabled="loadingQuestions || questionPage >= questionPages" @click="changeQuestionPage(1)">下一页</button><button :disabled="loadingQuestions" @click="loadQuestions">刷新</button></div>
         </section>
       </div>
 
@@ -147,8 +146,8 @@ import { computed, onMounted, ref } from 'vue';
 import AppShell from '@/layouts/AppShell.vue';
 import LatexText from '@/components/LatexText.vue';
 import AppToast from '@/components/AppToast.vue';
-import { teacherNavLinks } from '@/constants/navigation';
 import { useAuthStore } from '@/stores/auth';
+import { taskAvailabilityText } from '@/utils/assignmentProgress';
 import { useToast } from '@/composables/useToast';
 import {
   closeTaskApi,
@@ -156,26 +155,25 @@ import {
   deleteTeacherEventApi,
   getTeacherEventHistoryApi,
   getTeacherTasksApi,
+  getTaskQuestionsApi,
   publishDraftTaskApi,
   updateDraftTaskApi,
 } from '@/api/teacher-event';
-import { getAllQuestionsApi } from '@/api/question';
-import type { QuestionResponse } from '@/types/question';
+import { useQuestionCatalog } from '@/composables/useQuestionCatalog';
+import type { QuestionCatalogRow } from '@/types/question';
 import type { TeacherEventResponse } from '@/types/teacher-event';
 
 const auth = useAuthStore();
 const { visible, type, message, show } = useToast();
-const links = teacherNavLinks;
 
-const allQuestions = ref<QuestionResponse[]>([]);
+const { rows: allQuestions, loading: loadingQuestions, page: questionPage, total: questionTotal, pages: questionPages, search: searchText, load: loadQuestions, changePage: changeQuestionPage } = useQuestionCatalog(show);
+const selectedQuestions = ref<Record<number, Pick<QuestionCatalogRow, 'id' | 'content'>>>({});
 const selectedIds = ref<number[]>([]);
 const tasks = ref<TeacherEventResponse[]>([]);
 const editingTask = ref<TeacherEventResponse | null>(null);
 const taskTitle = ref('');
-const searchText = ref('');
 const startAt = ref('');
 const dueAt = ref('');
-const loadingQuestions = ref(false);
 const loadingTasks = ref(false);
 const publishing = ref(false);
 const archivedEvents = ref<TeacherEventResponse[]>([]);
@@ -183,16 +181,7 @@ const historyPage = ref(1);
 const historyTotal = ref(0);
 const historyPages = ref(0);
 
-const questionMap = computed<Record<number, QuestionResponse>>(() => {
-  const map: Record<number, QuestionResponse> = {};
-  for (const question of allQuestions.value) map[question.id] = question;
-  return map;
-});
-const filteredQuestions = computed(() => {
-  const keyword = searchText.value.trim().toLowerCase();
-  if (!keyword) return allQuestions.value;
-  return allQuestions.value.filter(question => String(question.id).includes(keyword) || question.content.toLowerCase().includes(keyword));
-});
+const questionMap = computed<Record<number, Pick<QuestionCatalogRow, 'id' | 'content'>>>(() => ({ ...selectedQuestions.value, ...Object.fromEntries(allQuestions.value.map(q => [q.id, q])) }));
 const draftTasks = computed(() => tasks.value.filter(task => task.status === 'DRAFT'));
 const openTasks = computed(() => tasks.value.filter(task => task.status === 'PUBLISHED' && task.availability === 'OPEN'));
 const closedTasks = computed(() => tasks.value.filter(task => task.status === 'CLOSED' || task.availability === 'ENDED'));
@@ -200,14 +189,7 @@ const latestOpenTask = computed(() => openTasks.value[0] ?? null);
 const canPublish = computed(() => Boolean(taskTitle.value.trim()) && selectedIds.value.length > 0);
 const canSaveDraft = computed(() => Boolean(taskTitle.value.trim()));
 
-const statusText = (task: TeacherEventResponse) => {
-  if (task.status === 'DRAFT') return '草稿';
-  if (task.status === 'CLOSED') return '已截止';
-  if (task.status === 'ARCHIVED') return '已归档';
-  if (task.availability === 'SCHEDULED') return '未开始';
-  if (task.availability === 'ENDED') return '已截止';
-  return '进行中';
-};
+const statusText = (task: TeacherEventResponse) => taskAvailabilityText(task.availability ?? task.status);
 const formatDate = (value: string) => new Date(value).toLocaleString('zh-CN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 const formatWindow = (value: string | null, fallback: string) => value ? formatDate(value) : fallback;
 const toUtcIso = (value: string) => value ? new Date(value).toISOString().slice(0, 19) : null;
@@ -225,12 +207,6 @@ const validateTime = () => {
   return true;
 };
 
-const loadQuestions = async () => {
-  loadingQuestions.value = true;
-  try { allQuestions.value = await getAllQuestionsApi(); }
-  catch (error: any) { show(error?.response?.data?.message ?? '加载题库失败', 'error'); }
-  finally { loadingQuestions.value = false; }
-};
 const loadTasks = async () => {
   loadingTasks.value = true;
   try { tasks.value = await getTeacherTasksApi(); }
@@ -252,7 +228,11 @@ const changeHistoryPage = async (delta: number) => {
   await loadHistory();
 };
 const addQuestion = (id: number) => {
-  if (!selectedIds.value.includes(id) && selectedIds.value.length < 200) selectedIds.value.push(id);
+  if (!selectedIds.value.includes(id) && selectedIds.value.length < 200) {
+    const row = allQuestions.value.find(q => q.id === id);
+    if (row) selectedQuestions.value[id] = row;
+    selectedIds.value.push(id);
+  }
 };
 const removeQuestion = (id: number) => { selectedIds.value = selectedIds.value.filter(value => value !== id); };
 const moveUp = (index: number) => {
@@ -264,14 +244,19 @@ const moveDown = (index: number) => {
   [selectedIds.value[index + 1], selectedIds.value[index]] = [selectedIds.value[index], selectedIds.value[index + 1]];
 };
 const resetForm = () => {
-  editingTask.value = null; taskTitle.value = ''; selectedIds.value = []; startAt.value = ''; dueAt.value = '';
+  editingTask.value = null; taskTitle.value = ''; selectedIds.value = []; selectedQuestions.value = {}; startAt.value = ''; dueAt.value = '';
 };
-const editDraft = (task: TeacherEventResponse) => {
+const editDraft = async (task: TeacherEventResponse) => {
   editingTask.value = task;
   taskTitle.value = task.eventTitle;
   selectedIds.value = [...(task.questionIds ?? [])];
   startAt.value = toLocalInput(task.startAt);
   dueAt.value = toLocalInput(task.dueAt);
+  try {
+    const details = await getTaskQuestionsApi(task.id);
+    if (editingTask.value?.id !== task.id) return;
+    for (const item of details) selectedQuestions.value[item.id] = item;
+  } catch { if (editingTask.value?.id === task.id) show('草稿题目详情加载失败，可按题号继续编辑', 'error'); }
 };
 const payload = (status: 'DRAFT' | 'PUBLISHED') => ({
   eventTitle: taskTitle.value.trim(),
@@ -323,7 +308,7 @@ const archiveTask = async (task: TeacherEventResponse) => {
     show('任务已归档，历史作答已保留', 'success');
   } catch (error: any) { show(error?.response?.data?.message ?? '归档失败，请重试', 'error'); }
 };
-onMounted(async () => { await Promise.all([loadQuestions(), loadTasks(), loadHistory()]); });
+onMounted(async () => { await Promise.all([loadTasks(), loadHistory()]); });
 </script>
 
 <style scoped>

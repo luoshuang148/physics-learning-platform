@@ -23,8 +23,8 @@ public class TaskQuestionService {
   List<Long> ids=request.getQuestionIds();
   if(ids==null) {
    String legacy=request.getEventDescription();
-   if(legacy==null || !legacy.startsWith("QIDS:")) return List.of();
-   try { ids=Arrays.stream(legacy.substring(5).split(",")).map(String::trim).map(Long::valueOf).toList(); }
+   if(legacy==null || !legacy.startsWith("QIDS:")) ids=List.of();
+   else try { ids=Arrays.stream(legacy.substring(5).split(",")).map(String::trim).map(Long::valueOf).toList(); }
    catch(RuntimeException e){throw new IllegalArgumentException("旧任务题目列表无效");}
   }
   if((!allowEmpty && ids.isEmpty())||ids.size()>200||new HashSet<>(ids).size()!=ids.size()) throw new IllegalArgumentException(allowEmpty ? "任务最多包含200道不同题目" : "任务须包含1到200道不同题目");

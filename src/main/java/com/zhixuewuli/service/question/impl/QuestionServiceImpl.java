@@ -64,14 +64,11 @@ import java.util.List;
 public class QuestionServiceImpl implements QuestionService {
 
     private final QuestionRepository questionRepository;
-    private final UserPermissionUtil userPermissionUtil;
     private final com.zhixuewuli.repository.TeacherEventQuestionRepository taskQuestionRepository;
     private final com.zhixuewuli.repository.AnswerRecordRepository answerRepository;
 
     @Override
-    public Question createQuestion(QuestionCreateRequest request, Long teacherId) {
-
-        userPermissionUtil.checkTeacherPermission(teacherId);
+    public Question createQuestion(QuestionCreateRequest request) {
 
         log.info("开始创建题目，内容预览: {}",
                 request.getContent().length() > 50 ? request.getContent().substring(0, 50) + "..."
@@ -100,9 +97,7 @@ public class QuestionServiceImpl implements QuestionService {
     }
 
     @Override
-    public void deleteQuestionById(Long id, Long teacherId) {
-
-        userPermissionUtil.checkTeacherPermission(teacherId);
+    public void deleteQuestionById(Long id) {
 
         log.info("开始删除题目，ID: {}", id);
 
@@ -121,9 +116,7 @@ public class QuestionServiceImpl implements QuestionService {
     }
 
     @Override
-    public Question updateQuestion(QuestionUpdateRequest request, Long teacherId) {
-
-        userPermissionUtil.checkTeacherPermission(teacherId);
+    public Question updateQuestion(QuestionUpdateRequest request) {
 
         log.info("开始更新题目，ID: {}", request.getId());
 

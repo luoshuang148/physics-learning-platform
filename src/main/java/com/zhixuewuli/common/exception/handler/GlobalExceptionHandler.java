@@ -45,6 +45,13 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(429).header("Retry-After","60").body(Result.error(ResultCode.BUSINESS_ERROR,"登录尝试过多，请一分钟后重试"));
     }
 
+    /** {@code @PreAuthorize}/{@code @TeacherOnly} 拒绝发生在 MVC 内部，需在这里映射为 403。 */
+    @ExceptionHandler(org.springframework.security.access.AccessDeniedException.class)
+    public ResponseEntity<Result<?>> handleAccessDenied(org.springframework.security.access.AccessDeniedException e) {
+        log.warn("权限不足: {}", e.getMessage());
+        return error(FORBIDDEN, ResultCode.PERMISSION_DENIED, "权限不足", null);
+    }
+
     // ==================== 验证相关异常处理（最优先） ====================
 
     @ExceptionHandler(IllegalArgumentException.class)

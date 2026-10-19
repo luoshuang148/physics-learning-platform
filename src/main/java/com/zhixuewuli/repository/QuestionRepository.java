@@ -39,6 +39,13 @@ import java.util.List;
 @Repository
 public interface QuestionRepository extends JpaRepository<Question, Long> {
 
+    @Query("select new com.zhixuewuli.dto.response.QuestionCatalogRow(q.id, substring(q.content,1,180), q.correctOption, q.difficulty, " +
+            "case when q.imageBase64 is not null and q.imageBase64 <> '' then true else false end) from Question q " +
+            "where (:difficulty is null or q.difficulty=:difficulty) and " +
+            "(lower(q.content) like :pattern escape '!' or str(q.id) like :pattern escape '!') order by q.id desc")
+    org.springframework.data.domain.Page<com.zhixuewuli.dto.response.QuestionCatalogRow> catalog(
+            @Param("pattern") String pattern, @Param("difficulty") Integer difficulty, org.springframework.data.domain.Pageable pageable);
+
     /**
      * 检查题目内容是否存在
      * 

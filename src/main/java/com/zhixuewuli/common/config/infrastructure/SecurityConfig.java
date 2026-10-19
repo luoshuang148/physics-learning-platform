@@ -1,93 +1,129 @@
 package com.zhixuewuli.common.config.infrastructure;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.zhixuewuli.common.config.properties.SecurityProperties;
+import com.zhixuewuli.common.result.Result;
+import com.zhixuewuli.common.security.JwtAuthenticationFilter;
+import com.zhixuewuli.common.util.JwtUtil;
+import com.zhixuewuli.repository.UserRepository;
+import jakarta.servlet.DispatcherType;
+import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.security.config.Customizer;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.annotation.web.configurers.HeadersConfigurer;
+import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+
+import java.io.IOException;
+import java.util.List;
 
 /**
- * Spring Security配置类
- * 
- * 配置Spring Security的安全策略，暂时禁用安全检查以便测试流式API功能。
- * 在生产环境中应该启用适当的安全措施。
- * 
- * <p>
- * 当前配置：
- * </p>
+ * 统一的认证与授权配置。
+ *
  * <ul>
- * <li>禁用CSRF保护（开发阶段）</li>
- * <li>允许所有请求匿名访问</li>
- * <li>禁用表单登录</li>
- * <li>禁用HTTP基本认证</li>
+ * <li>认证：{@link JwtAuthenticationFilter} 解析 Bearer 令牌，写入 SecurityContext；</li>
+ * <li>URL 授权：默认需要登录，仅放行登录/注册、健康检查、接口文档和前端静态资源；</li>
+ * <li>角色授权：控制器方法上的 {@code @PreAuthorize("hasRole('TEACHER')")}；</li>
+ * <li>数据归属（例如学生只能看自己的记录）仍由 Service 层按业务规则判断。</li>
  * </ul>
- * 
- * @author 智学物理开发团队
- * @version 1.0.0
- * @since 2026
- * @see EnableWebSecurity 启用Web安全配置
  */
 @Configuration
 @EnableWebSecurity
+@EnableMethodSecurity
 public class SecurityConfig {
 
-    /**
-     * 配置密码编码器
-     * 
-     * 使用BCrypt算法进行密码加密，提供安全的密码存储。
-     * BCrypt具有自动加盐和可调节计算复杂度的特点。
-     * 
-     * @return PasswordEncoder 密码编码器实例
-     * 
-     * @implSpec 使用默认强度（10）的BCrypt算法
-     * @implSpec 在生产环境中可根据安全要求调整强度参数
-     */
+    /** 由后端托管的前端单页应用资源与路由，均为 GET。 */
+    private static final String[] SPA_RESOURCES = {
+            "/", "/index.html", "/favicon.svg", "/icons.svg", "/assets/**", "/three-physical-project/**",
+            "/auth/login", "/auth/register", "/student/**", "/teacher/**", "/preview/**"
+    };
+
+    private static final String[] API_DOCS = {
+            "/v3/api-docs", "/v3/api-docs/**", "/swagger-ui.html", "/swagger-ui/**", "/webjars/**"
+    };
+
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
 
-    /**
-     * 配置安全过滤链
-     * 
-     * 定义哪些请求需要保护，哪些可以匿名访问。
-     * 当前允许所有请求通过。
-     * 
-     * @param http HttpSecurity配置对象
-     * @return SecurityFilterChain 安全过滤链
-     * @throws Exception 配置过程中可能抛出的异常
-     * 
-     * @implSpec 开发阶段禁用所有安全限制
-     * @implSpec 生产环境应启用JWT认证和适当的权限控制
-     */
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http,com.zhixuewuli.common.util.JwtUtil jwt,com.zhixuewuli.repository.UserRepository users) throws Exception {
-        http
-                // 禁用CSRF保护（开发阶段）
-                .csrf(AbstractHttpConfigurer::disable)
-                // 配置请求授权规则
-                .authorizeHttpRequests(authz -> authz
-                        // 允许所有请求匿名访问
-                        .requestMatchers("/actuator/health").permitAll()
-                        .requestMatchers("/actuator/**").hasRole("TEACHER")
-                        .anyRequest().permitAll())
-                .addFilterBefore(new com.zhixuewuli.common.security.ActuatorTokenFilter(jwt,users),org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter.class)
-                .exceptionHandling(errors->errors.authenticationEntryPoint((request,response,error)->{
-                    response.setStatus(401);response.setContentType("application/json;charset=UTF-8");response.getWriter().write("{\"code\":401,\"message\":\"请先登录\"}");
-                }).accessDeniedHandler((request,response,error)->{
-                    response.setStatus(403);response.setContentType("application/json;charset=UTF-8");response.getWriter().write("{\"code\":403,\"message\":\"权限不足\"}");
-                }))
-                // 允许同源 iframe，供学生实验页嵌入实验组件
-                .headers(headers -> headers.frameOptions(HeadersConfigurer.FrameOptionsConfig::sameOrigin))
-                // 禁用表单登录
-                .formLogin(AbstractHttpConfigurer::disable)
-                // 禁用HTTP基本认证
-                .httpBasic(AbstractHttpConfigurer::disable);
+    public CorsConfigurationSource corsConfigurationSource(SecurityProperties properties) {
+        CorsConfiguration config = new CorsConfiguration();
+        config.setAllowedOriginPatterns(properties.getCorsAllowedOrigins());
+        config.setAllowedMethods(properties.getCorsAllowedMethods());
+        config.setAllowedHeaders(properties.getCorsAllowedHeaders());
+        config.setExposedHeaders(List.of("X-Session-Id"));
+        config.setAllowCredentials(properties.isCorsAllowCredentials());
+        config.setMaxAge((long) properties.getCorsMaxAge());
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", config);
+        return source;
+    }
 
+    @Bean
+    public SecurityFilterChain filterChain(HttpSecurity http, JwtUtil jwtUtil, UserRepository userRepository,
+            ObjectMapper objectMapper, @Value("${springdoc.api-docs.enabled:true}") boolean docsEnabled)
+            throws Exception {
+        http
+                .csrf(AbstractHttpConfigurer::disable)
+                // 使用下方 CorsConfigurationSource，预检请求在认证之前处理
+                .cors(Customizer.withDefaults())
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .formLogin(AbstractHttpConfigurer::disable)
+                .httpBasic(AbstractHttpConfigurer::disable)
+                .logout(AbstractHttpConfigurer::disable)
+                .authorizeHttpRequests(auth -> {
+                    // SSE 的异步分派、错误页和 SPA 转发都源自一个已经通过授权的请求
+                    auth.dispatcherTypeMatchers(DispatcherType.ASYNC, DispatcherType.ERROR, DispatcherType.FORWARD)
+                            .permitAll();
+                    auth.requestMatchers(HttpMethod.POST, "/auth/login", "/auth/register").permitAll();
+                    auth.requestMatchers("/actuator/health").permitAll();
+                    auth.requestMatchers("/actuator", "/actuator/**").hasRole("TEACHER");
+                    if (docsEnabled) {
+                        auth.requestMatchers(API_DOCS).permitAll();
+                    }
+                    // /teacher/events 是 API，必须排在 SPA 的 /teacher/** 之前
+                    auth.requestMatchers("/teacher/events", "/teacher/events/**").authenticated();
+                    auth.requestMatchers(HttpMethod.GET, SPA_RESOURCES).permitAll();
+                    auth.anyRequest().authenticated();
+                })
+                .addFilterBefore(new JwtAuthenticationFilter(jwtUtil, userRepository),
+                        UsernamePasswordAuthenticationFilter.class)
+                .exceptionHandling(errors -> errors
+                        .authenticationEntryPoint((request, response, e) -> {
+                            Object reason = request.getAttribute(JwtAuthenticationFilter.AUTH_ERROR_ATTRIBUTE);
+                            String message = reason == null ? "请先登录" : "认证失败: " + reason;
+                            writeError(response, objectMapper, HttpStatus.UNAUTHORIZED, message);
+                        })
+                        .accessDeniedHandler((request, response, e) ->
+                                writeError(response, objectMapper, HttpStatus.FORBIDDEN, "权限不足")))
+                // 允许同源 iframe，供学生实验页嵌入实验组件
+                .headers(headers -> headers.frameOptions(HeadersConfigurer.FrameOptionsConfig::sameOrigin));
         return http.build();
+    }
+
+    private static void writeError(HttpServletResponse response, ObjectMapper objectMapper, HttpStatus status,
+            String message) throws IOException {
+        response.setStatus(status.value());
+        response.setCharacterEncoding("UTF-8");
+        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+        objectMapper.writeValue(response.getWriter(),
+                new Result<>(status.value(), message, null, System.currentTimeMillis(), null));
     }
 }

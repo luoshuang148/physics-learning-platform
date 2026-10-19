@@ -1,5 +1,5 @@
 <template>
-  <AppShell :subtitle="`作业详情 · ${data?.title ?? ''}`" :links="links">
+  <AppShell :subtitle="`作业详情 · ${data?.title ?? ''}`">
     <div v-if="loading" class="detail-loading">正在加载作业统计…</div>
     <div v-else-if="error" class="panel-card detail-error">{{ error }}</div>
     <div v-else-if="data" class="detail-page">
@@ -22,8 +22,8 @@
         <div class="detail-stat"><span>应交</span><strong>{{ data.totalStudents }}</strong></div>
         <div class="detail-stat"><span>已参与</span><strong>{{ data.participatedStudents }}</strong><small>{{ data.participationRate }}%</small></div>
         <div class="detail-stat"><span>已完成</span><strong>{{ data.completedStudents }}</strong><small>{{ data.completionRate }}%</small></div>
-        <div class="detail-stat"><span>未交</span><strong>{{ data.notStartedStudents }}</strong></div>
-        <div class="detail-stat"><span>未完成</span><strong>{{ data.partialStudents }}</strong></div>
+        <div class="detail-stat"><span>{{ studentStatusText('NOT_STARTED') }}</span><strong>{{ data.notStartedStudents }}</strong></div>
+        <div class="detail-stat"><span>{{ studentStatusText('PARTIAL') }}</span><strong>{{ data.partialStudents }}</strong></div>
         <div class="detail-stat"><span>首次正确率</span><strong>{{ data.accuracy }}%</strong><small>{{ data.correctQuestions }} / {{ data.answeredQuestions }}</small></div>
       </section>
 
@@ -31,6 +31,8 @@
         <div class="section-head">
           <div>
             <h2>学生完成情况</h2>
+            <p v-if="data.legacyRoster">升级前名单按迁移时现有数据初始化，原始名单无法完全还原；升级后名单不再随新注册或停用变化。</p>
+            <p>按作业应参与名单及已保存题数统计，停用账号仍保留历史。答完全部题目即完成；截止后，未作答记为未交，部分作答记为未完成。</p>
           </div>
           <div class="filter-tabs">
             <button v-for="item in filters" :key="item.key" class="filter-btn" :class="{ active: filter === item.key }" @click="filter = item.key">
@@ -90,25 +92,22 @@
 import { computed, onMounted, ref } from 'vue';
 import { useRoute } from 'vue-router';
 import AppShell from '@/layouts/AppShell.vue';
-import { teacherNavLinks } from '@/constants/navigation';
 import { getTaskDetailApi } from '@/api/teacher-event';
 import type { TaskDetailResponse, TaskStudentRow } from '@/types/teacher-event';
+import { studentProgressText, taskAvailabilityText } from '@/utils/assignmentProgress';
 
 const route = useRoute();
-const links = teacherNavLinks;
 const loading = ref(true);
 const error = ref('');
 const data = ref<TaskDetailResponse | null>(null);
 const filter = ref<'all' | 'NOT_STARTED' | 'PARTIAL' | 'COMPLETED'>('all');
 
-const statusTextMap: Record<string, string> = { DRAFT: '草稿', SCHEDULED: '未开始', OPEN: '进行中', ENDED: '已截止', CLOSED: '已截止', ARCHIVED: '已归档' };
-const studentStatusMap: Record<string, string> = { NOT_STARTED: '未交', PARTIAL: '未完成', COMPLETED: '已完成' };
-const statusText = computed(() => data.value ? (statusTextMap[data.value.availability] ?? data.value.availability) : '');
-const studentStatusText = (status: TaskStudentRow['status']) => studentStatusMap[status] ?? status;
+const statusText = computed(() => taskAvailabilityText(data.value?.availability));
+const studentStatusText = (status: TaskStudentRow['status']) => studentProgressText(status, data.value?.availability);
 const filters = computed(() => [
   { key: 'all' as const, label: '全部', count: data.value?.students.length ?? 0 },
-  { key: 'NOT_STARTED' as const, label: '未交', count: data.value?.notStartedStudents ?? 0 },
-  { key: 'PARTIAL' as const, label: '未完成', count: data.value?.partialStudents ?? 0 },
+  { key: 'NOT_STARTED' as const, label: studentStatusText('NOT_STARTED'), count: data.value?.notStartedStudents ?? 0 },
+  { key: 'PARTIAL' as const, label: studentStatusText('PARTIAL'), count: data.value?.partialStudents ?? 0 },
   { key: 'COMPLETED' as const, label: '已完成', count: data.value?.completedStudents ?? 0 },
 ]);
 const filteredStudents = computed(() => (data.value?.students ?? []).filter(student => filter.value === 'all' || student.status === filter.value));

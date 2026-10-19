@@ -43,6 +43,7 @@ import com.zhixuewuli.common.exception.teacherevent.EventAlreadyExistsException;
 @RequiredArgsConstructor
 @Slf4j
 public class AnswerRecordServiceImpl implements AnswerRecordService {
+    private final com.zhixuewuli.service.teacherEvent.TaskRosterService roster;
 
     private final AnswerRecordRepository answerRecordRepository;
     private final QuestionRepository questionRepository;
@@ -57,22 +58,18 @@ public class AnswerRecordServiceImpl implements AnswerRecordService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<StudentAnswerStats> getStudentAnswerStats(Long currentUserId) {
-        userPermissionUtil.checkTeacherPermission(currentUserId);
+    public List<StudentAnswerStats> getStudentAnswerStats() {
         return answerRecordRepository.summarizeStudents();
     }
 
     @Override
     @Transactional(readOnly = true)
-    public PageResult<AnswerRecordResponse> getTeacherAnswerPage(
-            Long currentUserId, int page, int size, boolean wrongOnly, String studentName) {
-        return getTeacherAnswerPage(currentUserId,page,size,wrongOnly,studentName,null);
+    public PageResult<AnswerRecordResponse> getTeacherAnswerPage(int page, int size, boolean wrongOnly, String studentName) {
+        return getTeacherAnswerPage(page,size,wrongOnly,studentName,null);
     }
     @Override
     @Transactional(readOnly = true)
-    public PageResult<AnswerRecordResponse> getTeacherAnswerPage(
-            Long currentUserId,int page,int size,boolean wrongOnly,String studentName,Long eventId) {
-        userPermissionUtil.checkTeacherPermission(currentUserId);
+    public PageResult<AnswerRecordResponse> getTeacherAnswerPage(int page,int size,boolean wrongOnly,String studentName,Long eventId) {
         if (page < 1 || size < 1 || size > 100 || (long) (page - 1) * size > Integer.MAX_VALUE) {
             throw new IllegalArgumentException("页码须大于零，每页条数须在1到100之间");
         }
@@ -107,7 +104,9 @@ public class AnswerRecordServiceImpl implements AnswerRecordService {
         boolean practice=eventId==null || "PRACTICE".equals(request.getIntent());
         if(eventId!=null || request.getRequestId()!=null) {
             if(request.getRequestId()==null || request.getRequestId().isBlank()) throw new IllegalArgumentException("任务提交必须提供requestId");
-            userRepository.lockById(currentUserId).orElseThrow(()->new IllegalArgumentException("用户不存在"));
+            User submitter=userRepository.lockById(currentUserId).orElseThrow(()->new IllegalArgumentException("用户不存在"));
+            if(submitter.getUserType()!=User.UserType.STUDENT)
+                throw new InsufficientPermissionException("仅学生可以提交任务作答或补练");
             var previous=answerRecordRepository.findByUserIdAndRequestId(currentUserId,request.getRequestId());
             if(previous.isPresent()) {
                 var old=previous.get();
@@ -136,6 +135,7 @@ public class AnswerRecordServiceImpl implements AnswerRecordService {
                 throw new EventAlreadyExistsException("教学任务已截止");
             }
         }
+        if (eventId!=null && !practice) roster.ensureAnswerer(eventId,currentUserId);
         // Unscoped legacy submissions are free practice and never attach themselves to the current assignment.
         Question taskQuestion=eventId==null ? null : taskQuestions.get(eventId,request.getQuestionId());
         if(taskQuestion!=null) {
@@ -332,9 +332,6 @@ public class AnswerRecordServiceImpl implements AnswerRecordService {
     public void deleteAnswerRecord(String recordId, Long currentUserId) {
         log.info("删除答题记录 - RecordId: {}, Operator: {}", recordId, currentUserId);
 
-        // 1. 权限验证
-        userPermissionUtil.checkTeacherPermission(currentUserId);
-
         // 2. 验证记录存在性
         AnswerRecord record = answerRecordRepository.findById(recordId)
                 .orElseThrow(() -> new AnswerRecordNotFoundException(recordId));
@@ -360,9 +357,6 @@ public class AnswerRecordServiceImpl implements AnswerRecordService {
     public void batchDeleteByTimeRange(RecordBatchDeleteRequest request, Long currentUserId) {
         log.info("开始批量删除操作 - StartTime: {}, EndTime: {}, Operator: {}",
                 request.getStartTime(), request.getEndTime(), currentUserId);
-
-        // 1. 权限验证
-        userPermissionUtil.checkTeacherPermission(currentUserId);
 
         // 2. 参数验证
         if (request.getStartTime().isAfter(request.getEndTime())) {
@@ -391,9 +385,6 @@ public class AnswerRecordServiceImpl implements AnswerRecordService {
     public Long countTotalAnswers(Long currentUserId) {
         log.debug("统计总答题记录数 - Operator: {}", currentUserId);
 
-        // 权限验证
-        userPermissionUtil.checkTeacherPermission(currentUserId);
-
         return answerRecordRepository.count();
     }
 
@@ -401,8 +392,6 @@ public class AnswerRecordServiceImpl implements AnswerRecordService {
     public AnswerRecordBatchResponse getAllUsersAnswerRecords(Long currentUserId) {
         log.info("查询所有用户答题记录 - Operator: {}", currentUserId);
 
-        // 权限验证
-        userPermissionUtil.checkTeacherPermission(currentUserId);
         ensureLegacyHistoryBounded(answerRecordRepository.count());
 
         return convertToBatchResponse(answerRecordRepository.findAll());
@@ -412,8 +401,6 @@ public class AnswerRecordServiceImpl implements AnswerRecordService {
     public AnswerRecordBatchResponse getAllUsersWrongAnswers(Long currentUserId) {
         log.info("查询所有用户错题记录 - Operator: {}", currentUserId);
 
-        // 权限验证
-        userPermissionUtil.checkTeacherPermission(currentUserId);
         ensureLegacyHistoryBounded(answerRecordRepository.countWrong());
 
         return convertToBatchResponse(answerRecordRepository.findByCorrectFalseOrderByAnsweredAtDesc());
@@ -467,7 +454,6 @@ public class AnswerRecordServiceImpl implements AnswerRecordService {
     private AnswerRecordBatchResponse latestSessionRecords(Long teacherId,
             Supplier<Optional<User>> studentLookup) {
         try {
-            userPermissionUtil.checkTeacherPermission(teacherId);
             User student = studentLookup.get().orElseThrow(() -> new UserNotFoundException("学生不存在"));
             if (student.getUserType() != User.UserType.STUDENT) {
                 throw new UserNotFoundException("学生不存在");
@@ -522,9 +508,6 @@ public class AnswerRecordServiceImpl implements AnswerRecordService {
     @Override
     public AnswerStatsResponse getAnswerStats(Long currentUserId) {
         log.info("获取答题统计数据 - Operator: {}", currentUserId);
-
-        // 权限验证
-        userPermissionUtil.checkTeacherPermission(currentUserId);
 
         // 获取有答题记录的学生人数
         long answeredStudentCount = answerRecordRepository.countDistinctActiveStudentIds();

@@ -1,5 +1,8 @@
 package com.zhixuewuli.controller;
 
+import com.zhixuewuli.common.security.TeacherOnly;
+import com.zhixuewuli.common.security.AuthenticatedUser;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import com.zhixuewuli.common.result.Result;
 import com.zhixuewuli.dto.request.QuestionCreateRequest;
 import com.zhixuewuli.dto.request.QuestionUpdateRequest;
@@ -9,7 +12,6 @@ import com.zhixuewuli.service.question.QuestionService;
 import com.zhixuewuli.common.util.OptionMappingUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
@@ -64,6 +66,15 @@ public class QuestionController {
     private final QuestionService questionService;
     private final OptionMappingUtil optionMappingUtil;
     private final com.zhixuewuli.service.question.AnswerAccessPolicy answerAccess;
+    private final com.zhixuewuli.service.question.QuestionCatalogService catalog;
+
+    @GetMapping("/teacher/page")
+    @TeacherOnly
+    public Result<com.zhixuewuli.common.result.PageResult<com.zhixuewuli.dto.response.QuestionCatalogRow>> page(
+            @RequestParam(defaultValue="1") int page, @RequestParam(defaultValue="20") int size,
+            @RequestParam(defaultValue="") String search, @RequestParam(required=false) Integer difficulty) {
+        return Result.success(catalog.page(page,size,search,difficulty));
+    }
 
     @PostMapping("/teacher/create")
     @Operation(
@@ -77,15 +88,15 @@ public class QuestionController {
         }
     )
     @ResponseStatus(HttpStatus.CREATED)
+    @TeacherOnly
     public Result<QuestionResponse> createQuestion(
             @io.swagger.v3.oas.annotations.Parameter(description = "题目创建请求参数", required = true) @Valid @RequestBody QuestionCreateRequest request,
-            HttpServletRequest httpRequest) {
+            @AuthenticationPrincipal AuthenticatedUser user) {
 
-        Long userId = (Long) httpRequest.getAttribute("userId");
-        String username = (String) httpRequest.getAttribute("username");
+        String username = user.username();
         log.info("用户 {} 开始创建题目", username);
 
-        Question question = questionService.createQuestion(request, userId);
+        Question question = questionService.createQuestion(request);
         QuestionResponse response = convertToResponse(question);
 
         log.info("用户 {} 题目创建成功，ID: {}", username, question.getId());
@@ -103,15 +114,15 @@ public class QuestionController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "题目不存在")
         }
     )
+    @TeacherOnly
     public Result<Void> deleteQuestion(
             @io.swagger.v3.oas.annotations.Parameter(description = "题目 ID", required = true) @PathVariable @Positive(message = "题目ID必须为正数") Long id,
-            HttpServletRequest httpRequest) {
+            @AuthenticationPrincipal AuthenticatedUser user) {
 
-        Long userId = (Long) httpRequest.getAttribute("userId");
-        String username = (String) httpRequest.getAttribute("username");
+        String username = user.username();
         log.info("用户 {} 开始删除题目，ID: {}", username, id);
 
-        questionService.deleteQuestionById(id, userId);
+        questionService.deleteQuestionById(id);
 
         log.info("用户 {} 题目删除成功，ID: {}", username, id);
         return Result.success();
@@ -129,15 +140,15 @@ public class QuestionController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "题目不存在")
         }
     )
+    @TeacherOnly
     public Result<QuestionResponse> updateQuestion(
             @io.swagger.v3.oas.annotations.Parameter(description = "题目更新请求参数", required = true) @Valid @RequestBody QuestionUpdateRequest request,
-            HttpServletRequest httpRequest) {
+            @AuthenticationPrincipal AuthenticatedUser user) {
 
-        Long userId = (Long) httpRequest.getAttribute("userId");
-        String username = (String) httpRequest.getAttribute("username");
+        String username = user.username();
         log.info("用户 {} 开始更新题目，ID: {}", username, request.getId());
 
-        Question question = questionService.updateQuestion(request, userId);
+        Question question = questionService.updateQuestion(request);
         QuestionResponse response = convertToResponse(question);
 
         log.info("用户 {} 题目更新成功，ID: {}", username, question.getId());
@@ -155,12 +166,12 @@ public class QuestionController {
     )
     public Result<QuestionResponse> getQuestionById(
             @io.swagger.v3.oas.annotations.Parameter(description = "题目 ID", required = true) @PathVariable @Positive(message = "题目ID必须为正数") Long id,
-            HttpServletRequest httpRequest) {
+            @AuthenticationPrincipal AuthenticatedUser user) {
 
         log.info("查询题目详情，ID: {}", id);
 
         Question question = questionService.getQuestionById(id);
-        QuestionResponse response = answerAccess.forBank((Long) httpRequest.getAttribute("userId"), convertToResponse(question));
+        QuestionResponse response = answerAccess.forBank(user.id(), convertToResponse(question));
 
         return Result.success(response);
     }
@@ -175,10 +186,10 @@ public class QuestionController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "权限不足（非教师身份）")
         }
     )
-    public Result<List<QuestionResponse>> getAllQuestions(HttpServletRequest httpRequest) {
+    public Result<List<QuestionResponse>> getAllQuestions(@AuthenticationPrincipal AuthenticatedUser user) {
 
-        Long userId = (Long) httpRequest.getAttribute("userId");
-        String username = (String) httpRequest.getAttribute("username");
+        Long userId = user.id();
+        String username = user.username();
         log.info("用户 {} ，ID{}查询所有题目", username, userId);
 
         List<Question> questions = questionService.getAllQuestions(userId);

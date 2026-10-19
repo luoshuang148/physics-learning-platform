@@ -182,6 +182,11 @@ public class AIBusinessProperties {
          */
         private String aliyunApiKey;
 
+        /** 报告密钥未设置或留空时，复用智谱密钥。 */
+        public String getAliyunApiKey() {
+                return aliyunApiKey == null || aliyunApiKey.isBlank() ? zhipuApiKey : aliyunApiKey;
+        }
+
         /**
          * 阿里云基础URL
          * 阿里云DashScope API的服务端点地址

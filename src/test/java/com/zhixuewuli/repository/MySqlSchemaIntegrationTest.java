@@ -26,6 +26,65 @@ class MySqlSchemaIntegrationTest {
     @Autowired AnswerRecordService service;
     @Autowired com.zhixuewuli.service.ai.report.ReportInputRepository reportInputs;
     @Autowired TeacherEventService teaching;
+    @Autowired com.zhixuewuli.service.user.UserService userService;
+
+    @Test
+    @Transactional(propagation=org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
+    void concurrentTeacherDeactivationRetainsAnAdministratorOnMySql() throws Exception {
+        var a=user("mysql_guard_a",User.UserType.TEACHER);
+        var b=user("mysql_guard_b",User.UserType.TEACHER);
+        var gate=new java.util.concurrent.CountDownLatch(1);
+        try(var pool=java.util.concurrent.Executors.newFixedThreadPool(2)) {
+            var futures=new java.util.ArrayList<java.util.concurrent.Future<Boolean>>();
+            for(Long id:java.util.List.of(a.getId(),b.getId())) futures.add(pool.submit(()->{
+                gate.await();var update=new UserAdminUpdateRequest();update.setUserId(id);update.setActive(false);
+                try {userService.updateUserByAdmin(update,id);return true;}
+                catch(com.zhixuewuli.common.exception.BusinessException expected){assertThat(expected.getMessage()).contains("最后一位");return false;}
+            }));
+            gate.countDown();int succeeded=0;for(var future:futures)if(future.get(15,java.util.concurrent.TimeUnit.SECONDS))succeeded++;
+            assertThat(succeeded).isEqualTo(1);
+            assertThat(users.countByUserTypeAndActiveTrue(User.UserType.TEACHER)).isEqualTo(1);
+        } finally {users.deleteAllById(java.util.List.of(a.getId(),b.getId()));}
+    }
+
+    @Autowired org.springframework.transaction.PlatformTransactionManager transactionManager;
+    @Autowired com.zhixuewuli.service.teacherEvent.TaskRosterService roster;
+    @Autowired com.zhixuewuli.service.user.ClassroomGuard classroomGuard;
+
+    @Test
+    @Transactional(propagation=org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
+    void enrollmentSeesRecipientCommittedAfterItsRepeatableReadSnapshot() throws Exception {
+        var teacher=user("mysql_snapshot_teacher",User.UserType.TEACHER);
+        var student=user("mysql_snapshot_student",User.UserType.STUDENT);
+        var created=new java.util.concurrent.atomic.AtomicReference<Long>();
+        var tx=new org.springframework.transaction.support.TransactionTemplate(transactionManager);
+        tx.setIsolationLevel(org.springframework.transaction.TransactionDefinition.ISOLATION_REPEATABLE_READ);
+        try(var pool=java.util.concurrent.Executors.newSingleThreadExecutor()) {
+            tx.executeWithoutResult(status->{
+                // Permission checking has already established this request's consistent-read snapshot.
+                var enrolled=users.findById(student.getId()).orElseThrow();
+                assertThat(events.count()).isZero();
+                try {
+                    created.set(pool.submit(()->{
+                        var request=new TeacherEventCreateRequest();request.setEventTitle("snapshot publish");
+                        return teaching.publishEvent(request,teacher.getId()).getId();
+                    }).get(15,java.util.concurrent.TimeUnit.SECONDS));
+                } catch(Exception failure) {throw new RuntimeException(failure);}
+                classroomGuard.lock();
+                roster.enroll(enrolled);
+                // Old snapshot reads miss the publication's recipient and attempt a duplicate INSERT.
+                users.flush();
+            });
+            assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM task_recipients WHERE event_id=? AND user_id=?",
+                    Integer.class,created.get(),student.getId())).isEqualTo(1);
+        } finally {
+            if(created.get()!=null) {
+                jdbc.update("DELETE FROM task_recipients WHERE event_id=?",created.get());
+                jdbc.update("DELETE FROM teacher_events WHERE id=?",created.get());
+            }
+            users.deleteAllById(java.util.List.of(student.getId(),teacher.getId()));
+        }
+    }
 
     @Test
     void allLearningTablesRetainValidTaskForeignKeys() {
@@ -50,7 +109,7 @@ class MySqlSchemaIntegrationTest {
         var request = new AnswerRecordSubmitRequest(); request.setQuestionId(question.getId());
         request.setUserAnswer("B"); request.setIntent("ASSIGNMENT");request.setEventId(eventId);request.setRequestId("mysql-request");
         service.submitAnswerRecord(request, student.getId(), "mysql-session");
-        var page = service.getTeacherAnswerPage(teacher.getId(), 1, 10, true, "mysql_student");
+        var page = service.getTeacherAnswerPage(1, 10, true, "mysql_student");
         assertThat(page.getRecords()).hasSize(1);
         assertThat(page.getRecords().getFirst().getImageBase64()).isNull();
         assertThat(answers.findAll().getFirst().getEventId()).isEqualTo(eventId);
@@ -61,8 +120,8 @@ class MySqlSchemaIntegrationTest {
         assertThat(input.getFirst().isTimestampUtc()).isTrue();
         jdbc.update("UPDATE questions SET explanation='edited after assignment' WHERE id=?", question.getId());
         assertThat(reportInputs.student(student.getId(), "mysql-session", eventId).getFirst().getAnalysisSnapshot()).isNull();
-        assertThat(service.getTeacherAnswerPage(teacher.getId(), 1, 10, true, "mysql_student").getRecords().getFirst().getQuestionAnalysis()).isNull();
-        teaching.deleteCurrentEvent(teacher.getId());
+        assertThat(service.getTeacherAnswerPage(1, 10, true, "mysql_student").getRecords().getFirst().getQuestionAnalysis()).isNull();
+        teaching.deleteCurrentEvent();
         assertThat(answers.count()).isEqualTo(1);
         assertThat(events.findById(eventId).orElseThrow().getIsGlobal()).isFalse();
     }

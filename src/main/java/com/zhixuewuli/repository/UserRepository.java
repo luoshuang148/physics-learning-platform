@@ -11,6 +11,11 @@ import java.util.List;
 
 @Repository
 public interface UserRepository extends JpaRepository<User, Long> {
+    @Query(value="select id from users where user_type='TEACHER' and active=true order by id for update",nativeQuery=true)
+    List<Long> lockActiveTeacherIds();
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_READ)
+    @Query("select u from User u where u.userType=com.zhixuewuli.entity.User.UserType.STUDENT and u.active=true order by u.id")
+    List<User> findActiveStudentsForRoster();
     @org.springframework.data.jpa.repository.Modifying(flushAutomatically=true,clearAutomatically=true)
     @org.springframework.transaction.annotation.Transactional
     @Query("update User u set u.lastLogin=:time where u.id=:id and u.tokenVersion=:expectedVersion and u.active=true")

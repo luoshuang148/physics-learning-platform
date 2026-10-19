@@ -30,6 +30,23 @@ import org.junit.jupiter.api.Test;
 @DisplayName("StreamContentFixer 单元测试 - LaTeX/Markdown 格式修复")
 class StreamContentFixerUnitTest {
 
+    @Test
+    void preservesPhysicalNumbersEquationsAndUrls() {
+        for (String input : new String[]{"加速度 1.5 m/s²", "0.25 A", "-1.5", "+0.25", "$v=1.5$", "版本 v1.2.3", "https://example.com/v1.2", "量值为 1.5，误差 -0.25"}) {
+            assertThat(StreamContentFixer.fix(input)).as(input).isEqualTo(input);
+            for (int i = 1; i < input.length(); i++) {
+                assertThat(StreamContentFixer.fix(input.substring(0, i)) + StreamContentFixer.fix(input.substring(i)))
+                        .as("split %s at %s", input, i).isEqualTo(input);
+            }
+        }
+    }
+
+    @Test
+    void repairsOrderedListsOnlyAtLineOrHeadingStart() {
+        assertThat(StreamContentFixer.fix("说明\n1.第一步\n  2.第二步")).isEqualTo("说明\n1. 第一步\n  2. 第二步");
+        assertThat(StreamContentFixer.fix("见 1.第一步")).isEqualTo("见 1.第一步");
+    }
+
     // ==================== 空值和边界测试 ====================
 
     @Test

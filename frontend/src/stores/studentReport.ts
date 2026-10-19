@@ -1,6 +1,5 @@
 import { defineStore } from 'pinia';
 import { useAuthStore } from './auth';
-import { getSessionId } from '@/utils/session';
 
 export interface CachedStudentReport {
   scope: string;
@@ -35,15 +34,15 @@ export const useStudentReportStore = defineStore('studentReport', {
     cachedReport: loadCache() as CachedStudentReport | null,
   }),
   actions: {
-    hydrateFromStorage(eventId?: number) {
-      const scope = `${useAuthStore().user?.id}:${eventId}:${getSessionId()}`;
+    hydrateFromStorage(eventId: number, answerRevision: string) {
+      const scope = `${useAuthStore().user?.id}:${eventId}:${answerRevision}`;
       const cache = loadCache();
       this.cachedReport = cache?.scope === scope ? cache : null;
     },
-    setCachedReport(payload: Omit<CachedStudentReport, 'updatedAt' | 'scope'>, eventId?: number) {
+    setCachedReport(payload: Omit<CachedStudentReport, 'updatedAt' | 'scope'>, eventId: number, answerRevision: string) {
       this.cachedReport = {
         ...payload,
-        scope: `${useAuthStore().user?.id}:${eventId}:${getSessionId()}`,
+        scope: `${useAuthStore().user?.id}:${eventId}:${answerRevision}`,
         updatedAt: new Date().toISOString(),
       };
       persistCache(this.cachedReport);

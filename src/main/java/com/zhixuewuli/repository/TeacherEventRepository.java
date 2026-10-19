@@ -47,6 +47,16 @@ public interface TeacherEventRepository extends JpaRepository<TeacherEvent, Long
     @Query("select e from TeacherEvent e where e.status = com.zhixuewuli.entity.TeacherEvent.Status.PUBLISHED order by e.createdAt desc, e.id desc")
     List<TeacherEvent> findPublishedTasks();
 
+    @Lock(jakarta.persistence.LockModeType.PESSIMISTIC_READ)
+    @Query("select e from TeacherEvent e where e.status=com.zhixuewuli.entity.TeacherEvent.Status.PUBLISHED order by e.id")
+    List<TeacherEvent> findPublishedTasksForRoster();
+
+    @Query("select e from TeacherEvent e where e.status in (com.zhixuewuli.entity.TeacherEvent.Status.PUBLISHED, com.zhixuewuli.entity.TeacherEvent.Status.CLOSED) " +
+            "or (e.status=com.zhixuewuli.entity.TeacherEvent.Status.ARCHIVED " +
+            "and exists(select a.id from AnswerRecord a where a.eventId=e.id and a.userId=:userId and a.practice=false)) " +
+            "order by e.createdAt desc, e.id desc")
+    List<TeacherEvent> findStudentReviewTasks(@Param("userId") Long userId);
+
     long countByStatus(TeacherEvent.Status status);
 
     long countByStatusNot(TeacherEvent.Status status);

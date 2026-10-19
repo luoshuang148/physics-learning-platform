@@ -51,6 +51,7 @@ export interface TaskQuestionRow {
 }
 
 export interface TaskDetailResponse {
+  legacyRoster?: boolean;
   taskId: number;
   title: string;
   status: TeacherEventStatus;

@@ -42,6 +42,9 @@ import static org.mockito.Mockito.when;
  * 遵循Given-When-Then测试模式，使用Mockito进行依赖模拟
  */
 class AuthServiceUnitTest extends BaseUnitTest {
+    @Mock private com.zhixuewuli.service.user.ClassroomGuard classroomGuard;
+    @Mock private com.zhixuewuli.service.teacherEvent.TaskRosterService roster;
+
 
     @Mock
     private UserRepository userRepository;

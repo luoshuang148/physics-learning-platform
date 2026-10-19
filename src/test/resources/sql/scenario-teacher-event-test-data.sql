@@ -50,3 +50,5 @@ VALUES (1, 2001, '教师用户', '新学期开始', '2026 年春季学期正式�
 --
 -- 所有用户密码：password123
 -- ============================================================
+
+INSERT INTO task_recipients(event_id,user_id,source) VALUES(1,1001,'MIGRATED');

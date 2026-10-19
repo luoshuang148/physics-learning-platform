@@ -1,5 +1,5 @@
 <template>
-  <AppShell :subtitle="`AI 问答 · ${auth.user?.realName ?? ''}`" :links="links">
+  <AppShell :subtitle="`AI 问答 · ${auth.user?.realName ?? ''}`">
     <div class="ai-page student-font">
       <section class="ai-hero">
         <div class="mode-tabs">
@@ -118,13 +118,6 @@ const SESSION_TYPE_MAP: Record<AIMode, string> = {
 const auth = useAuthStore();
 const { state, reset } = useAIStreamState();
 
-const links = [
-  { label: '首页', to: '/student/home' },
-  { label: '作业', to: '/student/task' },
-  { label: '错题本', to: '/student/wrong-book' },
-  { label: 'AI 问答', to: '/student/ai' },
-  { label: '学习报告', to: '/student/report' },
-];
 
 const question = ref('');
 const questionId = ref<number | undefined>(undefined);

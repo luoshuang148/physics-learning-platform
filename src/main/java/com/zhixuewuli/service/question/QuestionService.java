@@ -67,7 +67,7 @@ public interface QuestionService {
      * @implSpec 记录创建操作日志
      * @implSpec 返回完整的题目实体信息
      */
-    Question createQuestion(QuestionCreateRequest request, Long teacherId);
+    Question createQuestion(QuestionCreateRequest request);
 
     /**
      * 根据ID删除题目
@@ -82,7 +82,7 @@ public interface QuestionService {
      * @implSpec 记录删除操作日志
      * @implSpec 支持级联删除关联数据（如答题记录）
      */
-    void deleteQuestionById(Long id, Long teacherId);
+    void deleteQuestionById(Long id);
 
     /**
      * 更新题目信息（全量覆盖）
@@ -101,7 +101,7 @@ public interface QuestionService {
      * @implSpec 采用全量覆盖更新策略
      * @implSpec 记录更新操作日志
      */
-    Question updateQuestion(QuestionUpdateRequest request, Long teacherId);
+    Question updateQuestion(QuestionUpdateRequest request);
 
     /**
      * 根据ID获取题目

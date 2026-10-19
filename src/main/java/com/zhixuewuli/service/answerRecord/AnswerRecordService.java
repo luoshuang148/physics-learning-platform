@@ -12,11 +12,10 @@ import com.zhixuewuli.dto.response.AnswerRecordSummaryResponse;
 import com.zhixuewuli.dto.response.StudentAnswerSummary;
 
 public interface AnswerRecordService {
-    List<StudentAnswerStats> getStudentAnswerStats(Long currentUserId);
+    List<StudentAnswerStats> getStudentAnswerStats();
 
-    PageResult<AnswerRecordResponse> getTeacherAnswerPage(Long id,int page,int size,boolean wrongOnly,String studentName,Long eventId);
-    PageResult<AnswerRecordResponse> getTeacherAnswerPage(
-            Long currentUserId, int page, int size, boolean wrongOnly, String studentName);
+    PageResult<AnswerRecordResponse> getTeacherAnswerPage(int page,int size,boolean wrongOnly,String studentName,Long eventId);
+    PageResult<AnswerRecordResponse> getTeacherAnswerPage(int page, int size, boolean wrongOnly, String studentName);
 
     // === 学生基础功能 ===
 

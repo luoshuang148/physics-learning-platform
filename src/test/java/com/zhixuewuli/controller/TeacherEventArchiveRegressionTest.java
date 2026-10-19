@@ -37,7 +37,7 @@ class TeacherEventArchiveRegressionTest extends BaseControllerIntegrationTest {
         StudentReport report = new StudentReport(); report.setUserId(1001L); report.setRealName("学生用户");
         report.setSessionId("archive"); report.setReportContent("report"); reports.saveAndFlush(report);
 
-        events.deleteCurrentEvent(2001L);
+        events.deleteCurrentEvent();
         assertThat(answers.count()).isEqualTo(1);
         assertThat(histories.count()).isEqualTo(1);
         assertThat(reports.count()).isEqualTo(1);
@@ -55,7 +55,7 @@ class TeacherEventArchiveRegressionTest extends BaseControllerIntegrationTest {
         AnswerRecord answer = new AnswerRecord(); answer.setUserId(1001L); answer.setQuestionId(question.getId());
         answer.setSessionId("task-a"); answer.setUserAnswer("A"); answer.setCorrect(true); answer.setEventId(1L);
         answers.saveAndFlush(answer);
-        events.deleteCurrentEvent(2001L);
+        events.deleteCurrentEvent();
         var next = new com.zhixuewuli.dto.request.TeacherEventCreateRequest();
         next.setEventTitle("Task B"); next.setEventTimestamp(LocalDateTime.now());
         Long newId = events.publishEvent(next, 2001L).getId();
@@ -80,7 +80,7 @@ class TeacherEventArchiveRegressionTest extends BaseControllerIntegrationTest {
         var context = sessions.getOrCreateSession("event-linked", 1001L, ConversationType.REAL_TIME_QA, null, () -> "physics");
         sessions.addInteraction(context, "question", "answer", 10);
         assertThat(histories.findAll()).extracting(ConversationHistory::getEventId).containsExactly(1L);
-        events.deleteCurrentEvent(2001L);
+        events.deleteCurrentEvent();
         request.setRequestId("new-after-archive");
         assertThatThrownBy(() -> answerService.submitAnswerRecord(request, 1001L, "event-linked"))
                 .isInstanceOf(com.zhixuewuli.common.exception.BusinessException.class);

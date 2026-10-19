@@ -21,9 +21,8 @@ class TeacherReportResourceRegressionTest {
     private final AnswerRecordRepository answers = mock(AnswerRecordRepository.class);
     private final AliyunAIClient client = mock(AliyunAIClient.class);
     private final com.zhixuewuli.service.ai.report.ReportInputRepository inputs=mock(com.zhixuewuli.service.ai.report.ReportInputRepository.class);
-    private final AliyunAIReportServiceImpl service = new AliyunAIReportServiceImpl(inputs,client, answers,
-            mock(QuestionRepository.class), mock(StudentReportRepository.class), mock(UserRepository.class),
-            config, new AIBusinessProperties(), mock(OptionMappingUtil.class), mock(UserPermissionUtil.class),
+    private final AliyunAIReportServiceImpl service = new AliyunAIReportServiceImpl(inputs,client, mock(StudentReportRepository.class), mock(UserRepository.class),
+            config, new AIBusinessProperties(),
             streams, new ObjectMapper(), mock(TransactionTemplate.class), Runnable::run);
 
     @AfterEach void close() { streams.destroy(); }

@@ -1,5 +1,5 @@
 <template>
-  <AppShell :subtitle="`学生答题 · ${auth.user?.realName ?? ''}`" :links="links">
+  <AppShell :subtitle="`学生答题 · ${auth.user?.realName ?? ''}`">
     <div class="q-page">
       <!-- 顶部：任务标题 + 圆点导航 -->
       <div class="q-header">
@@ -122,6 +122,7 @@
       <div v-if="allDone" class="finish-bar">
         <span class="finish-bar-text">全部题目已完成</span>
         <div class="finish-bar-actions">
+          <button v-if="!isPractice && activeTeachingEventId" class="neon-btn primary" @click="openReview">查看本次结果与复盘</button>
           <button class="neon-btn primary" @click="finishAndExit">完成答题，返回首页</button>
         </div>
       </div>
@@ -168,12 +169,6 @@ const isPractice = computed(() => route.path === '/student/practice');
 const getQuestionViewStateKey = () => `${QUESTION_VIEW_STATE_KEY_PREFIX}_v2_${auth.user?.id ?? 'anonymous'}_${activeTeachingEventId.value ?? 'free'}_${isPractice.value ? `practice_${route.query.questionId ?? 'first'}` : 'assignment'}`;
 const getQuestionTaskEventIdKey = () => `${QUESTION_TASK_EVENT_ID_KEY_PREFIX}_${auth.user?.id ?? 'anonymous'}_${isPractice.value ? 'practice' : 'assignment'}`;
 
-const links = [
-  { label: '首页', to: '/student/home' },
-  { label: '作业', to: '/student/task' },
-  { label: '错题本', to: '/student/wrong-book' },
-  { label: '学习报告', to: '/student/report' },
-];
 
 const questions = ref<QuestionResponse[]>([]);
 const currentQuestion = ref<QuestionResponse | null>(null);
@@ -268,6 +263,12 @@ const finishAndExit = () => {
   }
   clearQuestionViewState();
   router.push('/student/home');
+};
+
+const openReview = () => {
+  if (needsAnswerCommit.value || !activeTeachingEventId.value) return;
+  clearQuestionViewState();
+  router.push({ path: '/student/report', query: { eventId: activeTeachingEventId.value } });
 };
 
 const goNext = () => {
@@ -415,9 +416,19 @@ onMounted(async () => {
 
     restoreQuestionViewState(recordResult.records ?? []);
     if (isPractice.value) currentQuestion.value = questions.value.find(q => q.id === Number(route.query.questionId)) ?? questions.value[0] ?? null;
+    if (!isPractice.value && route.query.resume === '1') {
+      // A retry must stay on its original question until the answer is saved.
+      currentQuestion.value = pendingAnswer.value
+        ? questions.value.find(q => q.id === pendingAnswer.value?.questionId) ?? currentQuestion.value
+        : questions.value.find(q => !doneMap.value[q.id]) ?? questions.value[0] ?? null;
+      if (!pendingAnswer.value) selectedOption.value = '';
+    }
     currentQuestion.value = currentQuestion.value ?? questions.value[0] ?? null;
-    if (currentQuestion.value && doneMap.value[currentQuestion.value.id]) {
-      submitResult.value = doneMap.value[currentQuestion.value.id];
+    submitResult.value = currentQuestion.value ? doneMap.value[currentQuestion.value.id] ?? null : null;
+    if (route.query.resume === '1') {
+      persistQuestionViewState();
+      const { resume, ...query } = route.query;
+      await router.replace({ path: route.path, query });
     }
     if (questions.value.length === 0) {
       show('当前任务题目不存在，请联系教师调整题目配置', 'error');
@@ -640,6 +651,7 @@ const submitAnswer = async () => {
 
 .finish-bar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
@@ -660,9 +672,11 @@ const submitAnswer = async () => {
 
 .finish-bar-actions {
   display: flex;
+  flex-wrap: wrap;
+  max-width: 100%;
   gap: 8px;
   align-items: center;
-  flex-shrink: 0;
+  flex-shrink: 1;
 }
 
 .finish-pop-enter-active {

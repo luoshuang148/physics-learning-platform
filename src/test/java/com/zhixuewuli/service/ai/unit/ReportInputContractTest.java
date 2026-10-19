@@ -21,14 +21,18 @@ class ReportInputContractTest {
   Question q=new Question();q.setId(9L);q.setContent(text);q.setOptions("{\"A\":\"one\",\"B\":\"two\"}");q.setCorrectOption("A");
   var r=new AnswerRecord();r.setId(String.valueOf(event));r.setUserId(123456L);r.setEventId(event);r.setQuestionId(9L);r.setPractice(practice);r.setCorrect(correct);r.setUserAnswer("B");r.setAnsweredAt(LocalDateTime.of(2026,1,1,0,0));r.setQuestionSnapshot(mapper.writeValueAsString(q));return r;
  }
+ @Test void evidenceCarriesTheHighestInputRevision() throws Exception {
+  var first=record(1,"first",false,false);first.setAttemptOrder(4L);
+  var practice=record(1,"practice",true,true);practice.setAttemptOrder(9L);
+  var prepared=com.zhixuewuli.service.ai.report.ReportPreparation.prepare(List.of(first,practice),Map.of(),mapper,false,"fixture");
+  assertThat(prepared.evidence()).containsEntry("answerRevision","9");
+ }
  @Test void studentPromptOmitsNameAndUsesEachHistoricalTaskVersion() throws Exception {
-  var method=AliyunAIReportServiceImpl.class.getDeclaredMethod("buildStudentReportPrompt",List.class,Map.class,String.class);method.setAccessible(true);
-  String prompt=(String)method.invoke(service,List.of(record(1,"OLD_TASK",false,false),record(2,"NEW_TASK",true,true)),Map.of(),"真实姓名张三");
-  assertThat(prompt).doesNotContain("真实姓名张三","123456").contains("OLD_TASK","NEW_TASK","原始作答","补练");
+  String prompt=com.zhixuewuli.service.ai.report.ReportPreparation.prepare(List.of(record(1,"OLD_TASK",false,false),record(2,"NEW_TASK",true,true)),Map.of(),mapper,false,"fixture").prompt();
+  assertThat(prompt).doesNotContain("真实姓名张三","123456").contains("OLD_TASK","NEW_TASK","原始作答","补练","本次作业复盘","不虚构薄弱点");
  }
  @Test void teacherPromptUsesAnonymousLabelsAndExactSeparatedCounts() throws Exception {
-  var method=AliyunAIReportServiceImpl.class.getDeclaredMethod("buildTeacherAnalysisPrompt",List.class,Map.class,Map.class);method.setAccessible(true);
-  String prompt=(String)method.invoke(service,List.of(record(1,"OLD_TASK",false,false),record(2,"NEW_TASK",true,true)),Map.of(),Map.of(123456L,"真实姓名张三"));
+  String prompt=com.zhixuewuli.service.ai.report.ReportPreparation.prepare(List.of(record(1,"OLD_TASK",false,false),record(2,"NEW_TASK",true,true)),Map.of(),mapper,true,"fixture").prompt();
   assertThat(prompt).doesNotContain("真实姓名张三","123456").contains("原始作答：1","原始正确：0","补练：1","补练正确：1","学生1");
  }
  @Test void teacherQuestionPromptAlsoOmitsPersonalNamesAndUsesSnapshot() throws Exception {

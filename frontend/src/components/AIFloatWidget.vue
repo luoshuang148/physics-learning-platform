@@ -3,6 +3,7 @@
     <button
       class="ai-fab"
       :class="{ active: drawerOpen, dragging: isDragging }"
+      :aria-label="drawerOpen ? '关闭 AI 学习助手' : '打开 AI 学习助手'"
       @mousedown="onDragStart"
       @touchstart.passive="onTouchStart"
       @click="onFabClick"
@@ -155,8 +156,11 @@ import { useAIStreamState } from '@/composables/useAIStreamState';
 import { useToast } from '@/composables/useToast';
 import type { ConversationHistory } from '@/types/ai';
 import { renderMarkdown } from '@/utils/markdown';
+import { useRoute } from 'vue-router';
 
 import 'katex/dist/katex.min.css';
+
+const route = useRoute();
 
 // 配置 marked 开启 GFM 支持
 
@@ -352,6 +356,8 @@ const clampPosition = (nextRight: number, nextBottom: number) => {
   const fabSize = 58;
   const minEdge = 8;
   const minRight = minEdge;
+  const navigationHeight = document.querySelector('.app-navigation-bottom')?.getBoundingClientRect().height ?? 0;
+  const minBottom = navigationHeight ? navigationHeight + 12 : minEdge;
   const maxBottom = Math.max(minEdge, window.innerHeight - (fabSize + minEdge));
   const maxRightDefault = Math.max(minRight, window.innerWidth - (fabSize + minEdge));
 
@@ -359,7 +365,7 @@ const clampPosition = (nextRight: number, nextBottom: number) => {
 
   return {
     right: Math.max(minRight, Math.min(maxRight, nextRight)),
-    bottom: Math.max(minEdge, Math.min(maxBottom, nextBottom)),
+    bottom: Math.max(minBottom, Math.min(maxBottom, nextBottom)),
   };
 };
 
@@ -372,6 +378,8 @@ const normalizeFloatingPosition = () => {
 const handleWindowResize = () => {
   normalizeFloatingPosition();
 };
+
+watch(() => route.path, () => nextTick(normalizeFloatingPosition));
 
 const onDragStart = (e: MouseEvent) => {
   dragMoved = false;
@@ -1113,5 +1121,12 @@ const clearSession = async () => {
   .ai-tool-row {
     justify-content: space-between;
   }
+}
+.ai-fab { width: 44px; height: 44px; background: #fff !important; border: 1px solid #d9e4df !important; box-shadow: 0 4px 15px #2e57421c !important; font-weight: 600; }
+.ai-fab-icon { color: #1d715b !important; font-size: 14px; }
+.ai-fab.active { background: #edf6f2 !important; }
+.ai-fab-label { display: none; }
+@media (max-width: 760px) {
+  .ai-drawer { position: fixed; left: 12px; right: 12px; bottom: calc(144px + env(safe-area-inset-bottom, 0px)); width: auto; max-height: calc(100dvh - 168px - env(safe-area-inset-bottom, 0px)); }
 }
 </style>
