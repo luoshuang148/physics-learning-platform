@@ -29,8 +29,6 @@ services:
     volumes:
       # MySQL 数据持久化到数据盘
       - /data/mysql:/var/lib/mysql
-      # 仅在数据库目录首次初始化时自动执行建表脚本
-      - ./src/main/resources/sql/schema_init.sql:/docker-entrypoint-initdb.d/01-schema_init.sql:ro
     command:
       - --character-set-server=utf8mb4
       - --collation-server=utf8mb4_unicode_ci

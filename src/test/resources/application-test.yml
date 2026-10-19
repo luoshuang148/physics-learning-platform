@@ -20,6 +20,10 @@ spring:
       pool-name: TestHikariCP
       register-mbeans: false
   
+  # H2 测试库由 Hibernate create-drop 建表；Flyway 只验证 MySQL 路径
+  flyway:
+    enabled: false
+
   # JPA配置
   jpa:
     hibernate:

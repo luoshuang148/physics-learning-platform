@@ -29,11 +29,11 @@
 ```bash
 cp .env.dev.example .env
 # 修改 .env 中的数据库密码和 JWT 密钥
-mysql -u root -p < src/main/resources/sql/schema_init.sql
+mysql -u root -p -e "CREATE DATABASE IF NOT EXISTS zhixuewuli CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
 ./mvnw spring-boot:run
 ```
 
-初始化 SQL 仅用于空库。已有旧版数据请先备份，再按[生产部署指南](docs/生产部署指南.md)执行增量升级。应用用 `ddl-auto=validate` 校验表结构，不会自动建表。
+应用启动时由 Flyway 自动迁移数据库：空库执行 `V8__baseline_current_schema.sql` 建立完整结构；已有 V7 库会 baseline 到 8，不重复执行建表。应用仍用 `ddl-auto=validate` 校验实体与表结构。旧于 V7 的数据库必须先按[生产部署指南](docs/生产部署指南.md)完成历史升级，不能直接让 Flyway baseline。
 
 另一个终端启动前端：
 
@@ -65,13 +65,13 @@ cd frontend && npm ci && npm test && npm run build
 默认后端套件使用隔离的 H2 数据，不访问真实模型。MySQL 验证需要独立测试库：
 
 ```bash
-# 在独立 MySQL 实例初始化 schema_init.sql 后执行；测试会写入数据
+# 在独立 MySQL 实例创建空库后执行；Flyway 自动建表，测试会写入数据
 MYSQL_TEST_URL='jdbc:mysql://127.0.0.1:3306/zhixuewuli?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai' \
 MYSQL_TEST_USER=root MYSQL_TEST_PASSWORD=your_test_password \
 ./mvnw -B test -Dgroups=mysql -DexcludedGroups=external-api
 ```
 
-CI 对 MySQL 8.4 分别执行全新库和旧版 V1→V7 升级，包含 MIGRATED/MISSING 旧题及历史记录保留检查。`src/test/resources/mysql/schema-v1.sql` 是可销毁的旧版测试夹具，**包含删库语句，只能用于独立测试实例**。
+CI 对 MySQL 8.4 分别执行 Flyway 空库迁移和旧版 V1→V7 升级后的 baseline，包含 MIGRATED/MISSING 旧题及历史记录保留检查。`src/test/resources/mysql/schema-v1.sql` 是可销毁的旧版测试夹具，**包含删库语句，只能用于独立测试实例**。
 
 ## 后端改进证据
 
@@ -92,7 +92,7 @@ src/main/java/com/zhixuewuli/
   service/          业务规则、权限与会话管理
   repository/       JPA 查询
   common/           安全配置与 JWT 过滤器、流式客户端、异常处理
-src/main/resources/sql/  新建库与增量升级 SQL
+src/main/resources/db/migration/  Flyway 迁移脚本（当前从 V8 基线开始）
 src/test/           单元、H2 集成及 MySQL 专项测试
 frontend/           Vue 页面及实验演示资源
 docs/               启动、部署、验证和面试说明

@@ -73,9 +73,7 @@ jobs:
           distribution: temurin
           java-version: '21'
           cache: maven
-      - name: Initialize fresh schema
-        run: docker exec -i ${{ job.services.mysql.id }} mysql -uroot -ptest-root-password < src/main/resources/sql/schema_init.sql
-      - name: Verify fresh schema against MySQL 8.4
+      - name: Verify Flyway fresh schema against MySQL 8.4
         run: ./mvnw -B test -Dgroups=mysql -DexcludedGroups=external-api
       - name: Verify preserved legacy fixture and upgrade through V7
         env:
@@ -115,9 +113,8 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - name: Build deployable frontend/backend image
         run: docker build -t physics-learning:e2e .
-      - name: Initialize isolated schema and boot real image with AI disabled
+      - name: Boot real image and let Flyway migrate with AI disabled
         run: |
-          docker exec -i ${{ job.services.mysql.id }} mysql -uroot -ptest-root-password < src/main/resources/sql/schema_init.sql
           docker run -d --name physics-e2e --network host -e SPRING_PROFILES_ACTIVE=prod -e SERVER_PORT=18080 -e DB_HOST=127.0.0.1 -e DB_PORT=3306 -e DB_USER=root -e DB_PASSWORD=test-root-password -e APP_JWT_SECRET=isolated-ci-fixture-secret-never-use-in-production-2026 -e AI_ENABLED=false -e ALIYUN_AI_API_KEY= -e ZHIPU_AI_API_KEY= -e BOOTSTRAP_TEACHER_ENABLED=true -e BOOTSTRAP_TEACHER_USERNAME=e2e_teacher -e BOOTSTRAP_TEACHER_PASSWORD=E2e-teacher-fixture-2026 physics-learning:e2e
           for n in $(seq 1 60); do
             if curl --silent --fail http://127.0.0.1:18080/api/v1/actuator/health; then exit 0; fi
