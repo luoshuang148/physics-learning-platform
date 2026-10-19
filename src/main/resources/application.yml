@@ -13,6 +13,20 @@ spring:
       timeout: 2s
       repositories:
         enabled: false
+  # RabbitMQ 批量报告消息（镜像版本固定，凭据只从环境变量读取）
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
+    publisher-confirm-type: correlated
+    publisher-returns: true
+    listener:
+      simple:
+        acknowledge-mode: manual
+        prefetch: ${RABBITMQ_PREFETCH:2}
+        concurrency: ${RABBITMQ_CONCURRENCY:2}
+        auto-startup: ${REPORT_BATCH_ENABLED:true}
   config:
     import: "optional:file:.env[.properties]"
   profiles:
@@ -97,6 +111,30 @@ app:
     enabled: ${BOOTSTRAP_TEACHER_ENABLED:false}
     username: ${BOOTSTRAP_TEACHER_USERNAME:}
     password: ${BOOTSTRAP_TEACHER_PASSWORD:}
+  # 批量学生报告（RabbitMQ + Outbox）业务参数
+  report-batch:
+    enabled: ${REPORT_BATCH_ENABLED:true}
+    max-students-per-batch: ${REPORT_BATCH_MAX_STUDENTS:100}
+    max-active-batches-per-teacher: 5
+    item-max-attempts: 3
+    item-lease: 6m
+    retry-base-delay: 30s
+    retry-max-delay: 10m
+    publish-interval: 5s
+    publish-batch-size: 20
+    publish-lease: 30s
+    outbox-max-attempts: 20
+    publish-confirm-timeout: 10s
+    pending-delivery-timeout: 6m
+    recover-interval: 30s
+    recover-batch-size: 50
+    model-timeout: 5m
+    main-exchange: report.batch.exchange
+    main-queue: report.batch.item.queue
+    main-routing-key: report.batch.item
+    dead-letter-exchange: report.batch.dlx
+    dead-letter-queue: report.batch.item.dlq
+    dead-letter-routing-key: report.batch.item.dead
   # LaTeX服务配置
   latex:
     strict-mode: true

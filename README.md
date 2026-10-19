@@ -19,8 +19,9 @@
 - 题库管理及任务选题使用服务端分页、搜索和无图片正文的列表投影；编辑时再读详情，跨页选题保持顺序。
 - 作业复盘按用户、任务和作答版本恢复已保存报告；新增作答或补练使旧版本失效。AI 状态区分配置与最近实际调用，不为页面检查额外请求模型。
 - 教师总览使用数据库聚合；公开健康检查不含细节，运行指标仅教师可访问。
+- 批量学生报告使用 RabbitMQ 异步生成：创建批次与发件箱记录在同一事务提交；发布确认后标记投递，消费端手动确认，子任务认领使用条件更新加租约，数据库唯一约束与执行者校验共同保证幂等，旧执行者不能覆盖新状态；自动重试按延迟退避调度，重试耗尽进入死信队列并支持教师手动重试，无作答学生直接跳过不调用模型。 已发布未认领任务可恢复，投递耗尽可手动重试；教师可为同一作业显式生成新批次，查询按当前班级权限与作业范围过滤。
 - SSE 请求独立取消：断开或超时会取消上游 HTTP 调用；同一会话只允许一个活动请求，并限制全局、用户连接数及执行队列。
-- Maven Wrapper、JUnit、Playwright 与 GitHub Actions 覆盖后端、前端、MySQL 全新/升级路径、Docker 启动、浏览器主流程及备份恢复。
+- Maven Wrapper、JUnit、Testcontainers（Redis/RabbitMQ）、Playwright 与 GitHub Actions 覆盖后端、前端、批量报告消息链路、MySQL 全新/升级路径、Docker 启动、浏览器主流程及备份恢复。
 
 ## 本地运行
 
@@ -33,7 +34,7 @@ mysql -u root -p -e "CREATE DATABASE IF NOT EXISTS zhixuewuli CHARACTER SET utf8
 ./mvnw spring-boot:run
 ```
 
-应用启动时由 Flyway 自动迁移数据库：空库执行 `V8__baseline_current_schema.sql` 建立完整结构；已有 V7 库会 baseline 到 8，不重复执行建表。应用仍用 `ddl-auto=validate` 校验实体与表结构。旧于 V7 的数据库必须先按[生产部署指南](docs/生产部署指南.md)完成历史升级，不能直接让 Flyway baseline。
+应用启动时由 Flyway 自动迁移数据库：空库执行 `V8__baseline_current_schema.sql` 建立完整结构；已有 V7 库会 baseline 到 8，不重复执行建表。后续增量迁移（V9 多班级结构与 V10 批量报告三表）按版本自动执行。应用仍用 `ddl-auto=validate` 校验实体与表结构。旧于 V7 的数据库必须先按[生产部署指南](docs/生产部署指南.md)完成历史升级，不能直接让 Flyway baseline。
 
 另一个终端启动前端：
 
@@ -44,6 +45,8 @@ npm run dev
 ```
 
 访问 [http://localhost:5173](http://localhost:5173)，后端 API 前缀为 `/api/v1`。开发环境默认关闭 AI，无需模型密钥即可运行普通功能；启用 AI 时在 `.env` 中设置 `AI_ENABLED=true` 和对应模型密钥（报告密钥留空时可复用智谱密钥，但服务地址和模型必须匹配），需要自行确认模型权限和费用。
+
+批量学生报告需要 RabbitMQ：使用仓库自带 Compose 时执行 `docker compose up -d rabbitmq`；不用 Docker 时需自行启动 RabbitMQ 并核对 `.env` 中的 `RABBITMQ_*`。若暂时不需要该功能，可设 `REPORT_BATCH_ENABLED=false` 关闭消费、发件箱调度与租约恢复；此时接口仍可创建批次，但不会被处理，重新开启后由发件箱调度继续投递。
 
 首次使用时在 `.env` 临时设置：
 
@@ -62,7 +65,7 @@ BOOTSTRAP_TEACHER_PASSWORD=your_own_password_at_least_12_characters
 cd frontend && npm ci && npm test && npm run build
 ```
 
-默认后端套件使用隔离的 H2 数据，不访问真实模型。MySQL 验证需要独立测试库：
+默认后端套件使用隔离的 H2 数据与 Testcontainers（Redis、RabbitMQ），不访问真实模型；批量报告的端到端用例会启动真实 RabbitMQ 容器验证投递、重试与死信，因此运行测试需要本机 Docker 或兼容的容器运行时。MySQL 验证需要独立测试库：
 
 ```bash
 # 在独立 MySQL 实例创建空库后执行；Flyway 自动建表，测试会写入数据

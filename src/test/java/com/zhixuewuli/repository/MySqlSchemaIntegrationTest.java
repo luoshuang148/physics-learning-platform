@@ -50,12 +50,15 @@ class MySqlSchemaIntegrationTest extends com.zhixuewuli.common.redis.RedisTestSu
     @Autowired org.springframework.transaction.PlatformTransactionManager transactionManager;
     @Autowired com.zhixuewuli.service.teacherEvent.TaskRosterService roster;
     @Autowired com.zhixuewuli.service.user.ClassroomGuard classroomGuard;
+    @Autowired com.zhixuewuli.service.classroom.ClassAccessService classAccess;
 
     @Test
     @Transactional(propagation=org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
     void enrollmentSeesRecipientCommittedAfterItsRepeatableReadSnapshot() throws Exception {
         var teacher=user("mysql_snapshot_teacher",User.UserType.TEACHER);
         var student=user("mysql_snapshot_student",User.UserType.STUDENT);
+        // This regression targets task-recipient visibility; the student is already a class member.
+        classAccess.ensureStudent(classAccess.defaultClass().getId(), student.getId());
         var created=new java.util.concurrent.atomic.AtomicReference<Long>();
         var tx=new org.springframework.transaction.support.TransactionTemplate(transactionManager);
         tx.setIsolationLevel(org.springframework.transaction.TransactionDefinition.ISOLATION_REPEATABLE_READ);

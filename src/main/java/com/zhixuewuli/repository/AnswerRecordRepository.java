@@ -101,6 +101,8 @@ public interface AnswerRecordRepository extends JpaRepository<AnswerRecord, Stri
         long countMasteredQuestions(@Param("eventId") Long eventId);
         Optional<AnswerRecord> findByUserIdAndRequestId(Long userId,String requestId);
         boolean existsByQuestionId(Long questionId);
+        @Query("select distinct a.userId from AnswerRecord a where a.eventId=:eventId")
+        java.util.Set<Long> findUserIdsWithRecords(@Param("eventId") Long eventId);
         boolean existsByUserIdAndEventIdAndQuestionIdAndPracticeFalse(Long userId,Long eventId,Long questionId);
         @Query("select distinct a.questionId from AnswerRecord a where a.userId=:userId and a.eventId=:eventId and a.practice=false")
         java.util.Set<Long> findCompletedAssignmentQuestionIds(@Param("userId") Long userId, @Param("eventId") Long eventId);

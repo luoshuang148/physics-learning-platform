@@ -37,7 +37,7 @@ class MySqlAssignmentLockingTest extends com.zhixuewuli.common.redis.RedisTestSu
         var original=teaching.publishEvent(request,teacher.getId()).getId();
         var capturing=new CountDownLatch(1);var allowCapture=new CountDownLatch(1);
         doAnswer(call->{capturing.countDown();assertThat(allowCapture.await(10,TimeUnit.SECONDS)).isTrue();return call.callRealMethod();})
-                .when(org.springframework.test.util.AopTestUtils.<TaskRosterService>getUltimateTargetObject(roster)).capture(anyLong());
+                .when(org.springframework.test.util.AopTestUtils.<TaskRosterService>getUltimateTargetObject(roster)).capture(anyLong(), anyLong());
         Long questionId=question.getId();
         try(var pool=Executors.newFixedThreadPool(2)) {
             var replacement=pool.submit(()->teaching.replaceEvent(original,request,teacher.getId()));

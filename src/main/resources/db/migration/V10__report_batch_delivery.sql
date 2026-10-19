@@ -1,0 +1,71 @@
+-- RabbitMQ batch student-report delivery (V10): teacher batches, per-student items, transactional outbox.
+-- Rows are historical delivery evidence; deleting tasks/students/classes must not silently drop them.
+CREATE TABLE report_batches (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    class_id BIGINT NOT NULL,
+    event_id BIGINT NOT NULL,
+    teacher_id BIGINT NOT NULL,
+    idempotency_key VARCHAR(100) NOT NULL COMMENT '教师提供的幂等键，同键同参返回原批次',
+    request_hash CHAR(64) NOT NULL COMMENT '班级+任务参数摘要，用于区分同键不同参',
+    status VARCHAR(20) NOT NULL DEFAULT 'PENDING' COMMENT 'PENDING/PROCESSING/SUCCEEDED/PARTIAL_FAILED/FAILED',
+    total_count INT NOT NULL DEFAULT 0 COMMENT '创建时的应参与名单数量（含跳过项）',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    started_at DATETIME NULL,
+    finished_at DATETIME NULL,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT uk_report_batches_idempotency UNIQUE (teacher_id, idempotency_key),
+    CONSTRAINT fk_report_batch_class FOREIGN KEY (class_id) REFERENCES classes(id) ON DELETE RESTRICT,
+    CONSTRAINT fk_report_batch_event FOREIGN KEY (event_id) REFERENCES teacher_events(id) ON DELETE RESTRICT,
+    CONSTRAINT fk_report_batch_teacher FOREIGN KEY (teacher_id) REFERENCES users(id) ON DELETE RESTRICT,
+    INDEX idx_report_batches_teacher (teacher_id, created_at),
+    INDEX idx_report_batches_class (class_id, created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='批量报告批次表';
+
+CREATE TABLE report_batch_items (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    batch_id BIGINT NOT NULL,
+    user_id BIGINT NOT NULL,
+    student_name VARCHAR(100) NOT NULL COMMENT '创建批次时的学生姓名快照',
+    status VARCHAR(20) NOT NULL DEFAULT 'PENDING' COMMENT 'PENDING/PROCESSING/SUCCEEDED/FAILED/SKIPPED',
+    attempts INT NOT NULL DEFAULT 0 COMMENT '已执行的模型生成次数（含首次）',
+    max_attempts INT NOT NULL COMMENT '自动重试上限，创建时快照',
+    manual_retry_count INT NOT NULL DEFAULT 0,
+    execution_id CHAR(36) NULL COMMENT '当前/最后一次执行标识，防止过期执行者写入',
+    lease_owner VARCHAR(100) NULL,
+    lease_expires_at DATETIME NULL,
+    input_digest CHAR(64) NULL COMMENT '报告输入 SHA-256 摘要',
+    input_revision VARCHAR(60) NULL COMMENT '报告输入版本（最大 attempt_order）',
+    report_id BIGINT NULL,
+    error_code VARCHAR(40) NULL COMMENT 'TIMEOUT/RATE_LIMIT/UNAVAILABLE/AUTH/INPUT_INVALID/DATA_MISSING/AI_DISABLED/EXHAUSTED/UNKNOWN',
+    error_message VARCHAR(500) NULL COMMENT '长度受限的安全错误信息',
+    skip_reason VARCHAR(200) NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    started_at DATETIME NULL,
+    finished_at DATETIME NULL,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT uk_report_batch_item UNIQUE (batch_id, user_id),
+    CONSTRAINT fk_report_batch_item_batch FOREIGN KEY (batch_id) REFERENCES report_batches(id) ON DELETE CASCADE,
+    CONSTRAINT fk_report_batch_item_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE RESTRICT,
+    CONSTRAINT fk_report_batch_item_report FOREIGN KEY (report_id) REFERENCES student_reports(id) ON DELETE SET NULL,
+    INDEX idx_report_batch_items_batch_status (batch_id, status),
+    INDEX idx_report_batch_items_status_lease (status, lease_expires_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='批量报告子任务表';
+
+CREATE TABLE report_outbox (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    message_id CHAR(36) NOT NULL COMMENT '消息 UUID，消费端据此与任务标识配合去重',
+    exchange_name VARCHAR(100) NOT NULL,
+    routing_key VARCHAR(100) NOT NULL,
+    payload TEXT NOT NULL COMMENT '仅包含任务标识与协议版本的 JSON',
+    status VARCHAR(20) NOT NULL DEFAULT 'PENDING' COMMENT 'PENDING/PUBLISHED/FAILED',
+    attempts INT NOT NULL DEFAULT 0 COMMENT '投递尝试次数',
+    next_attempt_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    lease_owner VARCHAR(100) NULL,
+    lease_expires_at DATETIME NULL,
+    published_at DATETIME NULL,
+    last_error VARCHAR(500) NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT uk_report_outbox_message UNIQUE (message_id),
+    INDEX idx_report_outbox_due (status, next_attempt_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='报告消息事务性发件箱';

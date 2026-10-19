@@ -104,6 +104,13 @@ jobs:
         options: >-
           --health-cmd="mysqladmin ping -h localhost -ptest-root-password"
           --health-interval=10s --health-timeout=5s --health-retries=10
+      rabbitmq:
+        image: rabbitmq:3.13-alpine
+        ports:
+          - 5672:5672
+        options: >-
+          --health-cmd="rabbitmq-diagnostics -q ping"
+          --health-interval=15s --health-timeout=10s --health-retries=5
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -115,7 +122,7 @@ jobs:
         run: docker build -t physics-learning:e2e .
       - name: Boot real image and let Flyway migrate with AI disabled
         run: |
-          docker run -d --name physics-e2e --network host -e SPRING_PROFILES_ACTIVE=prod -e SERVER_PORT=18080 -e DB_HOST=127.0.0.1 -e DB_PORT=3306 -e DB_USER=root -e DB_PASSWORD=test-root-password -e APP_JWT_SECRET=isolated-ci-fixture-secret-never-use-in-production-2026 -e AI_ENABLED=false -e ALIYUN_AI_API_KEY= -e ZHIPU_AI_API_KEY= -e BOOTSTRAP_TEACHER_ENABLED=true -e BOOTSTRAP_TEACHER_USERNAME=e2e_teacher -e BOOTSTRAP_TEACHER_PASSWORD=E2e-teacher-fixture-2026 physics-learning:e2e
+          docker run -d --name physics-e2e --network host -e SPRING_PROFILES_ACTIVE=prod -e SERVER_PORT=18080 -e DB_HOST=127.0.0.1 -e DB_PORT=3306 -e DB_USER=root -e DB_PASSWORD=test-root-password -e APP_JWT_SECRET=isolated-ci-fixture-secret-never-use-in-production-2026 -e RABBITMQ_HOST=127.0.0.1 -e RABBITMQ_PORT=5672 -e AI_ENABLED=false -e ALIYUN_AI_API_KEY= -e ZHIPU_AI_API_KEY= -e BOOTSTRAP_TEACHER_ENABLED=true -e BOOTSTRAP_TEACHER_USERNAME=e2e_teacher -e BOOTSTRAP_TEACHER_PASSWORD=E2e-teacher-fixture-2026 physics-learning:e2e
           for n in $(seq 1 60); do
             if curl --silent --fail http://127.0.0.1:18080/api/v1/actuator/health; then exit 0; fi
             sleep 2

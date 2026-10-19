@@ -100,6 +100,7 @@ public class SecurityConfig {
                     }
                     // /teacher/events 是 API，必须排在 SPA 的 /teacher/** 之前
                     auth.requestMatchers("/teacher/events", "/teacher/events/**").authenticated();
+                    auth.requestMatchers("/teacher/report-batches", "/teacher/report-batches/**").authenticated();
                     auth.requestMatchers(HttpMethod.GET, SPA_RESOURCES).permitAll();
                     auth.anyRequest().authenticated();
                 })

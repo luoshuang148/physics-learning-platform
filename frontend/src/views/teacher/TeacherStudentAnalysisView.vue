@@ -850,5 +850,47 @@ onMounted(loadInsights);
     grid-template-columns: 1fr;
   }
 }
+
+/* 浅色主题适配：学生姓名与学习报告输出 */
+.student-name,
+.detail-student-name {
+  color: #172033;
+}
+
+.report-output :deep(.stream-box) {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+}
+
+.report-output :deep(.stream-content),
+.report-output :deep(.reasoning-content) {
+  background: #ffffff;
+  border-color: #e2e8f0;
+  color: #334155;
+}
+
+.report-output :deep(.reasoning-box) {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+}
+
+.report-output :deep(.reasoning-box summary) {
+  color: #334155;
+}
+
+.report-output :deep(.stream-empty-title) {
+  color: #172033;
+}
+
+.report-output :deep(.markdown-body h1),
+.report-output :deep(.markdown-body h2),
+.report-output :deep(.markdown-body h3),
+.report-output :deep(.markdown-body h4) {
+  color: #172033;
+}
+
+.report-output :deep(.markdown-body strong) {
+  color: #0f766e;
+}
 </style>
 

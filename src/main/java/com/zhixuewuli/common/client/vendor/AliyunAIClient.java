@@ -139,6 +139,81 @@ public class AliyunAIClient extends AbstractStreamingClient {
     }
 
     /**
+     * 阻塞式内容生成：供后台批量任务在事务外调用。
+     *
+     * <p>复用流式管线（重试一次、GLM thinking 关闭等），把全部内容收集为字符串；
+     * 通过看门狗线程在超时后取消底层 HTTP 调用，并抛出 {@link AITimeoutException}。</p>
+     *
+     * @param prompt  完整提示词
+     * @param model   模型名称
+     * @param timeout 调用超时
+     * @return 修复格式后的完整模型输出
+     */
+    public String generateBlocking(String prompt, String model, java.time.Duration timeout) {
+        StringBuilder collected = new StringBuilder();
+        java.util.concurrent.atomic.AtomicReference<Exception> failure = new java.util.concurrent.atomic.AtomicReference<>();
+        java.util.concurrent.atomic.AtomicReference<Runnable> cancelAction = new java.util.concurrent.atomic.AtomicReference<>();
+        java.util.concurrent.atomic.AtomicBoolean timedOut = new java.util.concurrent.atomic.AtomicBoolean(false);
+
+        Thread watchdog = new Thread(() -> {
+            try {
+                Thread.sleep(timeout.toMillis());
+                timedOut.set(true);
+                Runnable cancel = cancelAction.get();
+                if (cancel != null) cancel.run();
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+            }
+        }, "report-batch-ai-watchdog");
+        watchdog.setDaemon(true);
+
+        try {
+            watchdog.start();
+            streamGenerate(prompt, model, new AIStreamCallback() {
+                @Override
+                public void onCancel(Runnable action) {
+                    cancelAction.set(action);
+                    if (timedOut.get()) action.run();
+                }
+
+                @Override
+                public boolean isCancelled() {
+                    return timedOut.get();
+                }
+
+                @Override
+                public void onContent(String content, boolean isLast) {
+                    if (content != null && !content.isEmpty()) {
+                        collected.append(com.zhixuewuli.common.util.StreamContentFixer.fix(content));
+                    }
+                }
+
+                @Override
+                public void onComplete(int promptTokens, int completionTokens, int totalTokens) {
+                    log.debug("后台报告生成完成 - 模型: {}, tokens: {}/{}/{}", model,
+                            promptTokens, completionTokens, totalTokens);
+                }
+
+                @Override
+                public void onError(Exception error) {
+                    failure.set(error);
+                }
+            });
+        } finally {
+            watchdog.interrupt();
+        }
+
+        if (timedOut.get()) throw new AITimeoutException("后台报告生成超时（" + timeout.toMinutes() + " 分钟）");
+        Exception error = failure.get();
+        if (error != null) {
+            if (error instanceof RuntimeException runtime) throw runtime;
+            throw new com.zhixuewuli.common.exception.ai.AIServiceUnavailableException(error.getMessage());
+        }
+        if (collected.isEmpty()) throw new AIServiceUnavailableException("模型未返回报告内容");
+        return collected.toString();
+    }
+
+    /**
      * 构建生成请求
      * 符合阿里云百炼OpenAI兼容模式规范：
      * - 使用标准的messages格式
