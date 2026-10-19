@@ -11,6 +11,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 public class TaskOverviewResponse {
     private Long taskId;
+    private Long classId;
     private String title;
     private String status;
     private String availability;

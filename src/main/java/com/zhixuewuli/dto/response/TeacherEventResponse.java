@@ -43,6 +43,7 @@ public class TeacherEventResponse {
     private Long id;
     private Long teacherId;
     private String teacherName;
+    private Long classId;
     private String eventTitle;
     private String eventDescription;
     private LocalDateTime eventTimestamp;

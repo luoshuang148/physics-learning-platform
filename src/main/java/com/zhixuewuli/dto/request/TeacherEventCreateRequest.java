@@ -34,4 +34,7 @@ public class TeacherEventCreateRequest {
 
     @Schema(description = "截止时间；为空表示不设截止")
     private LocalDateTime dueAt;
+
+    @Schema(description = "所属班级；旧调用为空时使用教师默认班级")
+    private Long classId;
 }

@@ -14,6 +14,7 @@ import java.util.List;
 public class TaskDetailResponse {
     private boolean legacyRoster;
     private Long taskId;
+    private Long classId;
     private String title;
     private String status;
     private String availability;

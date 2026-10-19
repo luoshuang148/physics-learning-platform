@@ -22,6 +22,8 @@ public interface UserRepository extends JpaRepository<User, Long> {
     int recordLoginIfVersionMatches(Long id, Long expectedVersion, java.time.LocalDateTime time);
     long countByUserTypeAndActiveTrue(UserType role);
 
+    List<User> findByUserTypeAndActiveTrue(UserType userType);
+
     @Query("SELECT u FROM User u WHERE u.userType = com.zhixuewuli.entity.User.UserType.STUDENT AND u.active = true ORDER BY u.className, u.realName")
     List<User> findActiveStudents();
     @org.springframework.data.jpa.repository.Modifying(flushAutomatically=true,clearAutomatically=true)

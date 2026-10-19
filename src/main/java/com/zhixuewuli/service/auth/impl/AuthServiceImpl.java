@@ -55,6 +55,7 @@ public class AuthServiceImpl implements AuthService {
 
     private final UserRepository userRepository;
     private final com.zhixuewuli.common.security.AuthUserCache authUserCache;
+    private final com.zhixuewuli.service.classroom.ClassAccessService classAccess;
     private final com.zhixuewuli.service.user.ClassroomGuard classroomGuard;
     private final com.zhixuewuli.service.teacherEvent.TaskRosterService roster;
     private final PasswordUtil passwordUtil;
@@ -153,6 +154,7 @@ public class AuthServiceImpl implements AuthService {
             throw conflict;
         }
 
+        classAccess.ensureStudent(classAccess.defaultClass().getId(), savedUser.getId());
         roster.enroll(savedUser);
         log.debug("用户注册成功，用户ID: {}, 用户名: {}", savedUser.getId(), savedUser.getUsername());
 

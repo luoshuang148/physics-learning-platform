@@ -50,12 +50,14 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 public class TeacherEventController {
 
     private final TeacherEventService teacherEventService;
+    private final com.zhixuewuli.service.classroom.ClassAccessService classAccess;
 
     @GetMapping("/history")
     @TeacherOnly
     public Result<com.zhixuewuli.common.result.PageResult<TeacherEventResponse>> history(
-            @RequestParam(defaultValue = "1") int page, @RequestParam(defaultValue = "20") int size) {
-        return Result.success(teacherEventService.getEventHistory(page, size));
+            @RequestParam(defaultValue = "1") int page, @RequestParam(defaultValue = "20") int size,
+            @AuthenticationPrincipal AuthenticatedUser user) {
+        return Result.success(teacherEventService.getEventHistory(page, size, user.id()));
     }
 
 
@@ -131,8 +133,9 @@ public class TeacherEventController {
         }
     )
     @TeacherOnly
-    public Result<Void> deleteCurrentEvent(@RequestParam Long expectedEventId) {
+    public Result<Void> deleteCurrentEvent(@RequestParam Long expectedEventId, @AuthenticationPrincipal AuthenticatedUser user) {
         log.info("收到归档任务请求");
+        requireTeacherOfEvent(expectedEventId, user.id());
         teacherEventService.archiveEvent(expectedEventId);
         return Result.success();
     }
@@ -172,15 +175,15 @@ public class TeacherEventController {
     @GetMapping("/overview")
     @Operation(summary = "教师总览任务组合", description = "批量返回各任务完成率、正确率、未交人数与截止信息")
     @TeacherOnly
-    public Result<java.util.List<com.zhixuewuli.dto.response.TaskOverviewResponse>> overview() {
-        return Result.success(teacherEventService.getTaskOverview());
+    public Result<java.util.List<com.zhixuewuli.dto.response.TaskOverviewResponse>> overview(@AuthenticationPrincipal AuthenticatedUser user) {
+        return Result.success(teacherEventService.getTaskOverview(user.id()));
     }
 
     @GetMapping("/all")
     @Operation(summary = "教师任务列表", description = "返回当前教师所有未归档任务，支持并行任务管理")
     @TeacherOnly
-    public Result<java.util.List<TeacherEventResponse>> allTasks() {
-        return Result.success(teacherEventService.listTeacherTasks());
+    public Result<java.util.List<TeacherEventResponse>> allTasks(@AuthenticationPrincipal AuthenticatedUser user) {
+        return Result.success(teacherEventService.listTeacherTasks(user.id()));
     }
 
     @GetMapping("/available")
@@ -201,19 +204,23 @@ public class TeacherEventController {
 
     @PutMapping("/{id}/draft")
     @TeacherOnly
-    public Result<TeacherEventResponse> updateDraft(@PathVariable Long id, @Valid @RequestBody TeacherEventCreateRequest payload) {
+    public Result<TeacherEventResponse> updateDraft(@PathVariable Long id, @Valid @RequestBody TeacherEventCreateRequest payload,
+            @AuthenticationPrincipal AuthenticatedUser user) {
+        requireTeacherOfEvent(id, user.id());
         return Result.success(teacherEventService.updateDraft(id, payload));
     }
 
     @PostMapping("/{id}/publish")
     @TeacherOnly
-    public Result<TeacherEventResponse> publishDraft(@PathVariable Long id) {
+    public Result<TeacherEventResponse> publishDraft(@PathVariable Long id, @AuthenticationPrincipal AuthenticatedUser user) {
+        requireTeacherOfEvent(id, user.id());
         return Result.success(teacherEventService.publishTask(id));
     }
 
     @PostMapping("/{id}/close")
     @TeacherOnly
-    public Result<TeacherEventResponse> closeTask(@PathVariable Long id) {
+    public Result<TeacherEventResponse> closeTask(@PathVariable Long id, @AuthenticationPrincipal AuthenticatedUser user) {
+        requireTeacherOfEvent(id, user.id());
         return Result.success(teacherEventService.closeTask(id));
     }
 
@@ -235,12 +242,19 @@ public class TeacherEventController {
     @PutMapping("/{id}/replace")
     @TeacherOnly
     public Result<TeacherEventResponse> replace(@PathVariable Long id,@Valid @RequestBody TeacherEventCreateRequest payload,@AuthenticationPrincipal AuthenticatedUser user){
+        requireTeacherOfEvent(id, user.id());
         return Result.success(teacherEventService.replaceEvent(id,payload,user.id()));
     }
     @DeleteMapping("/{id}")
     @TeacherOnly
-    public Result<Void> archive(@PathVariable Long id) {
+    public Result<Void> archive(@PathVariable Long id, @AuthenticationPrincipal AuthenticatedUser user) {
+        requireTeacherOfEvent(id, user.id());
         teacherEventService.archiveEvent(id);
         return Result.success();
+    }
+
+    private void requireTeacherOfEvent(Long id, Long teacherId) {
+        TeacherEventResponse event = teacherEventService.getEvent(id);
+        if (event.getClassId() != null) classAccess.requireTeacher(event.getClassId(), teacherId);
     }
 }

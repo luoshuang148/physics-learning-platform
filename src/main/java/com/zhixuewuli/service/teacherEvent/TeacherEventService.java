@@ -19,6 +19,8 @@ public interface TeacherEventService {
 
     com.zhixuewuli.common.result.PageResult<TeacherEventResponse> getEventHistory(int page, int size);
 
+    com.zhixuewuli.common.result.PageResult<TeacherEventResponse> getEventHistory(int page, int size, Long teacherId);
+
     /** Legacy endpoint: create a task. status defaults to PUBLISHED. */
     TeacherEventResponse publishEvent(TeacherEventCreateRequest request, Long currentUserId);
 
@@ -29,6 +31,8 @@ public interface TeacherEventService {
 
     List<TeacherEventResponse> listTeacherTasks();
 
+    List<TeacherEventResponse> listTeacherTasks(Long teacherId);
+
     List<TeacherEventResponse> listStudentTasks(Long userId);
 
     List<com.zhixuewuli.dto.response.StudentTaskResultResponse> listStudentTaskResults(Long userId);
@@ -38,6 +42,8 @@ public interface TeacherEventService {
     com.zhixuewuli.dto.response.TaskDetailResponse getTaskDetail(Long id, Long userId);
 
     java.util.List<com.zhixuewuli.dto.response.TaskOverviewResponse> getTaskOverview();
+
+    java.util.List<com.zhixuewuli.dto.response.TaskOverviewResponse> getTaskOverview(Long teacherId);
 
     TeacherEventResponse updateDraft(Long id, TeacherEventCreateRequest request);
 

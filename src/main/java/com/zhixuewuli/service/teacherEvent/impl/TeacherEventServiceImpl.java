@@ -11,6 +11,7 @@ import com.zhixuewuli.dto.response.TaskDetailResponse;
 import com.zhixuewuli.dto.response.TaskOverviewResponse;
 import com.zhixuewuli.dto.response.StudentTaskResultResponse;
 import com.zhixuewuli.entity.TeacherEvent;
+import com.zhixuewuli.entity.TeachingClass;
 import com.zhixuewuli.entity.User;
 import com.zhixuewuli.repository.AnswerRecordRepository;
 import com.zhixuewuli.repository.TeacherEventRepository;
@@ -40,6 +41,7 @@ public class TeacherEventServiceImpl implements TeacherEventService {
     private final UserRepository userRepository;
     private final TaskQuestionService taskQuestions;
     private final AnswerAccessPolicy answerAccess;
+    private final com.zhixuewuli.service.classroom.ClassAccessService classAccess;
     private final com.zhixuewuli.service.user.ClassroomGuard classroomGuard;
     private final com.zhixuewuli.service.teacherEvent.TaskRosterService roster;
     private final com.zhixuewuli.repository.TaskRecipientRepository recipients;
@@ -65,9 +67,11 @@ public class TeacherEventServiceImpl implements TeacherEventService {
         var orderedQuestions = taskQuestions.prepare(request, status == TeacherEvent.Status.DRAFT || legacyImplicitPublish);
         User teacher = userRepository.findById(userId)
                 .orElseThrow(() -> new UserNotFoundException("用户不存在"));
+        TeachingClass teachingClass = classAccess.resolveForTask(request.getClassId(), userId);
 
         LocalDateTime now = now();
         TeacherEvent event = new TeacherEvent();
+        event.setClassId(teachingClass.getId());
         event.setTeacherId(userId);
         event.setTeacherName(teacher.getRealName());
         event.setEventTitle(request.getEventTitle().trim());
@@ -78,7 +82,7 @@ public class TeacherEventServiceImpl implements TeacherEventService {
         event.setDueAt(request.getDueAt());
         TeacherEvent saved = teacherEventRepository.saveAndFlush(event);
         taskQuestions.capture(saved.getId(), orderedQuestions);
-        if (status == TeacherEvent.Status.PUBLISHED) roster.capture(saved.getId());
+        if (status == TeacherEvent.Status.PUBLISHED) roster.capture(saved.getId(), teachingClass.getId());
         log.info("教学任务已创建 - EventId: {}, Status: {}, UserId: {}", saved.getId(), status, userId);
         return convertToResponse(saved);
     }
@@ -115,8 +119,10 @@ public class TeacherEventServiceImpl implements TeacherEventService {
         validateWindow(event.getStartAt(), event.getDueAt());
         event.setStatus(TeacherEvent.Status.PUBLISHED);
         if (event.getStartAt() == null) event.setStartAt(now());
+        var teachingClass = classAccess.resolveForTask(event.getClassId(), event.getTeacherId());
+        event.setClassId(teachingClass.getId());
         teacherEventRepository.saveAndFlush(event);
-        roster.capture(event.getId());
+        roster.capture(event.getId(), teachingClass.getId());
         return convertToResponse(event);
     }
 
@@ -174,7 +180,14 @@ public class TeacherEventServiceImpl implements TeacherEventService {
         if (event.getStatus() == TeacherEvent.Status.DRAFT && !answerAccess.isTeacher(viewerId)) {
             throw new EventNotFoundException();
         }
+        requireClassViewer(event, viewerId);
         return convertToResponse(event);
+    }
+
+    private void requireClassViewer(TeacherEvent event, Long viewerId) {
+        if (event.getClassId() == null || viewerId == null) return;
+        if (answerAccess.isTeacher(viewerId)) classAccess.requireTeacher(event.getClassId(), viewerId);
+        else classAccess.requireStudent(event.getClassId(), viewerId);
     }
 
     @Override
@@ -184,6 +197,7 @@ public class TeacherEventServiceImpl implements TeacherEventService {
         if (event.getStatus() == TeacherEvent.Status.DRAFT && !answerAccess.isTeacher(viewerId)) {
             throw new EventNotFoundException();
         }
+        requireClassViewer(event, viewerId);
         if (event.isScheduledAt(now()) && !answerAccess.isTeacher(viewerId)) {
             throw new TeacherEventBusinessException("任务尚未开始，暂不能查看题目");
         }
@@ -201,6 +215,20 @@ public class TeacherEventServiceImpl implements TeacherEventService {
     public List<TeacherEventResponse> listTeacherTasks() {
         return teacherEventRepository.findByStatusNotOrderByCreatedAtDesc(TeacherEvent.Status.ARCHIVED)
                 .stream().map(this::convertToResponse).toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<TeacherEventResponse> listTeacherTasks(Long teacherId) {
+        var classIds = classIds(teacherId);
+        return teacherEventRepository.findByStatusNotOrderByCreatedAtDesc(TeacherEvent.Status.ARCHIVED)
+                .stream().filter(task -> task.getClassId() != null && classIds.contains(task.getClassId()))
+                .map(this::convertToResponse).toList();
+    }
+
+    private java.util.Set<Long> classIds(Long teacherId) {
+        return classAccess.classesForTeacher(teacherId).stream().map(TeachingClass::getId)
+                .collect(java.util.stream.Collectors.toSet());
     }
 
     @Override
@@ -246,7 +274,18 @@ public class TeacherEventServiceImpl implements TeacherEventService {
     @Override
     @Transactional(readOnly = true)
     public List<TaskOverviewResponse> getTaskOverview() {
-        List<TeacherEvent> tasks = teacherEventRepository.findByStatusNotOrderByCreatedAtDesc(TeacherEvent.Status.ARCHIVED);
+        return buildTaskOverview(teacherEventRepository.findByStatusNotOrderByCreatedAtDesc(TeacherEvent.Status.ARCHIVED));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<TaskOverviewResponse> getTaskOverview(Long teacherId) {
+        var classIds = classIds(teacherId);
+        return buildTaskOverview(teacherEventRepository.findByStatusNotOrderByCreatedAtDesc(TeacherEvent.Status.ARCHIVED)
+                .stream().filter(task -> task.getClassId() != null && classIds.contains(task.getClassId())).toList());
+    }
+
+    private List<TaskOverviewResponse> buildTaskOverview(List<TeacherEvent> tasks) {
         if (tasks.isEmpty()) return List.of();
         List<Long> taskIds = tasks.stream().map(TeacherEvent::getId).toList();
         Map<Long,Long> recipientCounts=new HashMap<>();
@@ -274,6 +313,7 @@ public class TeacherEventServiceImpl implements TeacherEventService {
             long correct = rows.stream().mapToLong(row -> row.getCorrectQuestions() == null ? 0 : row.getCorrectQuestions()).sum();
             result.add(TaskOverviewResponse.builder()
                     .taskId(task.getId())
+                    .classId(task.getClassId())
                     .title(task.getEventTitle())
                     .status(task.getStatus().name())
                     .availability(availability(task, now))
@@ -322,6 +362,7 @@ public class TeacherEventServiceImpl implements TeacherEventService {
     @Transactional(readOnly = true)
     public TaskDetailResponse getTaskDetail(Long id, Long userId) {
         TeacherEvent event = teacherEventRepository.findById(id).orElseThrow(EventNotFoundException::new);
+        requireClassViewer(event, userId);
         List<Long> questionIds = taskQuestions.ids(id);
         List<QuestionResponse> questionResponses = taskQuestions.responses(id);
         Map<Long, String> previews = new HashMap<>();
@@ -395,6 +436,7 @@ public class TeacherEventServiceImpl implements TeacherEventService {
         return TaskDetailResponse.builder()
                 .legacyRoster(recipients.existsByEventIdAndSource(id,"MIGRATED"))
                 .taskId(event.getId())
+                .classId(event.getClassId())
                 .title(event.getEventTitle())
                 .status(event.getStatus().name())
                 .availability(meta.getAvailability())
@@ -441,6 +483,21 @@ public class TeacherEventServiceImpl implements TeacherEventService {
                 .pages(result.getTotalPages()).currentPage(page).pageSize(size).build();
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public com.zhixuewuli.common.result.PageResult<TeacherEventResponse> getEventHistory(int page, int size, Long teacherId) {
+        if (page < 1 || size < 1 || size > 100) throw new IllegalArgumentException("分页参数不合法");
+        var classIds = classIds(teacherId);
+        if (classIds.isEmpty()) return com.zhixuewuli.common.result.PageResult.<TeacherEventResponse>builder()
+                .records(List.of()).total(0).pages(0).currentPage(page).pageSize(size).build();
+        var result = teacherEventRepository.findByStatusAndClassIdIn(TeacherEvent.Status.ARCHIVED, classIds,
+                org.springframework.data.domain.PageRequest.of(page - 1, size,
+                        org.springframework.data.domain.Sort.by("updatedAt", "id").descending()));
+        return com.zhixuewuli.common.result.PageResult.<TeacherEventResponse>builder()
+                .records(result.map(this::convertToResponse).getContent()).total(result.getTotalElements())
+                .pages(result.getTotalPages()).currentPage(page).pageSize(size).build();
+    }
+
     private void validateWindow(LocalDateTime startAt, LocalDateTime dueAt) {
         if (startAt != null && dueAt != null && !dueAt.isAfter(startAt)) {
             throw new IllegalArgumentException("截止时间必须晚于开始时间");
@@ -468,6 +525,7 @@ public class TeacherEventServiceImpl implements TeacherEventService {
                 .questionCount(ids.size())
                 .teacherId(event.getTeacherId())
                 .teacherName(event.getTeacherName())
+                .classId(event.getClassId())
                 .eventTitle(event.getEventTitle())
                 .eventDescription(event.getEventDescription())
                 .eventTimestamp(event.getEventTimestamp()).timestampUtc(event.isTimestampUtc())

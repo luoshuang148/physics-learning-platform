@@ -38,6 +38,8 @@ public interface TeacherEventRepository extends JpaRepository<TeacherEvent, Long
     @Query("select e from TeacherEvent e where e.status = com.zhixuewuli.entity.TeacherEvent.Status.ARCHIVED")
     Page<TeacherEvent> findByIsGlobalFalse(Pageable page);
 
+    Page<TeacherEvent> findByStatusAndClassIdIn(TeacherEvent.Status status, java.util.Collection<Long> classIds, Pageable page);
+
     List<TeacherEvent> findByStatusNotOrderByCreatedAtDesc(TeacherEvent.Status status);
 
     List<TeacherEvent> findByStatusOrderByCreatedAtDesc(TeacherEvent.Status status);
@@ -50,6 +52,10 @@ public interface TeacherEventRepository extends JpaRepository<TeacherEvent, Long
     @Lock(jakarta.persistence.LockModeType.PESSIMISTIC_READ)
     @Query("select e from TeacherEvent e where e.status=com.zhixuewuli.entity.TeacherEvent.Status.PUBLISHED order by e.id")
     List<TeacherEvent> findPublishedTasksForRoster();
+
+    @Lock(jakarta.persistence.LockModeType.PESSIMISTIC_READ)
+    @Query("select e from TeacherEvent e where e.status=com.zhixuewuli.entity.TeacherEvent.Status.PUBLISHED and e.classId=:classId order by e.id")
+    List<TeacherEvent> findPublishedTasksForRosterByClass(@Param("classId") Long classId);
 
     @Query("select e from TeacherEvent e where e.status in (com.zhixuewuli.entity.TeacherEvent.Status.PUBLISHED, com.zhixuewuli.entity.TeacherEvent.Status.CLOSED) " +
             "or (e.status=com.zhixuewuli.entity.TeacherEvent.Status.ARCHIVED " +
