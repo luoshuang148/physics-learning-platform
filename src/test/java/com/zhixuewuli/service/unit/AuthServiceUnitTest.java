@@ -55,6 +55,8 @@ class AuthServiceUnitTest extends BaseUnitTest {
     @Mock
     private JwtUtil jwtUtil;
 
+    @Mock private com.zhixuewuli.common.security.AuthUserCache authUserCache;
+
     @InjectMocks
     private AuthServiceImpl authService;
 

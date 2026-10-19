@@ -1,4 +1,18 @@
 services:
+  redis:
+    image: redis:7.4-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--maxmemory-policy", "noeviction"]
+    ports:
+      - "127.0.0.1:6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - zhixuewuli-network
+
   # MySQL 数据库服务
   mysql:
     image: mysql:8.4
@@ -47,6 +61,8 @@ services:
     container_name: zhixuewuli-app
     restart: unless-stopped
     depends_on:
+      redis:
+        condition: service_healthy
       mysql:
         condition: service_healthy
     environment:
@@ -55,6 +71,7 @@ services:
       SPRING_DATASOURCE_URL: "jdbc:mysql://${DB_HOST:-mysql}:${DB_PORT:-3306}/${DB_NAME:-zhixuewuli}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai&characterEncoding=utf8&connectionCollation=utf8mb4_unicode_ci"
       DB_USER: ${DB_USER}
       DB_PASSWORD: ${DB_PASSWORD}
+      REDIS_HOST: redis
       DB_HOST: mysql
       DB_PORT: 3306
       DB_NAME: zhixuewuli

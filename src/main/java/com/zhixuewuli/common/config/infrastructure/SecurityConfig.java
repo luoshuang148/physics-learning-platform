@@ -5,7 +5,7 @@ import com.zhixuewuli.common.config.properties.SecurityProperties;
 import com.zhixuewuli.common.result.Result;
 import com.zhixuewuli.common.security.JwtAuthenticationFilter;
 import com.zhixuewuli.common.util.JwtUtil;
-import com.zhixuewuli.repository.UserRepository;
+import com.zhixuewuli.common.security.AuthUserCache;
 import jakarta.servlet.DispatcherType;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Value;
@@ -77,7 +77,7 @@ public class SecurityConfig {
     }
 
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http, JwtUtil jwtUtil, UserRepository userRepository,
+    public SecurityFilterChain filterChain(HttpSecurity http, JwtUtil jwtUtil, AuthUserCache users,
             ObjectMapper objectMapper, @Value("${springdoc.api-docs.enabled:true}") boolean docsEnabled)
             throws Exception {
         http
@@ -103,7 +103,7 @@ public class SecurityConfig {
                     auth.requestMatchers(HttpMethod.GET, SPA_RESOURCES).permitAll();
                     auth.anyRequest().authenticated();
                 })
-                .addFilterBefore(new JwtAuthenticationFilter(jwtUtil, userRepository),
+                .addFilterBefore(new JwtAuthenticationFilter(jwtUtil, users),
                         UsernamePasswordAuthenticationFilter.class)
                 .exceptionHandling(errors -> errors
                         .authenticationEntryPoint((request, response, e) -> {

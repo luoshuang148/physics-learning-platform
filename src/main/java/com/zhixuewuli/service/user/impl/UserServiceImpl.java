@@ -34,6 +34,7 @@ import java.util.List;
 public class UserServiceImpl implements UserService {
 
     private final UserRepository userRepository;
+    private final com.zhixuewuli.common.security.AuthUserCache authUserCache;
     private final ClassroomGuard classroomGuard;
     private final com.zhixuewuli.service.teacherEvent.TaskRosterService roster;
     private final com.zhixuewuli.repository.TaskRecipientRepository recipients;
@@ -88,7 +89,10 @@ public class UserServiceImpl implements UserService {
             com.zhixuewuli.common.util.DatabaseExceptionParserUtil.throwAppropriateBusinessException(conflict);
             throw conflict;
         }
-        if(request.getPassword()!=null&&!request.getPassword().isEmpty()) userRepository.incrementTokenVersion(currentUserId);
+        if(request.getPassword()!=null&&!request.getPassword().isEmpty()) {
+            userRepository.incrementTokenVersion(currentUserId);
+            authUserCache.invalidateAfterCommit(currentUserId);
+        }
         return saved;
     }
 
@@ -145,7 +149,10 @@ public class UserServiceImpl implements UserService {
         }
 
         User saved=userRepository.save(targetUser);
-        if(request.getUserType()!=null || request.getActive()!=null) userRepository.incrementTokenVersion(userId);
+        if(request.getUserType()!=null || request.getActive()!=null) {
+            userRepository.incrementTokenVersion(userId);
+            authUserCache.invalidateAfterCommit(userId);
+        }
         roster.enroll(saved);
         return saved;
     }
@@ -164,5 +171,6 @@ public class UserServiceImpl implements UserService {
             throw new com.zhixuewuli.common.exception.BusinessException("该用户有关联教学任务，请保留账号并停用以保留历史数据");
         }
         userRepository.delete(targetUser);
+        authUserCache.invalidateAfterCommit(userId);
     }
 }

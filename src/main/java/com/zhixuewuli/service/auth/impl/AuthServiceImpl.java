@@ -54,6 +54,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class AuthServiceImpl implements AuthService {
 
     private final UserRepository userRepository;
+    private final com.zhixuewuli.common.security.AuthUserCache authUserCache;
     private final com.zhixuewuli.service.user.ClassroomGuard classroomGuard;
     private final com.zhixuewuli.service.teacherEvent.TaskRosterService roster;
     private final PasswordUtil passwordUtil;
@@ -158,5 +159,8 @@ public class AuthServiceImpl implements AuthService {
         return savedUser;
     }
     @Override @Transactional
-    public void logout(Long userId){userRepository.incrementTokenVersion(userId);}
+    public void logout(Long userId){
+        userRepository.incrementTokenVersion(userId);
+        authUserCache.invalidateAfterCommit(userId);
+    }
 }

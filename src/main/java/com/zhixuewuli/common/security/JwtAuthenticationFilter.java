@@ -3,10 +3,7 @@ package com.zhixuewuli.common.security;
 import com.zhixuewuli.common.exception.auth.AccountDisabledException;
 import com.zhixuewuli.common.exception.auth.AuthenticationException;
 import com.zhixuewuli.common.exception.auth.InvalidTokenException;
-import com.zhixuewuli.common.exception.auth.UserNotFoundException;
 import com.zhixuewuli.common.util.JwtUtil;
-import com.zhixuewuli.entity.User;
-import com.zhixuewuli.repository.UserRepository;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import jakarta.servlet.FilterChain;
@@ -25,7 +22,7 @@ import java.io.IOException;
  *
  * <p>只负责“你是谁”：令牌无效时不直接拒绝，而是保持匿名并记录原因，
  * 由授权规则决定该路径是否需要登录，公开接口因此不受过期令牌影响。
- * 每次请求都会回库读取用户，以便即时生效的令牌撤销（tokenVersion）、停用和角色变更。</p>
+ * 用户安全快照缓存在 Redis；提交后失效使令牌撤销（tokenVersion）、停用和角色变更即时生效。</p>
  *
  * <p>不注册为 Spring Bean，避免被 Servlet 容器重复注册为普通过滤器。</p>
  */
@@ -38,11 +35,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private static final String BEARER_PREFIX = "Bearer ";
 
     private final JwtUtil jwtUtil;
-    private final UserRepository userRepository;
+    private final AuthUserCache users;
 
-    public JwtAuthenticationFilter(JwtUtil jwtUtil, UserRepository userRepository) {
+    public JwtAuthenticationFilter(JwtUtil jwtUtil, AuthUserCache users) {
         this.jwtUtil = jwtUtil;
-        this.userRepository = userRepository;
+        this.users = users;
     }
 
     @Override
@@ -75,15 +72,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         if (userId == null) {
             throw new InvalidTokenException();
         }
-        User user = userRepository.findById(userId).orElseThrow(UserNotFoundException::new);
-        long currentVersion = user.getTokenVersion() == null ? 0L : user.getTokenVersion();
+        AuthUserCache.Snapshot user = users.get(userId);
+        long currentVersion = user.tokenVersion() == null ? 0L : user.tokenVersion();
         if (JwtUtil.tokenVersion(claims) != currentVersion) {
             throw new InvalidTokenException();
         }
-        if (!Boolean.TRUE.equals(user.getActive())) {
+        if (!Boolean.TRUE.equals(user.active())) {
             throw new AccountDisabledException();
         }
-        return AuthenticatedUser.from(user);
+        return user.principal();
     }
 
     private String extractToken(HttpServletRequest request) {

@@ -17,7 +17,7 @@ import static org.mockito.ArgumentMatchers.*;
 @Tag("unit")
 class TeacherReportResourceRegressionTest {
     private final AIStreamingProperties config = new AIStreamingProperties();
-    private final StreamUtils streams = new StreamUtils(config);
+    private final StreamUtils streams = new StreamUtils(config, com.zhixuewuli.common.redis.LeaseMocks.create());
     private final AnswerRecordRepository answers = mock(AnswerRecordRepository.class);
     private final AliyunAIClient client = mock(AliyunAIClient.class);
     private final com.zhixuewuli.service.ai.report.ReportInputRepository inputs=mock(com.zhixuewuli.service.ai.report.ReportInputRepository.class);

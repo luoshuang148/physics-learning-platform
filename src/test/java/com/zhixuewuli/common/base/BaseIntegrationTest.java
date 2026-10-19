@@ -76,7 +76,15 @@ import java.util.Map;
 @TestPropertySource(locations = "classpath:application-test.yml")
 @Transactional
 @Tag("integration")
-public abstract class BaseIntegrationTest {
+public abstract class BaseIntegrationTest extends com.zhixuewuli.common.redis.RedisTestSupport {
+    @Autowired private org.springframework.data.redis.core.StringRedisTemplate redis;
+    @org.springframework.beans.factory.annotation.Value("${app.redis.namespace}") private String redisNamespace;
+    @org.junit.jupiter.api.BeforeEach
+    void clearRedisState() {
+        var keys = redis.keys(redisNamespace + "*");
+        if (keys != null && !keys.isEmpty()) redis.delete(keys);
+    }
+
 
     @Autowired(required = false)
     protected TestEntityManager entityManager;

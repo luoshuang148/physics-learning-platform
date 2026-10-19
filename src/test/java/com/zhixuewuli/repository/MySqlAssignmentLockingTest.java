@@ -19,7 +19,7 @@ import static org.mockito.Mockito.doAnswer;
 @Tag("mysql")
 @SpringBootTest
 @ActiveProfiles("mysql-test")
-class MySqlAssignmentLockingTest {
+class MySqlAssignmentLockingTest extends com.zhixuewuli.common.redis.RedisTestSupport {
     @Autowired UserRepository users;
     @Autowired QuestionRepository questions;
     @Autowired TeacherEventService teaching;

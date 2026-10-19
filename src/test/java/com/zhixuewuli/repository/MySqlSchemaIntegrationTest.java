@@ -17,7 +17,7 @@ import static org.assertj.core.api.Assertions.*;
 @SpringBootTest
 @ActiveProfiles("mysql-test")
 @Transactional
-class MySqlSchemaIntegrationTest {
+class MySqlSchemaIntegrationTest extends com.zhixuewuli.common.redis.RedisTestSupport {
     @Autowired org.springframework.jdbc.core.JdbcTemplate jdbc;
     @Autowired UserRepository users;
     @Autowired QuestionRepository questions;

@@ -59,6 +59,8 @@ class UserServiceUnitTest extends BaseUnitTest {
     @Mock
     private com.zhixuewuli.repository.TeacherEventRepository teacherEventRepository;
 
+    @Mock private com.zhixuewuli.common.security.AuthUserCache authUserCache;
+
     @InjectMocks
     private UserServiceImpl userService;
 
