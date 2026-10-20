@@ -447,7 +447,7 @@ const clearCurrentMode = async () => {
 }
 
 .history-error {
-  color: rgba(255, 107, 145, 0.92);
+  color: #b91c1c;
 }
 
 .session-tip {

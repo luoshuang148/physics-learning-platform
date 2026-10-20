@@ -68,9 +68,9 @@ const compactMode = computed(() => shouldShowFriendlyEmpty.value && !props.reaso
 
 <style scoped>
 .stream-box {
-  border: 1px solid rgba(151, 172, 249, 0.18);
+  border: 1px solid #e2e8f0;
   border-radius: 16px;
-  background: rgba(255, 255, 255, 0.04);
+  background: #ffffff;
   padding: 16px 18px;
   display: grid;
   gap: 12px;
@@ -86,11 +86,11 @@ const compactMode = computed(() => shouldShowFriendlyEmpty.value && !props.reaso
   gap: 10px;
   align-items: center;
   font-size: 13px;
-  color: #b9c7ea;
+  color: #64748b;
 }
 
 .pulse {
-  color: #5af3d3;
+  color: #0f766e;
   font-weight: 700;
 }
 
@@ -109,14 +109,14 @@ const compactMode = computed(() => shouldShowFriendlyEmpty.value && !props.reaso
 .stream-empty-title {
   font-size: 18px;
   font-weight: 700;
-  color: #eef4ff;
+  color: #172033;
 }
 
 .stream-empty-desc {
   margin: 0;
   font-size: 14px;
   line-height: 1.7;
-  color: #b9c7ea;
+  color: #64748b;
 }
 
 .stream-content,
@@ -125,21 +125,21 @@ const compactMode = computed(() => shouldShowFriendlyEmpty.value && !props.reaso
   font-family: inherit;
   font-size: 15px;
   line-height: 1.72;
-  color: #eef4ff;
+  color: #334155;
 }
 
 .stream-content {
-  background: rgba(8, 11, 24, 0.45);
-  border: 1px solid rgba(151, 172, 249, 0.12);
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
   border-radius: 14px;
   padding: 16px 18px;
   min-height: clamp(260px, 56vh, 720px);
 }
 
 .reasoning-box {
-  border: 1px solid rgba(151, 172, 249, 0.12);
+  border: 1px solid #e2e8f0;
   border-radius: 14px;
-  background: rgba(151, 172, 249, 0.06);
+  background: #f8fafc;
   padding: 12px 14px;
 }
 
@@ -147,21 +147,21 @@ const compactMode = computed(() => shouldShowFriendlyEmpty.value && !props.reaso
   cursor: pointer;
   font-size: 14px;
   font-weight: 700;
-  color: #d6e2ff;
+  color: #334155;
 }
 
 .reasoning-content {
   margin-top: 10px;
   font-size: 14px;
   line-height: 1.64;
-  color: #d8e5ff;
+  color: #475569;
 }
 
 .error-text {
   margin: 0;
   font-size: 14px;
   line-height: 1.7;
-  color: #ff9ab6;
+  color: #b91c1c;
 }
 
 .markdown-body :deep(p) {
@@ -176,7 +176,7 @@ const compactMode = computed(() => shouldShowFriendlyEmpty.value && !props.reaso
 .markdown-body :deep(h2),
 .markdown-body :deep(h3),
 .markdown-body :deep(h4) {
-  color: #5af3d3;
+  color: #0f766e;
   font-weight: 800;
   line-height: 1.3;
 }
@@ -201,17 +201,19 @@ const compactMode = computed(() => shouldShowFriendlyEmpty.value && !props.reaso
   font-size: 17px;
 }
 
-.markdown-body :deep(strong) { color: #ffd700; font-weight: 700; }
-.markdown-body :deep(em) { color: #ff8eb0; font-style: italic; }
+.markdown-body :deep(strong) { color: #92400e; font-weight: 700; }
+.markdown-body :deep(em) { color: #be123c; font-style: italic; }
 .markdown-body :deep(code) {
-  background: rgba(255,255,255,0.1);
+  background: #f1f5f9;
+  color: #0f766e;
   padding: 2px 6px;
   border-radius: 4px;
   font-family: 'Courier New', monospace;
   font-size: 0.92em;
 }
 .markdown-body :deep(pre) {
-  background: rgba(0,0,0,0.3);
+  background: #f1f5f9;
+  color: #334155;
   padding: 14px 16px;
   border-radius: 10px;
   overflow-x: auto;
@@ -221,18 +223,18 @@ const compactMode = computed(() => shouldShowFriendlyEmpty.value && !props.reaso
 .markdown-body :deep(ul),
 .markdown-body :deep(ol) { margin: 0.6em 0 0.85em; padding-left: 1.5em; }
 .markdown-body :deep(li) { margin: 0.28em 0; line-height: 1.7; }
-.markdown-body :deep(a) { color: #7cf5dd; text-decoration: underline; }
+.markdown-body :deep(a) { color: #2563eb; text-decoration: underline; }
 .markdown-body :deep(blockquote) {
   margin: 0.9em 0;
   padding: 0.7em 0.95em;
-  border-left: 3px solid rgba(90,243,211,0.5);
-  background: rgba(90,243,211,0.06);
-  color: #dce8ff;
+  border-left: 3px solid #0f766e;
+  background: #ecfdf5;
+  color: #475569;
 }
 .markdown-body :deep(.katex) { font-size: 1.05em; }
 .markdown-body :deep(.katex-display) { margin: 0.95em 0; text-align: center; }
 .markdown-body :deep(.katex-display .katex) { display: inline-block; }
-.markdown-body :deep(.katex-error) { color: #ff9ab6; font-style: italic; }
+.markdown-body :deep(.katex-error) { color: #b91c1c; font-style: italic; }
 
 /* GFM 表格样式 */
 .markdown-body :deep(table) {
@@ -243,24 +245,24 @@ const compactMode = computed(() => shouldShowFriendlyEmpty.value && !props.reaso
 }
 .markdown-body :deep(th),
 .markdown-body :deep(td) {
-  border: 1px solid rgba(90,243,211,0.3);
+  border: 1px solid #e2e8f0;
   padding: 8px 12px;
   text-align: left;
 }
 .markdown-body :deep(th) {
-  background: rgba(90,243,211,0.12);
+  background: #f8fafc;
   font-weight: 700;
-  color: #5af3d3;
+  color: #0f766e;
 }
 .markdown-body :deep(tr:nth-child(even)) {
-  background: rgba(255,255,255,0.03);
+  background: #f8fafc;
 }
 
 /* GFM 删除线样式 */
 .markdown-body :deep(del),
 .markdown-body :deep(s),
 .markdown-body :deep(strike) {
-  color: #888;
+  color: #94a3b8;
   text-decoration: line-through;
 }
 
@@ -276,6 +278,6 @@ const compactMode = computed(() => shouldShowFriendlyEmpty.value && !props.reaso
 }
 .markdown-body :deep(input[type="checkbox"]) {
   margin-top: 6px;
-  accent-color: #5af3d3;
+  accent-color: #0f766e;
 }
 </style>

@@ -455,7 +455,7 @@ select:focus {
 
 .link-inline {
   font-size: 12px;
-  color: #9dd9ff;
+  color: #2563eb;
 }
 
 .stream-box {
@@ -995,13 +995,6 @@ select:focus {
 .meta-label {
   color: #64748b !important;
 }
-.ai-fab {
-  background: #0f766e !important;
-  border: 1px solid #0f766e !important;
-  box-shadow: 0 8px 24px rgba(15, 118, 110, 0.22) !important;
-}
-.ai-fab-icon,
-.ai-fab-label { color: #ffffff !important; }
 .ai-drawer-head,
 .wap-header,
 .ai-dialog-head {

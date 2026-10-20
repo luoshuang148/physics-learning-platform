@@ -82,6 +82,6 @@ const onSubmit = async () => {
 .teacher-code-tip {
   margin: -4px 0 2px;
   font-size: var(--font-size-sm);
-  color: rgba(151, 172, 249, 0.78);
+  color: #64748b;
 }
 </style>

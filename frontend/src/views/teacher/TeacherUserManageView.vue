@@ -700,6 +700,14 @@ select.field-input option {
 .overview-chip strong { color: #172033 !important; }
 .field-label { color: #334155 !important; }
 .field-input { color: #172033 !important; background: #fff !important; border: 1px solid #dbe3ec !important; }
+.user-role.student { color: #0f766e !important; background: #ecfdf5 !important; }
+.user-role.teacher { color: #9d174d !important; background: #fdf2f8 !important; }
+.user-item-meta,
+.footer-time,
+.editor-sub {
+  color: #64748b !important;
+}
+.danger-btn { color: #b91c1c !important; background: #fef2f2 !important; border-color: #fecaca !important; }
 .toggle-btn.on { color: #0f766e !important; background: #ecfdf5 !important; border-color: #a7f3d0 !important; }
 .toggle-btn.off { color: #b91c1c !important; background: #fef2f2 !important; border-color: #fecaca !important; }
 @media (max-width: 900px) { .hero-stats { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; } }

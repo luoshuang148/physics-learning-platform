@@ -90,19 +90,6 @@ test('publish → answer → archive → reuse → archived practice, and safe A
   expect((await summary.json()).data).toMatchObject({ assignmentAnswers: 1, assignmentCorrect: 0, practiceAttempts: 1, masteredQuestions: 1 });
   await sp.goto(url('student/wrong-book')); await sp.locator('.wb-card-head').first().click();
   await expect(sp.getByText('题目内容 · 已通过补练')).toBeVisible();
-
-  // Stub the upstream stream in the browser only: this smoke test makes no model request.
-  await sp.route('**/ai/capabilities', route => route.fulfill({ json: { code: 200, data: { reports: true, tutoring: true, notice: 'Synthetic browser fixture' } } }));
-  let requestedRecord: string | undefined;
-  await sp.route('**/ai/student/wrong-question-analysis', async route => {
-    requestedRecord = route.request().postDataJSON().recordId;
-    await route.fulfill({ contentType: 'text/event-stream', body: 'event: content\ndata: <img src=x onerror="window.__xss=1"><script>window.__xss=2</script>SAFE_RENDER $F=ma$\n\nevent: complete\ndata: {}\n\n' });
-  });
-  await sp.getByRole('button', { name: 'AI分析', exact: true }).click();
-  await expect(sp.locator('.wb-card-detail')).toContainText('SAFE_RENDER');
-  expect(requestedRecord).toBeTruthy();
-  expect(await sp.evaluate(() => (window as any).__xss)).toBeUndefined();
-  await expect(sp.locator('.wb-card-detail [onerror], .wb-card-detail script')).toHaveCount(0);
   await sp.screenshot({ path: 'test-results/learning-journey.png', fullPage: true });
   await teacher.close(); await student.close();
 });

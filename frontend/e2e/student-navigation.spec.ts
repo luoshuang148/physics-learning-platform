@@ -68,7 +68,7 @@ test('student desktop has shared top navigation and preserves assignment entry a
   await noOverflow(page);
 });
 
-test('student mobile navigation stays accessible and the AI button clears it after dragging', async ({ page }) => {
+test('student mobile navigation stays accessible', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await fixture(page);
   await page.goto('student/home');
@@ -80,23 +80,6 @@ test('student mobile navigation stays accessible and the AI button clears it aft
   await expect(page).toHaveURL(/student\/task$/);
   await page.getByRole('button', { name: '开始作答' }).click();
   await expect(nav.getByRole('link', { name: '作业', exact: true })).toHaveAttribute('aria-current', 'page');
-  const fab = page.locator('.ai-fab');
-  let bounds = await fab.boundingBox();
-  await page.mouse.move(bounds!.x + 20, bounds!.y + 20);
-  await page.mouse.down();
-  await page.mouse.move(bounds!.x + 20, 830, { steps: 6 });
-  await page.mouse.up();
-  bounds = await fab.boundingBox();
-  const navBounds = await nav.boundingBox();
-  expect(bounds!.y + bounds!.height).toBeLessThanOrEqual(navBounds!.y);
-  await page.waitForTimeout(100); // Drag release briefly suppresses clicks.
-  await page.getByRole('button', { name: '打开 AI 学习助手', exact: true }).click();
-  await expect(page.locator('.ai-drawer')).toBeVisible();
-  const drawer = await page.locator('.ai-drawer').boundingBox();
-  expect(drawer!.y).toBeGreaterThanOrEqual(0);
-  expect(drawer!.x).toBeGreaterThanOrEqual(0);
-  expect(drawer!.y + drawer!.height).toBeLessThanOrEqual(navBounds!.y);
-  await page.getByRole('button', { name: '关闭 AI 学习助手', exact: true }).click();
   await noOverflow(page);
   await page.getByRole('button', { name: '个人菜单', exact: true }).click();
   await page.getByRole('button', { name: '设置', exact: true }).click();
@@ -142,7 +125,7 @@ test('teacher uses the shared desktop navigation and retains account controls', 
   await noOverflow(page);
 });
 
-test('teacher mobile bottom navigation clears content and AI controls at maximum font size', async ({ page }) => {
+test('teacher mobile bottom navigation clears content at maximum font size', async ({ page }) => {
   await fixture(page, 'TEACHER');
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('teacher/dashboard');
@@ -158,22 +141,6 @@ test('teacher mobile bottom navigation clears content and AI controls at maximum
     await expect(nav.getByRole('link', { name: label, exact: true })).toHaveAttribute('aria-current', 'page');
     await noOverflow(page);
   }
-  const fab = page.locator('.ai-fab');
-  const bounds = await fab.boundingBox();
-  await page.mouse.move(bounds!.x + 20, bounds!.y + 20);
-  await page.mouse.down();
-  await page.mouse.move(bounds!.x + 20, 830, { steps: 6 });
-  await page.mouse.up();
-  const navBounds = await nav.boundingBox();
-  const dragged = await fab.boundingBox();
-  expect(dragged!.y + dragged!.height).toBeLessThanOrEqual(navBounds!.y);
-  await page.waitForTimeout(100);
-  await page.getByRole('button', { name: '打开 AI 学习助手', exact: true }).click();
-  await expect(page.locator('.ai-drawer')).toBeVisible();
-  const drawer = await page.locator('.ai-drawer').boundingBox();
-  expect(drawer!.y).toBeGreaterThanOrEqual(0);
-  expect(drawer!.y + drawer!.height).toBeLessThanOrEqual(navBounds!.y);
-  await page.getByRole('button', { name: '关闭 AI 学习助手', exact: true }).click();
   await page.setViewportSize({ width: 320, height: 720 });
   await expect(nav.getByRole('link', { name: '学生学情', exact: true })).toBeVisible();
   await noOverflow(page);

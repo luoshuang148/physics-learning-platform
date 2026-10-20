@@ -455,9 +455,9 @@ const doDelete = async () => {
   border-radius: 999px;
   border: 1px solid rgba(255,255,255,0.08);
 }
-.diff-easy { color: rgba(120,220,150,0.9); }
-.diff-mid { color: rgba(255,180,60,0.9); }
-.diff-hard { color: rgba(255,100,100,0.9); }
+.diff-easy { color: #15803d; }
+.diff-mid { color: #b45309; }
+.diff-hard { color: #b91c1c; }
 .qm-item-actions { margin-left: auto; display: flex; gap: 6px; }
 .icon-act {
   width: 28px;
@@ -492,7 +492,7 @@ const doDelete = async () => {
   color: var(--text-muted);
   background: rgba(151,172,249,0.08);
 }
-.qm-opt-chip.correct { color: rgba(120,220,150,0.95); background: rgba(120,220,150,0.1); }
+.qm-opt-chip.correct { color: #15803d; background: #ecfdf5; }
 .qm-form-panel {
   border: 1px solid rgba(151,172,249,0.15);
   border-radius: 14px;
@@ -524,7 +524,7 @@ const doDelete = async () => {
 .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .half { min-width: 0; }
 .form-label { font-size: 12px; color: var(--text-muted); }
-.form-required { color: #ff6b91; }
+.form-required { color: #dc2626; }
 .form-textarea,
 .form-input,
 .opt-input {
@@ -541,8 +541,8 @@ const doDelete = async () => {
   gap: 10px;
   padding: 14px;
   border-radius: 14px;
-  border: 1px dashed rgba(90,243,211,0.32);
-  background: linear-gradient(180deg, rgba(90,243,211,0.08), rgba(151,172,249,0.05));
+  border: 1px dashed rgba(15,118,110,0.35);
+  background: #f8fdfb;
   cursor: pointer;
 }
 .image-upload-box.uploading {
@@ -550,9 +550,9 @@ const doDelete = async () => {
   pointer-events: none;
 }
 .image-upload-box.dragging {
-  border-color: rgba(90,243,211,0.7);
-  background: linear-gradient(180deg, rgba(90,243,211,0.16), rgba(151,172,249,0.08));
-  box-shadow: 0 0 0 3px rgba(90,243,211,0.12);
+  border-color: #0f766e;
+  background: #ecfdf5;
+  box-shadow: 0 0 0 3px rgba(15,118,110,0.12);
 }
 .image-file-input {
   display: none;
@@ -562,7 +562,7 @@ const doDelete = async () => {
   gap: 4px;
 }
 .image-upload-copy strong {
-  color: #d9fff4;
+  color: #0f766e;
   font-size: 13px;
 }
 .image-upload-copy span {
@@ -599,9 +599,9 @@ const doDelete = async () => {
 .image-remove-btn {
   padding: 8px 12px;
   border-radius: 10px;
-  border: 1px solid rgba(255,107,145,0.35);
-  background: rgba(255,107,145,0.12);
-  color: #ff9ab4;
+  border: 1px solid #fecaca;
+  background: #fef2f2;
+  color: #b91c1c;
   cursor: pointer;
 }
 .form-textarea { resize: vertical; }
@@ -635,9 +635,9 @@ const doDelete = async () => {
 .field-tip {
   padding: 8px 12px;
   border-radius: 10px;
-  border: 1px solid rgba(151,172,249,0.12);
-  background: linear-gradient(180deg, rgba(151,172,249,0.08), rgba(151,172,249,0.04));
-  color: rgba(214,224,255,0.72);
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  color: #475569;
   font-size: 12px;
   line-height: 1.5;
 }
@@ -654,7 +654,7 @@ const doDelete = async () => {
  .opt-row.correct .opt-input {
   border-color: rgba(120,220,150,0.35);
 }
-.opt-correct-mark { color: rgba(120,220,150,0.95); font-weight: 700; }
+.opt-correct-mark { color: #15803d; font-weight: 700; }
 .form-hint { font-size: 11px; color: var(--text-muted); opacity: 0.7; }
 .diff-picker { display: flex; gap: 6px; flex-wrap: wrap; }
 .diff-pick-btn {
@@ -689,14 +689,14 @@ const doDelete = async () => {
   cursor: pointer;
 }
 .cancel-btn {
-  border: 1px solid rgba(151,172,249,0.16);
-  background: rgba(255,255,255,0.03);
-  color: var(--text-muted);
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  color: #475569;
 }
 .submit-btn {
-  border: 1px solid rgba(90,243,211,0.5);
-  background: linear-gradient(120deg, rgba(90,243,211,0.9), rgba(124,245,221,0.85));
-  color: #061016;
+  border: 1px solid #0f766e;
+  background: #0f766e;
+  color: #ffffff;
 }
 .submit-btn:disabled { opacity: 0.65; cursor: not-allowed; }
 
@@ -714,17 +714,17 @@ const doDelete = async () => {
 .dialog {
   width: min(100%, 360px);
   border-radius: 14px;
-  border: 1px solid rgba(151,172,249,0.18);
-  background: linear-gradient(160deg, rgba(20,25,50,0.98), rgba(12,16,34,0.98));
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
   padding: 18px;
 }
-.dialog-title { font-size: 18px; font-weight: 700; color: var(--text-primary); }
-.dialog-body { margin-top: 10px; font-size: var(--font-size-sm); color: var(--text-muted); line-height: 1.7; }
+.dialog-title { font-size: 18px; font-weight: 700; color: #172033; }
+.dialog-body { margin-top: 10px; font-size: var(--font-size-sm); color: #64748b; line-height: 1.7; }
 .dialog-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }
 .danger-btn {
-  border: 1px solid rgba(255,107,145,0.45);
-  background: rgba(255,107,145,0.14);
-  color: #ff8fab;
+  border: 1px solid #fecaca;
+  background: #fef2f2;
+  color: #b91c1c;
 }
 
 .ai-mask { z-index: 140; }

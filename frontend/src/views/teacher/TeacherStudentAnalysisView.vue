@@ -624,7 +624,7 @@ onMounted(loadInsights);
 .detail-student-name,
 .question-title {
   font-weight: 800;
-  color: #eef4ff;
+  color: #172033;
 }
 
 .student-rate,
@@ -639,17 +639,17 @@ onMounted(loadInsights);
 .rate-high,
 .fail-text,
 .record-item.wrong .record-badge {
-  color: rgba(255, 152, 152, 0.96);
+  color: #b91c1c;
 }
 
 .rate-mid {
-  color: rgba(255, 198, 112, 0.96);
+  color: #b45309;
 }
 
 .rate-low,
 .ok-text,
 .record-item.correct .record-badge {
-  color: rgba(120, 220, 150, 0.96);
+  color: #15803d;
 }
 
 .student-detail-panel {

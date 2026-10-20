@@ -45,7 +45,7 @@
           <div v-if="expandedId === item.recordId" class="wb-card-detail">
             <section class="wb-detail-block">
               <h3 class="wb-section-title">题目内容 · {{ (detailOf(item)?.correct ?? item.correct) ? '已通过补练' : '待掌握' }}</h3>
-              <button class="wb-ai-clear-btn" @click="practice(item)">针对性补练</button>
+              <button class="wb-practice-btn" @click="practice(item)">针对性补练</button>
               <div v-if="detailOf(item)" class="wb-detail-q"><LatexText :content="detailOf(item)!.questionContent" /></div>
               <div v-else class="muted">{{ detailLoading[item.recordId] ? '正在加载详情…' : '详情加载失败' }}</div>
               <div v-if="detailOf(item)?.imageBase64" class="wb-question-image-wrap">
@@ -77,107 +77,6 @@
                 <LatexText :content="detailOf(item)!.questionAnalysis!" />
               </div>
             </section>
-
-            <section class="wb-ai-panel">
-              <div class="wb-ai-head">
-                <div>
-                  <div class="wb-ai-title">AI 追问</div>
-                </div>
-                <button
-                  v-if="hasInitialAnalysis(item.recordId)"
-                  class="wb-ai-fill-btn"
-                  :disabled="aiState.loading"
-                  @click="fillSuggestedQuestion(item)"
-                >推荐问题</button>
-              </div>
-
-              <div class="wb-ai-history">
-                <div v-if="!getMessages(item.recordId).length && !isCurrentLoading(item.recordId)" class="wb-ai-empty">
-                  暂无追问记录
-                </div>
-
-                <div v-for="msg in getMessages(item.recordId)" :key="msg.id" class="wb-ai-msg" :class="msg.role">
-                  <div class="wb-ai-msg-head">
-                    <span class="wb-ai-role">{{ msg.role === 'user' ? '我' : 'AI' }}</span>
-                    <span v-if="msg.meta" class="wb-ai-meta">{{ msg.meta }}</span>
-                  </div>
-                  <pre v-if="msg.role === 'user'" class="wb-ai-user">{{ msg.content }}</pre>
-                  <StreamOutput
-                    v-else
-                    :loading="false"
-                    :progress="0"
-                    :content="msg.content"
-                    :reasoning="msg.reasoning ?? ''"
-                    :token-usage="msg.tokenUsage ?? ''"
-                    :error="msg.error ?? ''"
-                  />
-                </div>
-
-                <div v-if="isCurrentLoading(item.recordId)" class="wb-ai-msg assistant">
-                  <div class="wb-ai-msg-head">
-                    <span class="wb-ai-role">AI</span>
-                    <span class="wb-ai-meta">正在分析… {{ aiState.progress }}%</span>
-                  </div>
-                  <StreamOutput
-                    :loading="aiState.loading"
-                    :progress="aiState.progress"
-                    :content="aiState.content"
-                    :reasoning="aiState.reasoning"
-                    :token-usage="aiState.tokenUsage"
-                    :error="aiState.error"
-                  />
-                </div>
-              </div>
-
-              <div v-if="hasInitialAnalysis(item.recordId)" class="wb-ai-composer">
-                <textarea
-                  v-model="aiQuestions[item.recordId]"
-                  :ref="(el) => setQuestionInputRef(item.recordId, el as Element | null)"
-                  class="wb-ai-textarea"
-                  rows="4"
-                  placeholder="输入你的追问"
-                />
-
-                <div class="wb-ai-actions">
-                  <div class="wb-ai-tools">
-                    <button
-                      class="wb-ai-icon-btn"
-                      type="button"
-                      :class="{ active: speechSupported && speechListeningRecordId === item.recordId }"
-                      :disabled="aiState.loading || !speechSupported"
-                      @click="toggleSpeechInput(item.recordId)"
-                      aria-label="语音输入"
-                    >
-                      <span>语音</span>
-                    </button>
-                    <button class="wb-ai-clear-btn" :disabled="aiState.loading" @click="clearMessages(item.recordId)">清空</button>
-                  </div>
-                  <button
-                    v-if="isCurrentLoading(item.recordId)"
-                    class="wb-ai-stop-btn"
-                    @click="stopCurrentAnalysis(item.recordId)"
-                  >停止分析</button>
-                  <button
-                    class="wb-ai-send-btn"
-                    :disabled="aiState.loading || !aiQuestions[item.recordId]?.trim()"
-                    @click="submitQuestionAsk(item)"
-                  >{{ aiState.loading && currentRecordId === item.recordId ? '分析中…' : '发送追问' }}</button>
-                </div>
-              </div>
-
-              <div v-else class="wb-ai-initial-actions">
-                <button
-                  v-if="isCurrentLoading(item.recordId)"
-                  class="wb-ai-stop-btn"
-                  @click="stopCurrentAnalysis(item.recordId)"
-                >停止分析</button>
-                <button
-                  class="wb-ai-send-btn"
-                  :disabled="aiState.loading"
-                  @click="startInitialAnalysis(item)"
-                >{{ aiState.loading && currentRecordId === item.recordId ? '分析中…' : 'AI分析' }}</button>
-              </div>
-            </section>
           </div>
         </div>
       </div>
@@ -196,72 +95,15 @@ import { useRouter } from 'vue-router';
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import AppShell from '@/layouts/AppShell.vue';
 import LatexText from '@/components/LatexText.vue';
-import StreamOutput from '@/components/StreamOutput.vue';
 import { useAuthStore } from '@/stores/auth';
 import { getAnswerRecordDetailApi, getPracticeReviewPageApi } from '@/api/answer-record';
-import { streamWrongQuestionAnalysis } from '@/api/ai';
-import { useAIStreamState } from '@/composables/useAIStreamState';
 import type { AnswerRecordResponse, AnswerRecordSummary } from '@/types/answer-record';
-
-interface WrongBookChatMessage {
-  id: string;
-  role: 'user' | 'assistant';
-  content: string;
-  reasoning?: string;
-  tokenUsage?: string;
-  error?: string;
-  meta?: string;
-}
-
-declare global {
-  interface Window {
-    SpeechRecognition?: new () => SpeechRecognition;
-    webkitSpeechRecognition?: new () => SpeechRecognition;
-  }
-}
-
-interface SpeechRecognition extends EventTarget {
-  continuous: boolean;
-  interimResults: boolean;
-  lang: string;
-  onresult: ((event: SpeechRecognitionEvent) => void) | null;
-  onerror: ((event: SpeechRecognitionErrorEvent) => void) | null;
-  onend: (() => void) | null;
-  start: () => void;
-  stop: () => void;
-}
-
-interface SpeechRecognitionEvent {
-  resultIndex: number;
-  results: SpeechRecognitionResultList;
-}
-
-interface SpeechRecognitionErrorEvent {
-  error: string;
-}
-
-interface SpeechRecognitionResultList {
-  length: number;
-  [index: number]: SpeechRecognitionResult;
-}
-
-interface SpeechRecognitionResult {
-  isFinal: boolean;
-  length: number;
-  [index: number]: SpeechRecognitionAlternative;
-}
-
-interface SpeechRecognitionAlternative {
-  transcript: string;
-}
 
 const practiceRouter = useRouter();
 const practice = (item: Pick<AnswerRecordSummary, 'eventId' | 'questionId'>) => {
  practiceRouter.push({path:'/student/practice',query:{eventId:item.eventId ?? undefined,questionId:item.questionId}});
 };
 const auth = useAuthStore();
-const { state: aiState, reset: resetAIState } = useAIStreamState();
-
 
 const loading = ref(false);
 const loadingMore = ref(false);
@@ -276,77 +118,6 @@ const searchText = ref('');
 const expandedId = ref<string | null>(null);
 const detailOf = (item: AnswerRecordSummary) => details.value[item.recordId];
 let searchTimer: ReturnType<typeof setTimeout> | undefined;
-const currentRecordId = ref<string | null>(null);
-const activeAbortController = ref<AbortController | null>(null);
-const aiQuestions = ref<Record<string, string>>({});
-const aiMessages = ref<Record<string, WrongBookChatMessage[]>>({});
-const questionInputRefs = new Map<string, HTMLTextAreaElement>();
-// 检测语音输入是否可用：需要安全上下文 + 浏览器支持
-const isSecureContext = typeof window !== 'undefined' && window.isSecureContext;
-const speechSupported = typeof window !== 'undefined' && Boolean(window.SpeechRecognition || window.webkitSpeechRecognition) && isSecureContext;
-const speechListeningRecordId = ref<string | null>(null);
-let speechRecognition: SpeechRecognition | null = null;
-
-const ensureSpeechRecognition = () => {
-  if (!speechSupported || speechRecognition) return speechRecognition;
-  const RecognitionCtor = window.SpeechRecognition ?? window.webkitSpeechRecognition;
-  if (!RecognitionCtor) return null;
-  speechRecognition = new RecognitionCtor();
-  speechRecognition.continuous = false;
-  speechRecognition.interimResults = false;
-  speechRecognition.lang = 'zh-CN';
-  speechRecognition.onresult = (event: SpeechRecognitionEvent) => {
-    const recordId = speechListeningRecordId.value;
-    if (!recordId) return;
-    let transcript = '';
-    for (let i = event.resultIndex; i < event.results.length; i += 1) {
-      transcript += event.results[i][0]?.transcript ?? '';
-    }
-    const normalized = transcript.trim();
-    if (!normalized) return;
-    const current = aiQuestions.value[recordId]?.trim() ?? '';
-    aiQuestions.value[recordId] = current ? `${current} ${normalized}` : normalized;
-    questionInputRefs.get(recordId)?.focus();
-  };
-  speechRecognition.onerror = (event: SpeechRecognitionErrorEvent) => {
-    speechListeningRecordId.value = null;
-    // 处理常见错误：权限被拒绝、静默失败
-    if (event.error === 'not-allowed' || event.error === 'denied') {
-      console.warn('语音输入权限被拒绝，请检查浏览器麦克风权限设置');
-    }
-  };
-  speechRecognition.onend = () => {
-    speechListeningRecordId.value = null;
-  };
-  return speechRecognition;
-};
-
-const toggleSpeechInput = (recordId: string) => {
-  const recognition = ensureSpeechRecognition();
-  if (!recognition || aiState.value.loading) return;
-  if (speechListeningRecordId.value === recordId) {
-    recognition.stop();
-    speechListeningRecordId.value = null;
-    return;
-  }
-  // 启动前先聚焦输入框，防止权限弹窗导致焦点丢失
-  questionInputRefs.get(recordId)?.focus();
-  speechListeningRecordId.value = recordId;
-  try {
-    recognition.start();
-  } catch {
-    speechListeningRecordId.value = null;
-  }
-};
-
-const setQuestionInputRef = (recordId: string, el: Element | null) => {
-  if (el instanceof HTMLTextAreaElement) {
-    questionInputRefs.set(recordId, el);
-    return;
-  }
-  questionInputRefs.delete(recordId);
-};
-
 const toggleExpand = async (item: AnswerRecordSummary) => {
   if (expandedId.value === item.recordId) {
     expandedId.value = null;
@@ -369,251 +140,6 @@ const toggleExpand = async (item: AnswerRecordSummary) => {
 
 const formatTime = (time: string) =>
   new Date(time).toLocaleString('zh-CN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-
-const formatNow = () => new Date().toLocaleString('zh-CN', {
-  month: '2-digit',
-  day: '2-digit',
-  hour: '2-digit',
-  minute: '2-digit',
-});
-
-const getMessages = (recordId: string) => aiMessages.value[recordId] ?? [];
-const hasInitialAnalysis = (recordId: string) => getMessages(recordId).some(message => message.role === 'assistant' && !message.error);
-const isCurrentLoading = (recordId: string) => aiState.value.loading && currentRecordId.value === recordId;
-
-const normalizeAIError = (raw: string | undefined) => {
-  const message = raw ?? '';
-  if (!message) return 'AI 服务暂不可用，请稍后重试。';
-  if (message.includes('401') || message.includes('API密钥') || message.includes('认证失败')) {
-    return 'AI 服务认证失败，请联系管理员检查配置。';
-  }
-  return message;
-};
-
-const isAbortError = (error: unknown) => {
-  if (!error) return false;
-  return (error instanceof DOMException && error.name === 'AbortError')
-    || (typeof error === 'object' && (error as { name?: string }).name === 'AbortError');
-};
-
-const fillSuggestedQuestion = (item: AnswerRecordSummary) => {
-  aiQuestions.value[item.recordId] = '请结合正确答案和题目解析，分析我为什么会做错，并告诉我以后如何避免类似错误。';
-};
-
-const buildInitialQuestion = (_item: AnswerRecordSummary) =>
-  '请结合正确答案和题目解析，分析我为什么会做错，并告诉我以后如何避免类似错误。';
-
-const clearMessages = (recordId: string) => {
-  aiMessages.value[recordId] = [];
-  aiQuestions.value[recordId] = '';
-  if (currentRecordId.value === recordId) {
-    activeAbortController.value?.abort();
-    currentRecordId.value = null;
-    resetAIState();
-  }
-};
-
-const stopCurrentAnalysis = (recordId: string) => {
-  if (!isCurrentLoading(recordId)) return;
-  activeAbortController.value?.abort();
-};
-
-const submitQuestionAsk = async (item: AnswerRecordSummary) => {
-  const prompt = aiQuestions.value[item.recordId]?.trim() ?? '';
-  if (!prompt || aiState.value.loading) return;
-
-  currentRecordId.value = item.recordId;
-  if (!aiMessages.value[item.recordId]) aiMessages.value[item.recordId] = [];
-
-  aiMessages.value[item.recordId].push({
-    id: `user-${Date.now()}`,
-    role: 'user',
-    content: prompt,
-    meta: formatNow(),
-  });
-
-  resetAIState();
-  aiState.value.loading = true;
-  aiQuestions.value[item.recordId] = '';
-  const abortController = new AbortController();
-  activeAbortController.value = abortController;
-
-  try {
-    await streamWrongQuestionAnalysis(
-      { question: prompt, questionId: item.questionId, recordId: item.recordId },
-      {
-        signal: abortController.signal,
-        sessionType: `student_wrong_book_${item.recordId}`,
-        onMessage: (payload) => {
-          aiState.value.content += payload.content;
-        },
-        onProgress: (payload) => {
-          aiState.value.progress = payload.progress ?? aiState.value.progress;
-        },
-        onReasoning: (payload) => {
-          aiState.value.reasoning += payload.reasoning;
-        },
-        onComplete: (payload) => {
-          aiState.value.loading = false;
-          aiState.value.tokenUsage = `Token: ${payload.totalTokens ?? 0} (in ${payload.promptTokens ?? 0} / out ${payload.completionTokens ?? 0})`;
-          aiMessages.value[item.recordId].push({
-            id: `assistant-${Date.now()}`,
-            role: 'assistant',
-            content: aiState.value.content,
-            reasoning: aiState.value.reasoning,
-            tokenUsage: aiState.value.tokenUsage,
-            meta: formatNow(),
-          });
-          resetAIState();
-          currentRecordId.value = null;
-        },
-        onError: (payload) => {
-          aiState.value.loading = false;
-          aiState.value.error = normalizeAIError(payload.message);
-          aiMessages.value[item.recordId].push({
-            id: `assistant-error-${Date.now()}`,
-            role: 'assistant',
-            content: aiState.value.content,
-            reasoning: aiState.value.reasoning,
-            error: aiState.value.error,
-            meta: formatNow(),
-          });
-          resetAIState();
-          currentRecordId.value = null;
-        },
-      }
-    );
-  } catch (error: any) {
-    if (isAbortError(error)) {
-      aiState.value.loading = false;
-      if (aiState.value.content || aiState.value.reasoning) {
-        aiMessages.value[item.recordId].push({
-          id: `assistant-abort-${Date.now()}`,
-          role: 'assistant',
-          content: aiState.value.content,
-          reasoning: aiState.value.reasoning,
-          tokenUsage: '已手动停止',
-          meta: formatNow(),
-        });
-      }
-      resetAIState();
-      currentRecordId.value = null;
-      return;
-    }
-
-    aiState.value.loading = false;
-    aiState.value.error = normalizeAIError(error?.message);
-    aiMessages.value[item.recordId].push({
-      id: `assistant-catch-${Date.now()}`,
-      role: 'assistant',
-      content: aiState.value.content,
-      reasoning: aiState.value.reasoning,
-      error: aiState.value.error,
-      meta: formatNow(),
-    });
-    resetAIState();
-    currentRecordId.value = null;
-  } finally {
-    if (activeAbortController.value === abortController) {
-      activeAbortController.value = null;
-    }
-  }
-};
-
-const startInitialAnalysis = async (item: AnswerRecordSummary) => {
-  if (aiState.value.loading) return;
-
-  currentRecordId.value = item.recordId;
-  if (!aiMessages.value[item.recordId]) aiMessages.value[item.recordId] = [];
-
-  resetAIState();
-  aiState.value.loading = true;
-  aiQuestions.value[item.recordId] = '';
-  const abortController = new AbortController();
-  activeAbortController.value = abortController;
-
-  try {
-    const question = buildInitialQuestion(item);
-    await streamWrongQuestionAnalysis(
-      { question, questionId: item.questionId, recordId: item.recordId },
-      {
-        signal: abortController.signal,
-        sessionType: `student_wrong_book_${item.recordId}`,
-        onMessage: (payload) => {
-          aiState.value.content += payload.content;
-        },
-        onProgress: (payload) => {
-          aiState.value.progress = payload.progress ?? aiState.value.progress;
-        },
-        onReasoning: (payload) => {
-          aiState.value.reasoning += payload.reasoning;
-        },
-        onComplete: (payload) => {
-          aiState.value.loading = false;
-          aiState.value.tokenUsage = `Token: ${payload.totalTokens ?? 0} (in ${payload.promptTokens ?? 0} / out ${payload.completionTokens ?? 0})`;
-          aiMessages.value[item.recordId].push({
-            id: `assistant-${Date.now()}`,
-            role: 'assistant',
-            content: aiState.value.content,
-            reasoning: aiState.value.reasoning,
-            tokenUsage: aiState.value.tokenUsage,
-            meta: formatNow(),
-          });
-          resetAIState();
-          currentRecordId.value = null;
-        },
-        onError: (payload) => {
-          aiState.value.loading = false;
-          aiState.value.error = normalizeAIError(payload.message);
-          aiMessages.value[item.recordId].push({
-            id: `assistant-error-${Date.now()}`,
-            role: 'assistant',
-            content: aiState.value.content,
-            reasoning: aiState.value.reasoning,
-            error: aiState.value.error,
-            meta: formatNow(),
-          });
-          resetAIState();
-          currentRecordId.value = null;
-        },
-      }
-    );
-  } catch (error: any) {
-    if (isAbortError(error)) {
-      aiState.value.loading = false;
-      if (aiState.value.content || aiState.value.reasoning) {
-        aiMessages.value[item.recordId].push({
-          id: `assistant-abort-${Date.now()}`,
-          role: 'assistant',
-          content: aiState.value.content,
-          reasoning: aiState.value.reasoning,
-          tokenUsage: '已手动停止',
-          meta: formatNow(),
-        });
-      }
-      resetAIState();
-      currentRecordId.value = null;
-      return;
-    }
-
-    aiState.value.loading = false;
-    aiState.value.error = normalizeAIError(error?.message);
-    aiMessages.value[item.recordId].push({
-      id: `assistant-catch-${Date.now()}`,
-      role: 'assistant',
-      content: aiState.value.content,
-      reasoning: aiState.value.reasoning,
-      error: aiState.value.error,
-      meta: formatNow(),
-    });
-    resetAIState();
-    currentRecordId.value = null;
-  } finally {
-    if (activeAbortController.value === abortController) {
-      activeAbortController.value = null;
-    }
-  }
-};
 
 const loadPage = async (targetPage = 1, append = false) => {
   if (targetPage === 1) loading.value = true;
@@ -640,8 +166,6 @@ onMounted(() => void loadPage(1, false));
 
 onBeforeUnmount(() => {
   if (searchTimer) clearTimeout(searchTimer);
-  activeAbortController.value?.abort();
-  speechRecognition?.stop();
 });
 </script>
 
@@ -767,13 +291,13 @@ onBeforeUnmount(() => {
 }
 
 .wb-chip.wrong {
-  background: rgba(255, 107, 145, 0.12);
-  color: rgba(255, 140, 165, 0.92);
+  background: #fef2f2;
+  color: #b91c1c;
 }
 
 .wb-chip.correct {
-  background: rgba(68, 232, 153, 0.1);
-  color: rgba(119, 244, 182, 0.92);
+  background: #ecfdf5;
+  color: #15803d;
 }
 
 .wb-time,
@@ -788,8 +312,7 @@ onBeforeUnmount(() => {
   padding: 0 18px 18px;
 }
 
-.wb-detail-block,
-.wb-ai-panel {
+.wb-detail-block {
   padding: 16px;
   border-radius: 18px;
   background: rgba(255, 255, 255, 0.025);
@@ -799,6 +322,15 @@ onBeforeUnmount(() => {
 .wb-section-title {
   margin: 0 0 12px;
   font-size: 16px;
+}
+
+.wb-practice-btn {
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(151, 172, 249, 0.2);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text);
+  cursor: pointer;
 }
 
 .wb-detail-q {
@@ -823,9 +355,7 @@ onBeforeUnmount(() => {
   box-shadow: 0 16px 34px rgba(4, 8, 20, 0.28);
 }
 
-.wb-detail-opts,
-.wb-analysis-grid,
-.wb-ai-history {
+.wb-detail-opts {
   display: grid;
   gap: 12px;
 }
@@ -867,134 +397,6 @@ onBeforeUnmount(() => {
   color: var(--text-muted);
 }
 
-.wb-ai-head,
-.wb-ai-actions,
-.wb-ai-msg-head {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
-  align-items: center;
-}
-
-.wb-ai-title {
-  font-size: 17px;
-  font-weight: 700;
-}
-
-.wb-ai-sub,
-.wb-ai-meta {
-  font-size: 12px;
-  color: var(--text-muted);
-}
-
-.wb-ai-fill-btn,
-.wb-ai-send-btn,
-.wb-ai-stop-btn,
-.wb-ai-clear-btn,
-.wb-ai-mini-btn,
-.wb-ai-icon-btn {
-  border-radius: 12px;
-  border: 1px solid rgba(151, 172, 249, 0.2);
-  background: rgba(255, 255, 255, 0.03);
-  color: var(--text);
-  cursor: pointer;
-}
-
-.wb-ai-fill-btn,
-.wb-ai-send-btn,
-.wb-ai-stop-btn,
-.wb-ai-clear-btn,
-.wb-ai-mini-btn {
-  padding: 10px 14px;
-}
-
-.wb-ai-stop-btn {
-  border-color: rgba(255, 107, 145, 0.45);
-  background: rgba(255, 107, 145, 0.12);
-  color: #ffd5e2;
-  font-weight: 700;
-}
-
-.wb-ai-send-btn {
-  border-color: rgba(90, 243, 211, 0.45);
-  background: linear-gradient(120deg, rgba(90, 243, 211, 0.88), rgba(255, 199, 122, 0.88));
-  color: #061016;
-  font-weight: 800;
-}
-
-.wb-ai-composer {
-  display: grid;
-  gap: 12px;
-  margin-top: 14px;
-}
-
-.wb-ai-initial-actions {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 14px;
-}
-
-.wb-ai-textarea {
-  width: 100%;
-}
-
-.wb-ai-tools {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.wb-ai-icon-btn {
-  width: 42px;
-  height: 42px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.wb-ai-file-input {
-  display: none;
-}
-
-.wb-ai-msg {
-  padding: 14px;
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.02);
-}
-
-.wb-ai-msg.user {
-  background: rgba(90, 243, 211, 0.06);
-}
-
-.wb-ai-role {
-  font-weight: 700;
-}
-
-.wb-ai-user {
-  margin: 0;
-  white-space: pre-wrap;
-  font-family: inherit;
-}
-
-.wb-ai-empty {
-  padding: 20px;
-  text-align: center;
-  color: var(--text-muted);
-}
-
-.wb-ai-image-wrap,
-.wb-ai-image-preview-card {
-  display: grid;
-  gap: 10px;
-  margin-top: 10px;
-}
-
-.wb-ai-image,
-.wb-ai-image-preview {
-  max-width: 240px;
-  border-radius: 14px;
-}
-
 @media (max-width: 980px) {
   .wb-card-head {
     grid-template-columns: 40px 1fr;
@@ -1002,10 +404,7 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 760px) {
-  .wb-hero,
-  .wb-ai-head,
-  .wb-ai-actions,
-  .wb-ai-msg-head {
+  .wb-hero {
     flex-direction: column;
     align-items: flex-start;
   }

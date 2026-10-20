@@ -262,37 +262,36 @@ onBeforeUnmount(() => {
   gap: 10px;
   padding: 13px 18px;
   border-radius: 12px;
-  border: 1.5px dashed rgba(255, 107, 145, 0.4);
-  background: rgba(255, 107, 145, 0.05);
+  border: 1.5px dashed rgba(190, 18, 60, 0.3);
+  background: #fdf2f8;
   cursor: pointer;
   transition: all 0.2s;
   text-align: left;
-  color: var(--text-primary, #e8eaf6);
+  color: #172033;
 }
 .wap-trigger:hover {
-  border-color: rgba(255, 107, 145, 0.7);
-  background: rgba(255, 107, 145, 0.1);
+  border-color: rgba(190, 18, 60, 0.55);
+  background: #fce7f3;
   transform: translateY(-1px);
-  box-shadow: 0 4px 20px rgba(255, 107, 145, 0.15);
+  box-shadow: 0 4px 20px rgba(190, 18, 60, 0.1);
 }
 .wap-trigger-icon { font-size: 20px; flex-shrink: 0; }
 .wap-trigger > span:nth-child(2) {
   font-size: var(--font-size-sm);
   font-weight: 600;
-  color: rgba(255, 140, 160, 0.95);
+  color: #be123c;
 }
 .wap-trigger-sub {
   font-size: var(--font-size-xs);
-  color: var(--text-muted, rgba(180,185,210,0.6));
+  color: #64748b;
   margin-left: auto;
 }
 
 .wap-panel {
-  border: 1.5px solid rgba(255, 107, 145, 0.25);
+  border: 1.5px solid #e2e8f0;
   border-radius: 14px;
   overflow: hidden;
-  background: rgba(20, 14, 28, 0.6);
-  backdrop-filter: blur(8px);
+  background: #ffffff;
 }
 
 .wap-header {
@@ -300,8 +299,8 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: space-between;
   padding: 10px 16px;
-  background: rgba(255, 107, 145, 0.07);
-  border-bottom: 1px solid rgba(255, 107, 145, 0.12);
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
 }
 .wap-title {
   display: flex;
@@ -309,7 +308,7 @@ onBeforeUnmount(() => {
   gap: 7px;
   font-size: var(--font-size-sm);
   font-weight: 700;
-  color: rgba(255, 150, 170, 0.95);
+  color: #be123c;
 }
 .wap-title-icon { font-size: 16px; }
 .wap-header-right {
@@ -319,34 +318,34 @@ onBeforeUnmount(() => {
 }
 .wap-streaming {
   font-size: var(--font-size-xs);
-  color: rgba(255, 180, 100, 0.8);
+  color: #b45309;
   font-style: italic;
 }
 .wap-done {
   font-size: var(--font-size-xs);
-  color: rgba(100, 220, 140, 0.8);
+  color: #15803d;
 }
 .wap-retry {
   background: none;
-  border: 1px solid rgba(255, 107, 145, 0.25);
+  border: 1px solid #e2e8f0;
   border-radius: 6px;
-  color: rgba(255, 150, 170, 0.7);
+  color: #64748b;
   font-size: 13px;
   cursor: pointer;
   padding: 2px 8px;
   transition: all 0.15s;
 }
 .wap-retry:hover {
-  border-color: rgba(255, 107, 145, 0.6);
-  color: rgba(255, 150, 170, 1);
-  background: rgba(255, 107, 145, 0.08);
+  border-color: #cbd5e1;
+  color: #0f766e;
+  background: #f8fafc;
 }
 
 .wap-stop {
-  background: rgba(255, 107, 145, 0.14);
-  border: 1px solid rgba(255, 107, 145, 0.45);
+  background: #fef2f2;
+  border: 1px solid #fecaca;
   border-radius: 6px;
-  color: rgba(255, 220, 228, 0.95);
+  color: #b91c1c;
   font-size: var(--font-size-sm);
   cursor: pointer;
   padding: 2px 8px;
@@ -354,7 +353,7 @@ onBeforeUnmount(() => {
 
 .wap-progress-wrap {
   height: 2px;
-  background: rgba(255,255,255,0.05);
+  background: #e2e8f0;
   overflow: hidden;
 }
 .wap-progress-bar {
@@ -385,24 +384,24 @@ onBeforeUnmount(() => {
   font-size: var(--font-size-xs);
   font-weight: 700;
   letter-spacing: 0.03em;
-  color: rgba(180, 185, 210, 0.68);
+  color: #64748b;
 }
 
 .wap-chat-item.user .wap-chat-role {
-  color: rgba(255, 190, 140, 0.92);
+  color: #b45309;
 }
 
 .wap-chat-item.assistant .wap-chat-role {
-  color: rgba(255, 150, 170, 0.92);
+  color: #be123c;
 }
 
 .wap-user-text {
   margin: 0;
   padding: 12px 14px;
   border-radius: 12px;
-  border: 1px solid rgba(255,255,255,0.06);
-  background: rgba(255,255,255,0.04);
-  color: rgba(240, 243, 255, 0.92);
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  color: #334155;
   white-space: pre-wrap;
   line-height: 1.7;
   font-size: var(--font-size-sm);
@@ -420,9 +419,9 @@ onBeforeUnmount(() => {
   border-radius: 6px;
   background: linear-gradient(
     90deg,
-    rgba(255,255,255,0.04) 0%,
-    rgba(255,255,255,0.09) 50%,
-    rgba(255,255,255,0.04) 100%
+    #e2e8f0 0%,
+    #f1f5f9 50%,
+    #e2e8f0 100%
   );
   background-size: 200% 100%;
   animation: shimmer 1.4s infinite;
@@ -435,7 +434,7 @@ onBeforeUnmount(() => {
 .wap-content {
   font-size: 15px;
   line-height: 1.72;
-  color: rgba(228, 233, 248, 0.92);
+  color: #334155;
 }
 .wap-content :deep(h1),
 .wap-content :deep(h2),
@@ -443,7 +442,7 @@ onBeforeUnmount(() => {
 .wap-content :deep(h4) {
   font-weight: 800;
   line-height: 1.3;
-  color: rgba(255, 160, 175, 0.95);
+  color: #be123c;
 }
 .wap-content :deep(h1) {
   font-size: 24px;
@@ -477,21 +476,21 @@ onBeforeUnmount(() => {
   line-height: 1.68;
 }
 .wap-content :deep(strong) {
-  color: rgba(255, 200, 120, 0.95);
+  color: #92400e;
   font-weight: 700;
 }
 .wap-content :deep(code) {
-  background: rgba(255,255,255,0.07);
+  background: #f1f5f9;
   border-radius: 4px;
   padding: 1px 5px;
   font-size: 0.9em;
-  color: rgba(150, 220, 255, 0.9);
+  color: #0f766e;
 }
 .wap-content :deep(pre) {
   margin: 0.9em 0 1em;
   padding: 14px 16px;
   border-radius: 10px;
-  background: rgba(5, 7, 18, 0.4);
+  background: #f8fafc;
   overflow-x: auto;
 }
 .wap-content :deep(pre code) {
@@ -499,10 +498,10 @@ onBeforeUnmount(() => {
   padding: 0;
 }
 .wap-content :deep(blockquote) {
-  border-left: 3px solid rgba(255,107,145,0.4);
+  border-left: 3px solid #fda4af;
   padding: 0.7em 0 0.7em 12px;
   margin: 0.9em 0;
-  color: rgba(214, 219, 240, 0.8);
+  color: #64748b;
   font-style: italic;
 }
 .wap-content :deep(.katex) {
@@ -515,16 +514,16 @@ onBeforeUnmount(() => {
 }
 
 .wap-reasoning {
-  border: 1px solid rgba(255, 107, 145, 0.16);
+  border: 1px solid #e2e8f0;
   border-radius: 12px;
-  background: rgba(255, 107, 145, 0.06);
+  background: #f8fafc;
   overflow: hidden;
 }
 .wap-reasoning summary {
   padding: 10px 12px;
   font-size: 12px;
   font-weight: 700;
-  color: rgba(255, 175, 190, 0.95);
+  color: #be123c;
   cursor: pointer;
   letter-spacing: 0.03em;
   user-select: none;
@@ -533,11 +532,11 @@ onBeforeUnmount(() => {
 .wap-reasoning summary::-webkit-details-marker {
   display: none;
 }
-.wap-reasoning summary:hover { color: rgba(255, 205, 215, 0.98); }
+.wap-reasoning summary:hover { color: #9d174d; }
 .wap-reasoning-text {
   padding: 0 12px 12px;
   font-size: 13px;
-  color: rgba(255, 230, 236, 0.84);
+  color: #475569;
   white-space: pre-wrap;
   line-height: 1.65;
   max-height: 220px;
@@ -548,7 +547,7 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: 8px;
-  color: rgba(255, 190, 140, 0.86);
+  color: #b45309;
   font-size: 13px;
   padding: 2px 0;
 }
@@ -557,7 +556,7 @@ onBeforeUnmount(() => {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: rgba(255, 160, 120, 0.9);
+  background: #f59e0b;
   animation: pulseGlow 0.9s infinite;
 }
 
@@ -566,14 +565,14 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 10px;
   padding: 10px 18px;
-  border-top: 1px solid rgba(255,107,145,0.15);
+  border-top: 1px solid #e2e8f0;
   font-size: 12px;
-  color: rgba(255, 140, 120, 0.85);
+  color: #b91c1c;
 }
 
 .wap-composer {
   padding: 14px 18px 16px;
-  border-top: 1px solid rgba(255, 107, 145, 0.1);
+  border-top: 1px solid #e2e8f0;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -581,7 +580,7 @@ onBeforeUnmount(() => {
 
 .wap-initial-actions {
   padding: 14px 18px 16px;
-  border-top: 1px solid rgba(255, 107, 145, 0.1);
+  border-top: 1px solid #e2e8f0;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -594,9 +593,9 @@ onBeforeUnmount(() => {
   resize: vertical;
   min-height: 76px;
   border-radius: 12px;
-  border: 1px solid rgba(255, 107, 145, 0.2);
-  background: rgba(11, 10, 18, 0.38);
-  color: rgba(238, 244, 255, 0.92);
+  border: 1px solid #dbe3ec;
+  background: #ffffff;
+  color: #172033;
   padding: 12px 14px;
   font-size: 13px;
   line-height: 1.7;
@@ -604,12 +603,12 @@ onBeforeUnmount(() => {
 }
 
 .wap-input:focus {
-  border-color: rgba(255, 150, 170, 0.45);
-  box-shadow: 0 0 0 3px rgba(255, 107, 145, 0.08);
+  border-color: #0f766e;
+  box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.12);
 }
 
 .wap-input::placeholder {
-  color: rgba(180, 185, 210, 0.5);
+  color: #94a3b8;
 }
 
 .wap-composer-actions {
@@ -622,25 +621,25 @@ onBeforeUnmount(() => {
 
 .wap-composer-tip {
   font-size: 11px;
-  color: rgba(180, 185, 210, 0.6);
+  color: #64748b;
 }
 
 .wap-send-btn {
   padding: 9px 16px;
   border-radius: 999px;
-  border: 1px solid rgba(255, 107, 145, 0.28);
-  background: linear-gradient(120deg, rgba(255, 107, 145, 0.84), rgba(255, 162, 122, 0.78));
-  color: #1a0912;
+  border: 1px solid #0f766e;
+  background: #0f766e;
+  color: #ffffff;
   font-size: 12px;
   font-weight: 800;
   cursor: pointer;
   transition: transform 0.16s ease, box-shadow 0.16s ease, opacity 0.16s ease;
-  box-shadow: 0 8px 24px rgba(255, 107, 145, 0.18);
+  box-shadow: 0 8px 24px rgba(15, 118, 110, 0.18);
 }
 
 .wap-send-btn:hover:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 10px 28px rgba(255, 107, 145, 0.24);
+  box-shadow: 0 10px 28px rgba(15, 118, 110, 0.24);
 }
 
 .wap-send-btn:disabled {
