@@ -5,8 +5,8 @@
       <div class="auth-brand">
         <span class="auth-brand-mark" />
         <div class="auth-brand-copy">
-          <strong>智学物理</strong>
-          <span>物理教学工作台</span>
+          <strong>教学管理</strong>
+          <span>课堂教学管理工作台</span>
         </div>
       </div>
       <slot />

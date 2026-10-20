@@ -1,10 +1,10 @@
 <div align="center">
 
-# 智学物理 · Physics Learning Platform
+# 教学管理平台 · Teaching Management Platform
 
-**面向中学物理教学的开源学习平台**
+**面向中学课堂的开源教学管理系统**
 
-学生答题与错题本 · 教师任务与学情分析 · AI 流式辅导 · 多班级协作
+班级与账号 · 题库与作业 · 在线作答与错题 · 学情分析 · AI 辅导 · 批量报告
 
 [![CI](https://github.com/luoshuang148/physics-learning-platform/actions/workflows/ci.yml/badge.svg)](https://github.com/luoshuang148/physics-learning-platform/actions/workflows/ci.yml)
 [![Java](https://img.shields.io/badge/Java-21-orange)](https://openjdk.org/)
@@ -35,7 +35,7 @@
 
 ## 项目简介
 
-智学物理（`zxwl_vlab`）是一个可本地一键运行的物理教学平台，覆盖「出题 → 发布作业 → 在线作答 → 错题整理 → 学情分析 → AI 辅导」完整闭环，适合中学物理课堂、教育机构内网以及后端/全栈学习与二次开发。
+教学管理平台（Teaching Management Platform）是一套可本地部署的中学课堂教学管理系统，覆盖「建班建号 → 题库与组卷 → 发布作业 → 在线作答 → 错题与学情 → AI 辅导」完整闭环，面向日常课堂管理、课后巩固以及后端/全栈学习与二次开发。内置学科示例以物理为主，业务能力可扩展到其他学科的作业与学情场景。
 
 | 角色 | 能做什么 |
 |------|----------|
@@ -229,13 +229,13 @@ CI 覆盖：后端单测与集成、前端单测与构建、MySQL 8.4 空库迁�
 
 ## 许可证
 
-[MIT License](LICENSE) © 智学物理项目
+[MIT License](LICENSE) © Teaching Management Platform
 
 ---
 
 ## English
 
-**ZhiXue Physics** is an open-source learning platform for secondary-school physics: question bank, class-scoped assignments, answer records & wrong-question book, streaming AI tutoring, and teacher analytics.
+**Teaching Management Platform** is an open-source classroom operations system: classes & accounts, question bank, assignments, answer records & wrong-question book, streaming AI tutoring, and teacher analytics.
 
 **Highlights**
 
