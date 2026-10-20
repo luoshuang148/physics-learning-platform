@@ -24,8 +24,18 @@ public class ClassroomService {
     private final ClassAccessService access;
 
     public List<TeachingClassResponse> listForTeacher(Long teacherId) {
+        List<TeachingClass> memberships = access.classesForTeacher(teacherId);
+        // A brand-new teacher has no membership yet; resolveForTask already falls back to
+        // 默认班级, so attach them here too or the class switcher stays empty and publish stays disabled.
+        if (memberships.isEmpty()) {
+            TeachingClass fallback = access.defaultClass();
+            var role = teachers.countOwners(fallback.getId()) > 0
+                    ? ClassTeacher.Role.CO_TEACHER : ClassTeacher.Role.OWNER;
+            access.addTeacher(fallback.getId(), teacherId, role);
+            memberships = access.classesForTeacher(teacherId);
+        }
         List<TeachingClassResponse> result = new ArrayList<>();
-        for (TeachingClass c : access.classesForTeacher(teacherId)) {
+        for (TeachingClass c : memberships) {
             var membership = teachers.findByClassIdAndTeacherId(c.getId(), teacherId).orElse(null);
             result.add(toResponse(c, membership == null ? null : membership.getRole().name()));
         }

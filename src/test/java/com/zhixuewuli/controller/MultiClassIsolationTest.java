@@ -5,6 +5,7 @@ import com.zhixuewuli.dto.request.ClassCreateRequest;
 import com.zhixuewuli.dto.request.TeacherEventCreateRequest;
 import com.zhixuewuli.entity.Question;
 import com.zhixuewuli.entity.TeacherEvent;
+import com.zhixuewuli.entity.TeachingClass;
 import com.zhixuewuli.entity.User;
 import com.zhixuewuli.repository.QuestionRepository;
 import com.zhixuewuli.repository.UserRepository;
@@ -67,5 +68,19 @@ class MultiClassIsolationTest extends BaseControllerIntegrationTest {
         assertThat(tasks.listStudentTasks(s2.getId())).extracting("id").contains(b.getId()).doesNotContain(a.getId());
         assertThatThrownBy(() -> tasks.getTaskDetail(a.getId(), 2002L)).hasMessageContaining("无权访问");
         assertThatThrownBy(() -> tasks.getEvent(a.getId(), s2.getId())).hasMessageContaining("无权访问");
+    }
+
+    @Test
+    void teacherWithoutMembershipReceivesDefaultClassOnListing() {
+        // Bootstrap teachers never touch class_teachers; listing must still return a usable class
+        // so the class switcher and publish flow are not stuck on an empty selection.
+        var listed = classrooms.listForTeacher(2002L);
+
+        assertThat(listed).isNotEmpty();
+        var fallback = listed.get(0);
+        assertThat(fallback.getName()).isEqualTo("默认班级");
+        assertThat(fallback.getRole()).isEqualTo("OWNER");
+        assertThat(access.classesForTeacher(2002L)).extracting(TeachingClass::getName)
+                .contains("默认班级");
     }
 }
