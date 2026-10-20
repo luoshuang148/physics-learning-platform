@@ -3,13 +3,20 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.zhixuewuli.entity.*;
 import com.zhixuewuli.service.ai.report.ReportPreparation;
 import org.junit.jupiter.api.*;
-import java.nio.file.*;
+import java.io.*;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import static org.assertj.core.api.Assertions.*;
 @Tag("unit")
 class ReportEvaluationFixturesTest {
  @Test void fixedSyntheticCorpusHasValidReferencesAndDeterministicEvidence() throws Exception {
-  var mapper=new ObjectMapper();var lines=Files.readAllLines(Path.of("docs/ai-evaluation/cases.jsonl"));assertThat(lines).hasSize(10);
+  var mapper=new ObjectMapper();
+  List<String> lines;
+  try(var in=Objects.requireNonNull(ReportEvaluationFixturesTest.class.getResourceAsStream("/ai-evaluation/cases.jsonl"),"missing classpath ai-evaluation/cases.jsonl");
+      var reader=new BufferedReader(new InputStreamReader(in,StandardCharsets.UTF_8))){
+   lines=reader.lines().toList();
+  }
+  assertThat(lines).hasSize(10);
   Set<String> ids=new HashSet<>();
   for(String line:lines){
    var c=mapper.readTree(line);assertThat(ids.add(c.get("id").asText())).isTrue();assertThat(c.get("reviewStatus").asText()).isEqualTo("pending");assertThat(c.get("rubric").size()).isGreaterThanOrEqualTo(3);
