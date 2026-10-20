@@ -99,7 +99,8 @@ class ReportBatchRabbitMqIntegrationTest extends RabbitMqTestSupport {
         assertThat(item.getReportId()).isNotNull();
         assertThat(item.getAttempts()).isEqualTo(1);
         assertThat(item.getFinishedAt()).isNotNull();
-        assertThat(pendingOutboxFor(batch.getId())).isZero();
+        // 批次 SUCCEEDED 可能先于发件箱 ack/marker 清空，需等待发件箱收敛
+        awaitUntil(WAIT_MILLIS, () -> pendingOutboxFor(batch.getId()) == 0, "发件箱 pending 应清空");
 
         ReportBatchItemReportResponse report = batchService.getItemReport(
                 fixture.teacherId(), batch.getId(), item.getId());
