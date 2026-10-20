@@ -13,6 +13,15 @@
 [![MySQL](https://img.shields.io/badge/MySQL-8.0%2B-4479a1)](https://www.mysql.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
+**在线演示：** [http://47.110.38.57](http://47.110.38.57) · 备用 [http://47-110-38-57.sslip.io](http://47-110-38-57.sslip.io)
+
+| 角色 | 账号 | 密码 |
+|------|------|------|
+| 教师 | `teacher` | `Teacher@2026` |
+| 学生 | `stu01` ~ `stu12` | `Student@2026` |
+
+> 演示服为阿里云试用规格，仅用于功能试用；数据可被重置，请勿写入真实个人信息。
+
 [快速开始](#-快速开始) · [功能](#-功能特性) · [架构](#-架构) · [文档](#-文档) · [贡献](#-贡献) · [English](#english)
 
 </div>

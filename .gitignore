@@ -210,3 +210,6 @@ frontend/test-results/
 artifacts/verification/
 
 __pycache__/
+
+# Frontend assets copied into the jar for packaging (generated)
+src/main/resources/static/

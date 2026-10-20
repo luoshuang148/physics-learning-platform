@@ -49,7 +49,7 @@ public class SecurityConfig {
 
     /** 由后端托管的前端单页应用资源与路由，均为 GET。 */
     private static final String[] SPA_RESOURCES = {
-            "/", "/index.html", "/favicon.svg", "/icons.svg", "/assets/**", "/three-physical-project/**",
+            "/", "/index.html", "/favicon.svg", "/favicon.png", "/icons.svg", "/assets/**", "/three-physical-project/**",
             "/auth/login", "/auth/register", "/student/**", "/teacher/**", "/preview/**"
     };
 
