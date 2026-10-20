@@ -213,3 +213,6 @@ __pycache__/
 
 # Frontend assets copied into the jar for packaging (generated)
 src/main/resources/static/
+
+# Local-only development notes (not published)
+dev-notes/
