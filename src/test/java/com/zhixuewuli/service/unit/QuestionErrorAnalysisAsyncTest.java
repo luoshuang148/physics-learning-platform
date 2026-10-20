@@ -8,7 +8,6 @@ import com.zhixuewuli.common.config.properties.AIStreamingProperties;
 import com.zhixuewuli.common.exception.InsufficientPermissionException;
 import com.zhixuewuli.common.util.OptionMappingUtil;
 import com.zhixuewuli.common.util.QuestionErrorConverter;
-import com.zhixuewuli.common.util.UserPermissionUtil;
 import com.zhixuewuli.dto.internal.ConversationType;
 import com.zhixuewuli.dto.internal.SessionContextInternalDTO;
 import com.zhixuewuli.dto.request.AIAskRequest;
@@ -59,8 +58,6 @@ class QuestionErrorAnalysisAsyncTest extends AIAsyncTestBase {
         @Mock
         private ReportInputRepository reportInputs;
 
-        @Mock
-        private UserPermissionUtil userPermissionUtil;
 
         // @Mock annotation removed - using parent class's mock
         // SessionManager sessionManager is inherited from AIServiceSyncTestBase
@@ -104,13 +101,7 @@ class QuestionErrorAnalysisAsyncTest extends AIAsyncTestBase {
                                         + (mockSessionContext.getLock() == null ? "null" : "not null"));
                 }
 
-                try (MockedStatic<com.zhixuewuli.common.util.HanLPWordCloudUtil> mocked = Mockito
-                                .mockStatic(com.zhixuewuli.common.util.HanLPWordCloudUtil.class)) {
-                        mocked.when(() -> com.zhixuewuli.common.util.HanLPWordCloudUtil.analyzeErrorReasons(anyList()))
-                                        .thenReturn(new java.util.HashMap<>());
-
-                        // Given
-                        doNothing().when(userPermissionUtil).checkTeacherPermission(teacherId);
+                // Given
 
                         // 模拟 sessionManager 调用 - 使用简单的返回，确保不为null
                         System.out.println("DEBUG Test: Setting up sessionManager.getOrCreateSession mock");
@@ -222,7 +213,6 @@ class QuestionErrorAnalysisAsyncTest extends AIAsyncTestBase {
                         verify(aiTaskExecutor).execute(any(Runnable.class));
 
                         // 验证权限检查被调用
-                        verify(userPermissionUtil).checkTeacherPermission(teacherId);
 
                         // 验证会话管理被调用
                         verify(sessionManager).getOrCreateSession(
@@ -240,7 +230,7 @@ class QuestionErrorAnalysisAsyncTest extends AIAsyncTestBase {
                         verify(aliyunAIClient).streamGenerate(any(), any(), any(AIStreamCallback.class));
 
                         // 验证 SSE 事件被发送（2 次：ai-content、complete）
-                        // 注：首次交互不再发送 student-list 和 word-cloud 初始化数据
+                        // 注：首次交互不再发送 student-list 初始化数据
                         try {
                                 verify(mockEmitter, times(2))
                                                 .send(any(
@@ -248,27 +238,8 @@ class QuestionErrorAnalysisAsyncTest extends AIAsyncTestBase {
                         } catch (IOException e) {
                                 // Mock 方法不会真正抛出 IOException
                         }
-                }
-
         }
 
-        @Test
-        @DisplayName("教师题目分析-验证权限检查")
-
-        void streamTeacherQuestionAnalysis_shouldCheckPermissions() {
-                // Given
-                doThrow(new InsufficientPermissionException("权限不足"))
-                                .when(userPermissionUtil).checkTeacherPermission(teacherId);
-
-                // When & Then
-                captureAndExecuteAsyncTask(() -> {
-                        service.streamTeacherQuestionAnalysis(teacherQuestionAnalysisRequest, mockEmitter, teacherId,
-                                        TEST_SESSION_ID);
-                });
-
-                // 验证权限检查被调用
-                verify(userPermissionUtil).checkTeacherPermission(teacherId);
-        }
 
         @Test
         @DisplayName("教师题目分析-验证无效题目 ID 处理")
@@ -292,7 +263,6 @@ class QuestionErrorAnalysisAsyncTest extends AIAsyncTestBase {
         @DisplayName("异步任务提交验证")
         void streamTeacherQuestionAnalysis_shouldSubmitAsyncTask() {
                 // Given
-                doNothing().when(userPermissionUtil).checkTeacherPermission(teacherId);
                 when(sessionManager.getOrCreateSession(anyString(), anyLong(), any(ConversationType.class),
                                 anyLong(), any()))
                                 .thenReturn(mockSessionContext);
@@ -309,7 +279,6 @@ class QuestionErrorAnalysisAsyncTest extends AIAsyncTestBase {
         @DisplayName("教师题目分析-会话取消后应停止SSE推送")
         void streamTeacherQuestionAnalysis_shouldSkipSseWhenSessionCancelled() {
                 // Given
-                doNothing().when(userPermissionUtil).checkTeacherPermission(teacherId);
                 when(answerRecordRepository.countByQuestionId(TEST_QUESTION_ID)).thenReturn(1L);
                 when(sessionManager.getOrCreateSession(anyString(), anyLong(), any(ConversationType.class),
                                 anyLong(), any()))
@@ -346,7 +315,6 @@ class QuestionErrorAnalysisAsyncTest extends AIAsyncTestBase {
         @DisplayName("教师题目分析-取消前有部分内容时应保存交互")
         void streamTeacherQuestionAnalysis_shouldPersistPartialWhenCancelledAfterContent() {
                 // Given
-                doNothing().when(userPermissionUtil).checkTeacherPermission(teacherId);
                 when(answerRecordRepository.countByQuestionId(TEST_QUESTION_ID)).thenReturn(1L);
                 when(sessionManager.getOrCreateSession(anyString(), anyLong(), any(ConversationType.class),
                                 anyLong(), any()))

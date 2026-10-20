@@ -42,6 +42,10 @@ import static org.mockito.Mockito.when;
  * 遵循Given-When-Then测试模式，使用Mockito进行依赖模拟
  */
 class AuthServiceUnitTest extends BaseUnitTest {
+    @Mock private com.zhixuewuli.service.user.ClassroomGuard classroomGuard;
+    @Mock private com.zhixuewuli.service.classroom.ClassAccessService classAccess;
+    @Mock private com.zhixuewuli.service.teacherEvent.TaskRosterService roster;
+
 
     @Mock
     private UserRepository userRepository;
@@ -51,6 +55,8 @@ class AuthServiceUnitTest extends BaseUnitTest {
 
     @Mock
     private JwtUtil jwtUtil;
+
+    @Mock private com.zhixuewuli.common.security.AuthUserCache authUserCache;
 
     @InjectMocks
     private AuthServiceImpl authService;
@@ -67,6 +73,9 @@ class AuthServiceUnitTest extends BaseUnitTest {
         mockUser.setPasswordHash("$2a$10$example_bcrypt_hash");
         mockUser.setActive(true);
         mockUser.setLastLogin(null);
+        var defaultClass = new com.zhixuewuli.entity.TeachingClass();
+        defaultClass.setId(1L);
+        org.mockito.Mockito.lenient().when(classAccess.defaultClass()).thenReturn(defaultClass);
     }
 
     // ==================== authenticate 测试 ====================
@@ -74,7 +83,6 @@ class AuthServiceUnitTest extends BaseUnitTest {
     @Test
     void authenticate_shouldReturnUser_whenCredentialsValid() {
         // Given
-        when(userRepository.findByRealName(validUsername)).thenReturn(Optional.empty());
         when(userRepository.findByUsername(validUsername)).thenReturn(Optional.of(mockUser));
         when(passwordUtil.matches(validPassword, mockUser.getPasswordHash())).thenReturn(true);
         when(userRepository.recordLoginIfVersionMatches(eq(mockUser.getId()),eq(mockUser.getTokenVersion()),any())).thenReturn(1);
@@ -89,36 +97,22 @@ class AuthServiceUnitTest extends BaseUnitTest {
                 .containsExactly(100L, validUsername, true);
 
         assertThat(result.getLastLogin()).isNotNull();
-        verify(userRepository).findByRealName(validUsername);
         verify(userRepository).findByUsername(validUsername);
         verify(passwordUtil).matches(validPassword, mockUser.getPasswordHash());
         verify(userRepository).recordLoginIfVersionMatches(eq(result.getId()),eq(result.getTokenVersion()),any());
     }
 
     @Test
-    void authenticate_shouldPreferRealName_whenRealNameMatched() {
-        // Given
-        String loginId = "张三";
-        User realNameMatchedUser = TestDataFactory.createUser();
-        realNameMatchedUser.setId(103L);
-        realNameMatchedUser.setUsername("student_zhangsan");
-        realNameMatchedUser.setRealName(loginId);
-        realNameMatchedUser.setPasswordHash("$2a$10$example_bcrypt_hash");
-        realNameMatchedUser.setActive(true);
+    void authenticate_shouldNotUseRealNameAsLoginIdentifier() {
+        String realName = "张三";
+        when(userRepository.findByUsername(realName)).thenReturn(Optional.empty());
 
-        when(userRepository.findByRealName(loginId)).thenReturn(Optional.of(realNameMatchedUser));
-        when(passwordUtil.matches(validPassword, realNameMatchedUser.getPasswordHash())).thenReturn(true);
-        when(userRepository.recordLoginIfVersionMatches(eq(realNameMatchedUser.getId()),eq(realNameMatchedUser.getTokenVersion()),any())).thenReturn(1);
+        assertThatThrownBy(() -> authService.authenticate(realName, validPassword))
+                .isInstanceOf(UserNotFoundException.class);
 
-        // When
-        User result = authService.authenticate(loginId, validPassword);
-
-        // Then
-        assertThat(result).isNotNull();
-        assertThat(result.getId()).isEqualTo(103L);
-        verify(userRepository).findByRealName(loginId);
-        verify(userRepository, never()).findByUsername(loginId);
-        verify(userRepository).recordLoginIfVersionMatches(eq(result.getId()),eq(result.getTokenVersion()),any());
+        verify(userRepository).findByUsername(realName);
+        verify(userRepository, never()).findByRealName(anyString());
+        verify(passwordUtil, never()).matches(anyString(), anyString());
     }
 
     @Test
@@ -130,7 +124,6 @@ class AuthServiceUnitTest extends BaseUnitTest {
         assertThatThrownBy(() -> authService.authenticate(nullUsername, validPassword))
                 .isInstanceOf(InvalidCredentialsException.class);
 
-        verify(userRepository, never()).findByRealName(anyString());
         verify(userRepository, never()).findByUsername(anyString());
         verify(passwordUtil, never()).matches(anyString(), anyString());
         verify(userRepository, never()).save(any(User.class));
@@ -145,7 +138,6 @@ class AuthServiceUnitTest extends BaseUnitTest {
         assertThatThrownBy(() -> authService.authenticate(emptyUsername, validPassword))
                 .isInstanceOf(InvalidCredentialsException.class);
 
-        verify(userRepository, never()).findByRealName(anyString());
         verify(userRepository, never()).findByUsername(anyString());
         verify(passwordUtil, never()).matches(anyString(), anyString());
         verify(userRepository, never()).save(any(User.class));
@@ -160,7 +152,6 @@ class AuthServiceUnitTest extends BaseUnitTest {
         assertThatThrownBy(() -> authService.authenticate(validUsername, nullPassword))
                 .isInstanceOf(InvalidCredentialsException.class);
 
-        verify(userRepository, never()).findByRealName(anyString());
         verify(userRepository, never()).findByUsername(anyString());
         verify(passwordUtil, never()).matches(anyString(), anyString());
         verify(userRepository, never()).save(any(User.class));
@@ -175,7 +166,6 @@ class AuthServiceUnitTest extends BaseUnitTest {
         assertThatThrownBy(() -> authService.authenticate(validUsername, emptyPassword))
                 .isInstanceOf(InvalidCredentialsException.class);
 
-        verify(userRepository, never()).findByRealName(anyString());
         verify(userRepository, never()).findByUsername(anyString());
         verify(passwordUtil, never()).matches(anyString(), anyString());
         verify(userRepository, never()).save(any(User.class));
@@ -185,14 +175,12 @@ class AuthServiceUnitTest extends BaseUnitTest {
     void authenticate_shouldThrowUserNotFoundException_whenUserNotFound() {
         // Given
         String nonExistentUsername = "nonexistent";
-        when(userRepository.findByRealName(nonExistentUsername)).thenReturn(Optional.empty());
         when(userRepository.findByUsername(nonExistentUsername)).thenReturn(Optional.empty());
 
         // When & Then
         assertThatThrownBy(() -> authService.authenticate(nonExistentUsername, validPassword))
                 .isInstanceOf(UserNotFoundException.class);
 
-        verify(userRepository).findByRealName(nonExistentUsername);
         verify(userRepository).findByUsername(nonExistentUsername);
         verify(passwordUtil, never()).matches(anyString(), anyString());
         verify(userRepository, never()).save(any(User.class));
@@ -206,14 +194,12 @@ class AuthServiceUnitTest extends BaseUnitTest {
         inactiveUser.setUsername("inactive_user");
         inactiveUser.setActive(false);
 
-        when(userRepository.findByRealName("inactive_user")).thenReturn(Optional.empty());
         when(userRepository.findByUsername("inactive_user")).thenReturn(Optional.of(inactiveUser));
 
         // When & Then
         assertThatThrownBy(() -> authService.authenticate("inactive_user", validPassword))
                 .isInstanceOf(AccountDisabledException.class);
 
-        verify(userRepository).findByRealName("inactive_user");
         verify(userRepository).findByUsername("inactive_user");
         verify(passwordUtil, never()).matches(anyString(), anyString());
         verify(userRepository, never()).save(any(User.class));
@@ -222,7 +208,6 @@ class AuthServiceUnitTest extends BaseUnitTest {
     @Test
     void authenticate_shouldThrowInvalidCredentialsException_whenPasswordIncorrect() {
         // Given
-        when(userRepository.findByRealName(validUsername)).thenReturn(Optional.empty());
         when(userRepository.findByUsername(validUsername)).thenReturn(Optional.of(mockUser));
         when(passwordUtil.matches(validPassword, mockUser.getPasswordHash())).thenReturn(false);
 
@@ -230,7 +215,6 @@ class AuthServiceUnitTest extends BaseUnitTest {
         assertThatThrownBy(() -> authService.authenticate(validUsername, validPassword))
                 .isInstanceOf(InvalidCredentialsException.class);
 
-        verify(userRepository).findByRealName(validUsername);
         verify(userRepository).findByUsername(validUsername);
         verify(passwordUtil).matches(validPassword, mockUser.getPasswordHash());
         verify(userRepository, never()).save(any(User.class));
@@ -301,9 +285,8 @@ class AuthServiceUnitTest extends BaseUnitTest {
         savedUser.setPasswordHash("$2a$10$new_encoded_password");
 
         when(userRepository.existsByUsername("newuser")).thenReturn(false);
-        when(userRepository.existsByRealName("newuser")).thenReturn(false);
         when(passwordUtil.encode("newpassword123")).thenReturn("$2a$10$new_encoded_password");
-        when(userRepository.save(any(User.class))).thenAnswer(invocation -> {
+        when(userRepository.saveAndFlush(any(User.class))).thenAnswer(invocation -> {
             User user = invocation.getArgument(0);
             user.setId(102L);
             return user;
@@ -322,9 +305,8 @@ class AuthServiceUnitTest extends BaseUnitTest {
         assertThat(result.getPasswordHash()).isEqualTo("$2a$10$new_encoded_password");
 
         verify(userRepository).existsByUsername("newuser");
-        verify(userRepository).existsByRealName("newuser");
         verify(passwordUtil).encode("newpassword123");
-        verify(userRepository).save(any(User.class));
+        verify(userRepository).saveAndFlush(any(User.class));
     }
 
     @Test
@@ -344,14 +326,12 @@ class AuthServiceUnitTest extends BaseUnitTest {
                 .hasMessage("用户名 'existinguser' 已存在");
 
         verify(userRepository).existsByUsername("existinguser");
-        verify(userRepository, never()).existsByRealName(anyString());
         verify(passwordUtil, never()).encode(anyString());
         verify(userRepository, never()).save(any(User.class));
     }
 
     @Test
-    void registerUser_shouldThrowUserNameDuplicateException_whenUsernameMatchesExistingRealName() {
-        // Given
+    void registerUser_shouldAllowUsernameThatMatchesAnotherUsersRealName() {
         RegisterRequest request = new RegisterRequest();
         request.setUsername("shared_name");
         request.setPassword("password123");
@@ -359,17 +339,31 @@ class AuthServiceUnitTest extends BaseUnitTest {
         request.setUserType(User.UserType.STUDENT);
 
         when(userRepository.existsByUsername("shared_name")).thenReturn(false);
-        when(userRepository.existsByRealName("shared_name")).thenReturn(true);
+        when(passwordUtil.encode("password123")).thenReturn("$2a$10$encoded");
+        when(userRepository.saveAndFlush(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        // When & Then
-        assertThatThrownBy(() -> authService.registerUser(request))
-                .isInstanceOf(UserNameDuplicateException.class)
-                .hasMessage("用户名 'shared_name' 已存在");
+        assertThat(authService.registerUser(request).getUsername()).isEqualTo("shared_name");
 
         verify(userRepository).existsByUsername("shared_name");
-        verify(userRepository).existsByRealName("shared_name");
-        verify(passwordUtil, never()).encode(anyString());
-        verify(userRepository, never()).save(any(User.class));
+        verify(userRepository, never()).existsByRealName(anyString());
+        verify(userRepository).saveAndFlush(any(User.class));
+    }
+
+    @Test
+    void registerUser_shouldMapConcurrentUsernameConstraintViolation() {
+        RegisterRequest request = new RegisterRequest();
+        request.setUsername("race_name");
+        request.setPassword("password123");
+        request.setRealName("并发用户");
+        request.setUserType(User.UserType.STUDENT);
+        when(userRepository.existsByUsername("race_name")).thenReturn(false);
+        when(passwordUtil.encode("password123")).thenReturn("$2a$10$encoded");
+        when(userRepository.saveAndFlush(any(User.class))).thenThrow(new org.springframework.dao.DataIntegrityViolationException(
+                "Duplicate entry 'race_name' for key 'users.username'"));
+
+        assertThatThrownBy(() -> authService.registerUser(request))
+                .isInstanceOf(UserNameDuplicateException.class)
+                .hasMessage("用户名 'race_name' 已存在");
     }
 
     @Test
@@ -382,9 +376,8 @@ class AuthServiceUnitTest extends BaseUnitTest {
         request.setUserType(User.UserType.STUDENT);
 
         when(userRepository.existsByUsername("newuser")).thenReturn(false);
-        when(userRepository.existsByRealName("newuser")).thenReturn(false);
         when(passwordUtil.encode("password123")).thenReturn("$2a$10$encoded_password");
-        when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(userRepository.saveAndFlush(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         // When
         User result = authService.registerUser(request);
@@ -393,8 +386,7 @@ class AuthServiceUnitTest extends BaseUnitTest {
         assertThat(result.getActive()).isTrue();
 
         verify(userRepository).existsByUsername("newuser");
-        verify(userRepository).existsByRealName("newuser");
         verify(passwordUtil).encode("password123");
-        verify(userRepository).save(any(User.class));
+        verify(userRepository).saveAndFlush(any(User.class));
     }
 }

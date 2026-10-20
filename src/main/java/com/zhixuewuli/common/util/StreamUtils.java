@@ -2,6 +2,7 @@ package com.zhixuewuli.common.util;
 
 import com.zhixuewuli.common.config.properties.AIStreamingProperties;
 import com.zhixuewuli.common.exception.BusinessException;
+import com.zhixuewuli.common.redis.RedisConnectionLeases;
 import com.zhixuewuli.common.result.ResultCode;
 import com.zhixuewuli.dto.internal.SessionContextInternalDTO;
 import lombok.extern.slf4j.Slf4j;
@@ -16,7 +17,6 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * SSE 流式处理工具类
@@ -32,8 +32,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 @Slf4j
 public class StreamUtils {
 
-    /** 当前活跃连接数计数器 */
-    private final AtomicInteger activeConnections = new AtomicInteger(0);
+    private final RedisConnectionLeases leases;
+    private final Map<SseEmitter, String> emitterLeases = new ConcurrentHashMap<>();
 
     /** 活跃连接映射表：emitter -> 创建时间戳 */
     private final Map<SseEmitter, Long> activeEmitters = new ConcurrentHashMap<>();
@@ -43,7 +43,6 @@ public class StreamUtils {
 
     private final Map<String, SseEmitter> conversationOwners = new ConcurrentHashMap<>();
     private final Map<SseEmitter, Long> emitterUsers = new ConcurrentHashMap<>();
-    private final Map<Long, Integer> userConnections = new HashMap<>();
 
     /** Request state lives on the emitter, so late callbacks cannot cancel a later request. */
     private static final class RequestEmitter extends SseEmitter {
@@ -85,15 +84,15 @@ public class StreamUtils {
     }
 
     public void claimUser(SseEmitter emitter, Long userId) {
-        synchronized (userConnections) {
+        synchronized (emitterLeases) {
             if (userId == null) throw new BusinessException("未认证请求");
-            if (isCancelled(emitter)) throw new BusinessException("请求已取消");
+            String lease = emitterLeases.get(emitter);
+            if (isCancelled(emitter) || lease == null) throw new BusinessException("请求已取消");
             if (emitterUsers.containsKey(emitter)) return;
-            int count = userConnections.getOrDefault(userId, 0);
             Integer configured = aiStreamingProperties.getMaxSseConnectionsPerUser();
             int limit = configured == null || configured < 1 ? 2 : configured;
-            if (count >= limit) throw new BusinessException("同时生成的请求过多，请等待当前请求完成");
-            userConnections.put(userId, count + 1);
+            if (!leases.claimUser(lease, userId, limit))
+                throw new BusinessException("同时生成的请求过多，请等待当前请求完成");
             emitterUsers.put(emitter, userId);
         }
     }
@@ -114,7 +113,8 @@ public class StreamUtils {
     /**
      * 构造器注入 AIStreamingProperties
      */
-    public StreamUtils(AIStreamingProperties aiStreamingProperties) {
+    public StreamUtils(AIStreamingProperties aiStreamingProperties, RedisConnectionLeases leases) {
+        this.leases = leases;
         this.aiStreamingProperties = aiStreamingProperties;
 
         // 创建带守护线程的调度器，确保 JVM 可以正常退出
@@ -126,10 +126,13 @@ public class StreamUtils {
 
         // 定期执行清理和状态记录（每 5 分钟）
         this.connectionMonitor.scheduleAtFixedRate(() -> {
-            cleanupStaleConnections();
-            logConnectionStatus();
+            try {
+                cleanupStaleConnections();
+                logConnectionStatus();
+            } catch (RuntimeException error) { log.warn("SSE 连接监控失败", error); }
         }, 5, 5, TimeUnit.MINUTES);
 
+        this.connectionMonitor.scheduleAtFixedRate(this::renewLeases, 20, 20, TimeUnit.SECONDS);
         log.info("SSE 连接监控任务已启动");
     }
 
@@ -167,28 +170,7 @@ public class StreamUtils {
      * @return true 表示允许新连接，false 表示已达上限
      */
     public boolean canAcceptNewConnection() {
-        return activeConnections.get() < getMaxConnections();
-    }
-
-    /**
-     * 原子预占一个连接名额，避免"先检查再增加"导致的并发超限
-     *
-     * @return 预占成功后的当前连接数
-     */
-    private int reserveConnectionSlotOrThrow() {
-        while (true) {
-            int current = activeConnections.get();
-            int max = getMaxConnections();
-            if (current >= max) {
-                log.warn("SSE 连接数已达上限：{}/{}", current, max);
-                throw new BusinessException("系统繁忙，连接数已达上限，请稍后重试");
-            }
-
-            int next = current + 1;
-            if (activeConnections.compareAndSet(current, next)) {
-                return next;
-            }
-        }
+        return leases.count() < getMaxConnections();
     }
 
     /**
@@ -197,7 +179,7 @@ public class StreamUtils {
      * @return 当前活跃连接数
      */
     public int getActiveConnectionCount() {
-        return activeConnections.get();
+        return leases.count();
     }
 
     /**
@@ -229,7 +211,7 @@ public class StreamUtils {
             return;
 
         if (emitter instanceof RequestEmitter request) request.cancelRequest();
-        Long creationTime = activeEmitters.remove(emitter);
+        activeEmitters.remove(emitter);
         SessionContextInternalDTO context;
         synchronized (conversationOwners) {
             context = emitterContexts.remove(emitter);
@@ -238,12 +220,12 @@ public class StreamUtils {
                 conversationOwners.remove(conversationKey(context), emitter);
             }
         }
-        synchronized (userConnections) {
+        synchronized (emitterLeases) {
+            String lease = emitterLeases.remove(emitter);
             Long userId = emitterUsers.remove(emitter);
-            if (userId != null) {
-                int remaining = userConnections.getOrDefault(userId, 1) - 1;
-                if (remaining <= 0) userConnections.remove(userId);
-                else userConnections.put(userId, remaining);
+            if (lease != null) {
+                try { leases.release(lease, userId); }
+                catch (RuntimeException error) { log.warn("释放 SSE 租约失败，将由 TTL 回收", error); }
             }
         }
 
@@ -251,9 +233,21 @@ public class StreamUtils {
             log.info("SSE 连接已移除，关联上下文已标记为取消");
         }
 
-        if (creationTime != null) {
-            activeConnections.decrementAndGet();
-            log.debug("连接移除，当前活跃连接数：{}", activeConnections.get());
+    }
+
+    private void renewLeases() {
+        for (SseEmitter emitter : emitterLeases.keySet()) {
+            boolean renewed;
+            synchronized (emitterLeases) {
+                String lease = emitterLeases.get(emitter);
+                if (lease == null) continue;
+                try { renewed = leases.renew(lease, emitterUsers.get(emitter)); }
+                catch (RuntimeException error) {
+                    log.warn("续期 SSE 租约失败，关闭连接", error);
+                    renewed = false;
+                }
+            }
+            if (!renewed) safeCompleteEmitter(emitter);
         }
     }
 
@@ -293,9 +287,9 @@ public class StreamUtils {
      */
     private void logConnectionStatus() {
         log.info("SSE 连接状态 - 当前活跃连接数：{}/{}, 使用率：{}%",
-                activeConnections.get(),
+                getActiveConnectionCount(),
                 getMaxConnections(),
-                (activeConnections.get() * 100.0 / getMaxConnections()));
+                (getActiveConnectionCount() * 100.0 / getMaxConnections()));
     }
 
     /**
@@ -350,12 +344,13 @@ public class StreamUtils {
      */
     public SseEmitter createConfiguredEmitterWithLimit(long timeout, long reconnectTime) {
         // 原子预占连接名额，确保并发下不突破上限
-        int currentConnections = reserveConnectionSlotOrThrow();
+        String lease = leases.acquire(getMaxConnections());
 
         SseEmitter emitter = new RequestEmitter(timeout);
+        emitterLeases.put(emitter, lease);
 
-        log.debug("创建 SseEmitter，超时时间：{}ms, 重连时间：{}ms, 当前连接数：{}",
-                timeout, reconnectTime, currentConnections);
+        log.debug("创建 SseEmitter，超时时间：{}ms, 重连时间：{}ms, 租约：{}",
+                timeout, reconnectTime, lease);
 
         try {
             // 发送初始连接消息，验证客户端连接状态
@@ -370,21 +365,21 @@ public class StreamUtils {
         } catch (IOException | RuntimeException e) {
             log.error("SSE 连接初始化失败：客户端可能已断开或网络异常", e);
             // 立即关闭 emitter 并减少计数
-            activeConnections.decrementAndGet();
+            safeRemoveEmitter(emitter);
             emitter.complete();
             throw new BusinessException("SSE 连接初始化失败，请刷新页面重试");
         }
 
         // 注册超时回调
         emitter.onTimeout(() -> {
-            log.warn("SSE 连接超时，等待客户端重连，当前连接数：{}", activeConnections.get());
+            log.warn("SSE 连接超时，等待客户端重连");
             safeRemoveEmitter(emitter); // 先移除，避免泄漏
             emitter.complete();
         });
 
         // 注册错误回调
         emitter.onError(throwable -> {
-            log.error("SSE 连接错误，当前连接数：{}", activeConnections.get(), throwable);
+            log.error("SSE 连接错误", throwable);
             safeRemoveEmitter(emitter);
             emitter.complete();
         });
@@ -425,6 +420,7 @@ public class StreamUtils {
      */
     @PreDestroy
     public void destroy() {
+        for (SseEmitter emitter : emitterLeases.keySet()) safeCompleteEmitter(emitter);
         if (connectionMonitor != null && !connectionMonitor.isShutdown()) {
             log.info("正在关闭 SSE 连接监控任务...");
             connectionMonitor.shutdown();

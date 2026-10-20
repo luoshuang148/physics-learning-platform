@@ -1,0 +1,504 @@
+/* =========================================
+   1. 全局底层样式
+   ========================================= */
+html,
+body {
+    height: 100%;
+    margin: 0;
+    overflow: hidden;
+    /* 防止出现滚动条 */
+    background-color: var(--theme-bg);
+    /* 深空背景色 */
+    font-family: var(--font-family-ui);
+}
+
+#c {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+/* =========================================
+   2. 宏观容器布局 (绝对防遮挡体系)
+   ========================================= */
+/* 左侧侧边栏：贯穿整个屏幕左侧，承载控制台与操作记录 */
+#left-sidebar {
+    position: absolute;
+    left: 20px;
+    top: 20px;
+    top: 20px;
+    /* 延伸到底部 */
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    width: 240px;
+    pointer-events: none;
+    /* 让空白处可以穿透点击 3D 场景 */
+}
+
+/* 顶部正中：AI 实验助教 */
+#ai-panel {
+    position: absolute;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 500px;
+    max-width: 90vw;
+    text-align: center;
+    z-index: 1000;
+}
+
+/* 顶部偏左：实时物理数据监控 */
+#data-panel {
+    position: absolute;
+    top: 20px;
+    right: calc(50% + 280px);
+    /* 动态挂载在 AI 面板左侧边距 20px 处 */
+    width: 220px;
+}
+
+/* 右下角：1D 经典能级图 */
+#right-sidebar {
+    position: absolute;
+    right: 20px;
+    bottom: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    width: 260px;
+    pointer-events: none;
+}
+
+/* =========================================
+   3. 面板通用组件 (Glassmorphism 毛玻璃)
+   ========================================= */
+/* 面板底板样式（与 Shared 风格统一） */
+.panel-style {
+    background: var(--theme-panel-bg);
+    backdrop-filter: blur(15px);
+    border: 1px solid var(--theme-panel-border);
+    border-radius: 12px;
+    color: var(--theme-text);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    pointer-events: auto;
+}
+
+/* 面板内部内容区 */
+.panel-content {
+    padding: 0;
+}
+
+/* 量子控制台内容适当贴合 Shared 风格，减少左右空白过大 */
+#ui-panel .panel-content {
+    padding: 0 4px;
+}
+
+/* 折叠标题：对齐 Shared/style.css，仅保留本实验必要间距修正 */
+details summary {
+    cursor: pointer;
+    font-size: var(--font-size-body);
+    font-weight: bold;
+    color: var(--theme-primary);
+    padding: 8px 0 12px 28px;
+    outline: none;
+    user-select: none;
+    list-style: none;
+    position: relative;
+}
+
+details summary::-webkit-details-marker {
+    display: none;
+}
+
+/* 禁用右上角额外箭头，保留 Shared 的左侧箭头 */
+details summary::after {
+    display: none;
+}
+
+#ai-panel summary {
+    color: var(--theme-text);
+}
+
+#ai-panel summary::before {
+    color: var(--theme-text);
+}
+
+details[open] summary {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* =========================================
+   4. 内部元素细节排版
+   ========================================= */
+/* 控制台通用分割线与小标题 */
+.section-title {
+    font-size: var(--font-size-caption);
+    color: #ccc;
+    margin: 0 0 10px 0;
+}
+
+.divider {
+    border: 0;
+    height: 1px;
+    background: rgba(255, 255, 255, 0.1);
+    margin: 15px 0;
+}
+
+/* 按钮通用样式 */
+button {
+    display: block;
+    width: 100%;
+    margin-bottom: 10px;
+    padding: 10px 12px;
+    background: var(--theme-button-bg);
+    border: 1px solid var(--theme-button-border);
+    color: #fff;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+button:hover {
+    background: rgba(0, 229, 255, 0.4);
+    transform: translateY(-2px);
+}
+
+.btn-danger {
+    background: rgba(255, 85, 85, 0.15);
+    border-color: var(--theme-accent);
+    color: var(--theme-test);
+}
+
+.btn-danger:hover {
+    background: rgba(255, 85, 85, 0.4);
+}
+
+/* 输入框组合 (能量大炮) */
+.input-group {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+    align-items: center;
+}
+
+.input-group input {
+    flex: 1;
+    background: var(--theme-panel-bg);
+    color: #fff;
+    border: 1px solid var(--theme-panel-border);
+    border-radius: 4px;
+    padding: 6px;
+    outline: none;
+}
+
+.input-group input:focus {
+    border-color: var(--theme-panel-border);
+}
+
+/* 能量大炮：炮弹类型切换器样式 */
+.projectile-toggle {
+    display: flex;
+    background: var(--theme-panel-bg);
+    border: 1px solid var(--theme-panel-border);
+    border-radius: 6px;
+    overflow: hidden;
+    margin-bottom: 12px;
+}
+
+.projectile-toggle input[type="radio"] {
+    display: none;
+    /* 隐藏原始的圆圈按钮 */
+}
+
+.projectile-toggle label {
+    flex: 1;
+    text-align: center;
+    padding: 8px 0;
+    font-size: 13px;
+    color: #888;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    user-select: none;
+}
+
+/* 光子被选中时的状态 (青蓝色) */
+.projectile-toggle input#proj-photon:checked+label {
+    background: rgba(0, 229, 255, 0.2);
+    color: #00e5ff;
+    font-weight: bold;
+    box-shadow: inset 0 0 10px rgba(0, 229, 255, 0.4);
+}
+
+/* 电子被选中时的状态 (荧光绿) */
+.projectile-toggle input#proj-electron:checked+label {
+    background: rgba(0, 255, 136, 0.2);
+    color: #00ff88;
+    font-weight: bold;
+    box-shadow: inset 0 0 10px rgba(0, 255, 136, 0.4);
+}
+
+/* 粒子切换开关样式 */
+.mode-switch {
+    display: flex;
+    background: var(--theme-panel-bg);
+    border-radius: 20px;
+    border: 1px solid var(--theme-panel-border);
+    overflow: hidden;
+}
+
+.mode-btn {
+    padding: 4px 12px;
+    font-size: 12px;
+    color: #888;
+    cursor: pointer;
+    transition: 0.3s;
+}
+
+.mode-btn.active {
+    background: rgba(0, 229, 255, 0.3);
+    color: #fff;
+    font-weight: bold;
+}
+
+/* 数据面板高亮排版 */
+#data-panel p {
+    margin: 8px 0;
+    font-size: 14px;
+    color: #ccc;
+}
+
+#data-panel strong {
+    color: var(--theme-accent);
+    float: right;
+}
+
+/* 数值靠右对齐 */
+
+/* AI 面板特殊配色 */
+#ai-panel strong {
+    color: var(--theme-accent);
+}
+
+#ai-panel p {
+    margin: 0;
+    font-size: var(--font-size-body-sm);
+    line-height: 1.6;
+    color: var(--theme-text-soft);
+}
+
+/* 1D 能级图画布底板 */
+#energy-canvas {
+    background-color: var(--theme-panel-bg);
+    border: 1px solid var(--theme-panel-border);
+    border-radius: 4px;
+    display: block;
+    margin: 0 auto;
+    box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.8);
+}
+
+/* --- 实验操作日志专属样式 --- */
+#log-panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+/* 拉伸填满左侧剩余空间 */
+#log-panel details {
+    display: flex;
+    flex-direction: column;
+}
+
+.log-content {
+    flex: 1;
+    max-height: 200px !important;
+    max-height: none;
+    overflow-y: auto;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.log-content::-webkit-scrollbar {
+    width: 4px;
+}
+
+.log-content::-webkit-scrollbar-thumb {
+    background: rgba(0, 229, 255, 0.5);
+    border-radius: 4px;
+}
+
+.log-item {
+    background: var(--theme-panel-bg);
+    border-left: 3px solid var(--theme-panel-border);
+    padding: 8px 10px;
+    border-radius: 0 6px 6px 0;
+    color: #ddd;
+    font-size: 12px;
+    line-height: 1.5;
+    animation: fadeIn 0.3s ease-out;
+}
+
+.log-item .time {
+    font-size: 10px;
+    color: #888;
+    margin-bottom: 2px;
+}
+
+.log-item span {
+    color: #ffbf00;
+    font-weight: bold;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateX(-10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+
+/* =========================================
+   5. 3D 空间漂浮标签 (CSS2D)
+   ========================================= */
+.orbit-label {
+    color: rgba(0, 229, 255, 0.9);
+    font-family: 'Courier New', monospace;
+    font-size: 16px;
+    font-weight: bold;
+    pointer-events: none;
+    text-shadow: 0 0 8px #00e5ff;
+    margin-top: -10px;
+}
+
+.photon-label {
+    background: var(--theme-panel-bg);
+    border: 1px solid var(--theme-panel-border);
+    color: #fff;
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-family: monospace;
+    pointer-events: none;
+    white-space: nowrap;
+    text-align: center;
+    margin-top: 20px;
+}
+
+.photon-label span {
+    color: #ffbf00;
+    font-weight: bold;
+}
+
+
+/* =========================================
+   6. lil-gui 控制面板赛博朋克覆写
+   ========================================= */
+:root {
+    --lil-gui-accent-color: var(--theme-slider-bg) !important;
+    /* 进度条颜色 */
+    --lil-gui-focus-color: var(--theme-slider-bg) !important;
+    --lil-gui-hover-color: var(--theme-slider-shadow) !important;
+}
+
+.lil-gui {
+    --font-size: 15px !important;
+    --widget-height: 28px !important;
+    /* 调高控件，防止球被挤扁 */
+    --name-width: 45% !important;
+    --number-color: var(--theme-slider-bg) !important;
+    --text-color: #eee !important;
+}
+
+.lil-gui .slider {
+    background: color-mix(in srgb, var(--theme-slider-bg) 30%, #000 70%) !important;
+    height: 4px !important;
+    border-radius: 2px !important;
+    margin-top: 12px !important;
+    overflow: visible !important;
+    /* 允许圆球溢出轨道边界 */
+}
+
+.lil-gui .fill,
+.lil-gui .slider-fg {
+    background: var(--theme-slider-bg) !important;
+    height: 100% !important;
+    position: relative !important;
+    overflow: visible !important;
+}
+
+/* 生成主题色滑块球 */
+.lil-gui .fill::after,
+.lil-gui .slider-fg::after {
+    content: '' !important;
+    position: absolute !important;
+    right: -6px !important;
+    top: 50% !important;
+    transform: translateY(-50%) !important;
+    width: 12px !important;
+    height: 12px !important;
+    background: #ffffff !important;
+    border: 3px solid var(--theme-slider-bg) !important;
+    border-radius: 50% !important;
+    box-shadow: 0 0 12px var(--theme-slider-shadow), 0 0 5px rgba(255, 255, 255, 0.8) !important;
+    z-index: 9999 !important;
+    cursor: grab !important;
+    transition: transform 0.1s, box-shadow 0.1s;
+}
+
+/* 拖拽反馈 */
+.lil-gui .fill:active::after,
+.lil-gui .slider-fg:active::after {
+    transform: translateY(-50%) scale(1.4) !important;
+    box-shadow: 0 0 20px var(--theme-slider-shadow), 0 0 10px #fff !important;
+    cursor: grabbing !important;
+}
+
+.lil-gui .slider-knob {
+    display: none !important;
+}
+
+/* 非全屏紧凑模式：优先缩宽并重排顶部信息面板 */
+body.layout-nonfull #left-sidebar,
+body.layout-compact #left-sidebar {
+    left: 8px !important;
+    top: 8px !important;
+    width: clamp(170px, 15vw, 200px) !important;
+}
+
+body.layout-nonfull #ai-panel,
+body.layout-compact #ai-panel {
+    top: 8px !important;
+    width: clamp(240px, 30vw, 320px) !important;
+}
+
+body.layout-nonfull #data-panel,
+body.layout-compact #data-panel {
+    top: 8px !important;
+    right: 8px !important;
+    width: clamp(150px, 14vw, 185px) !important;
+}
+
+body.layout-nonfull #right-sidebar,
+body.layout-compact #right-sidebar {
+    right: 8px !important;
+    bottom: 8px !important;
+    width: clamp(170px, 15vw, 210px) !important;
+}
+
+body.layout-nonfull .panel,
+body.layout-compact .panel {
+    padding: 10px !important;
+}
+
+body.layout-nonfull details summary,
+body.layout-compact details summary {
+    font-size: 14px;
+}

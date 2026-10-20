@@ -1,118 +1,70 @@
 <template>
-  <AppShell :subtitle="`${greeting}，${auth.user?.realName ?? '同学'}`" :links="links">
-    <div v-if="loading" class="home-loading">
-      <div class="loading-ring" />
-      <p>正在加载…</p>
-    </div>
-
+  <AppShell :subtitle="`${greeting}，${auth.user?.realName ?? '同学'}`">
+    <div v-if="loading" class="student-home-loading" role="status">正在加载…</div>
     <template v-else>
-      <section class="overview-card" :class="{ idle: !task }">
-        <div class="overview-main">
-          <div class="overview-kicker">学生首页</div>
-          <h1 class="overview-title">{{ greeting }}，{{ auth.user?.realName ?? auth.user?.username }}</h1>
-
-          <div v-if="task" class="overview-task-meta">
-            <span class="task-live-badge">⚡ 当前任务</span>
-            <span class="task-meta">{{ task.teacherName }} · {{ formatTime(task.eventTimestamp) }}</span>
+      <header class="student-welcome">
+        <div>
+          <span class="student-eyebrow">学习空间</span>
+          <h1>{{ greeting }}，{{ auth.user?.realName ?? '同学' }}<span aria-hidden="true">☀</span></h1>
+          <p>从今天的一次练习开始。</p>
+        </div>
+        <div class="student-today">{{ today.date }}<span>{{ today.weekday }}</span></div>
+      </header>
+      <section class="student-current-task">
+        <div class="student-task-copy">
+          <div v-if="task" class="student-task-meta">
+            <span class="student-task-tag">{{ currentResult?.progress.label }}</span>
+            <span>{{ taskAvailabilityText(task.availability ?? task.status) }}</span>
+            <span>{{ task.teacherName }}</span>
+            <span v-if="openTasks.length > 1">另有 {{ openTasks.length - 1 }} 个待完成任务</span>
           </div>
-
-          <h2 class="overview-task-title">{{ task ? task.eventTitle : '当前暂无教师任务' }}</h2>
-
-          <div class="overview-actions">
-            <button v-if="task" class="primary-action" @click="enterExperiment">
-              <span>进入实验</span>
-              <span class="start-arrow">→</span>
-            </button>
-            <button v-else class="secondary-action" @click="loadAll">刷新任务</button>
+          <span v-else class="student-eyebrow">教师作业</span>
+          <h2>{{ task?.eventTitle ?? '当前暂无教师任务' }}</h2>
+          <p v-if="task">{{ taskQuestionCount }} 道题 · {{ task.dueAt ? '截止 ' + formatTime(task.dueAt) : '不限截止时间' }}</p>
+          <p v-else>任务发布后会显示在这里，也可以先去探索实验。</p>
+          <div v-if="currentResult" class="student-task-progress">
+            <span>已完成 {{ currentResult.progress.answered }} / {{ currentResult.progress.total }} 题</span>
+            <span>{{ !currentResult.progress.total ? '等待教师配置题目' : currentResult.progress.completed ? '全部题目已保存' : '还剩 ' + currentResult.progress.remaining + ' 题' }}</span>
+            <progress :value="currentResult.progress.percent" max="100" aria-label="当前作业完成进度" />
+          </div>
+          <div class="student-task-actions">
+            <button v-if="currentResult?.canResume" class="student-start" @click="enterTask">{{ currentResult.progress.answered ? '继续作答' : '开始作答' }}<AppIcon name="arrow" /></button>
+            <RouterLink v-else-if="currentResult && currentResult.answeredQuestions > 0" class="student-start" :to="{ path: '/student/report', query: { eventId: task?.id } }">查看结果 / 复盘<AppIcon name="arrow" /></RouterLink>
+            <button v-else-if="!task" class="student-refresh" @click="loadAll">刷新任务</button>
+            <span v-else class="student-unavailable">{{ taskAvailabilityText(task.availability ?? task.status) }}</span>
+            <RouterLink class="student-text-link" to="/student/task">全部作业 <span>{{ tasks.length }}</span></RouterLink>
           </div>
         </div>
-
-        <div class="overview-side">
-          <div class="status-panel">
-            <span class="panel-label">学习状态</span>
-            <div class="status-grid">
-              <div class="status-item">
-                <span class="status-value">{{ myStats.total }}</span>
-                <span class="status-name">累计答题</span>
-              </div>
-              <div class="status-item">
-                <span class="status-value">{{ myStats.accuracy }}%</span>
-                <span class="status-name">正确率</span>
-              </div>
-              <div class="status-item">
-                <span class="status-value">{{ myStats.wrong }}</span>
-                <span class="status-name">待复习</span>
-              </div>
-            </div>
-          </div>
+        <div class="student-atom" aria-hidden="true">
+          <i class="student-orbit" /><i class="student-orbit orbit-two" /><i class="student-orbit orbit-three" />
+          <i class="student-nucleus" /><i class="student-electron" /><span>F = ma</span>
         </div>
       </section>
-
-      <section class="home-grid">
-        <div class="main-column">
-          <div v-if="recentWrong.length" class="panel-card wrong-preview">
-            <div class="panel-head">
-              <div>
-                <h3 class="panel-title">最近错题</h3>
-                <p class="panel-subtitle">优先复习最近暴露的问题</p>
-              </div>
-              <router-link to="/student/wrong-book" class="panel-link">进入错题本 →</router-link>
-            </div>
-
-            <div class="wp-list">
-              <div v-for="r in recentWrong" :key="r.recordId" class="wp-item">
-                <span class="wp-ans wrong">{{ r.userAnswer }}</span>
-                <span class="wp-correct">→ {{ r.correctAnswer }}</span>
-                <div class="wp-content"><LatexText :content="r.questionContent?.slice(0, 80) ?? ''" /></div>
-              </div>
-            </div>
-          </div>
-
-          <div v-else class="panel-card empty-card">
-            <div class="empty-icon">🎉</div>
-            <div>
-              <h3 class="panel-title">暂无错题</h3>
-              <p class="panel-subtitle">继续保持，完成任务后可再查看学习报告。</p>
-            </div>
-          </div>
-        </div>
-
-        <aside class="side-column">
-          <div class="panel-card next-step-card">
-            <div class="panel-head compact">
-              <h3 class="panel-title">下一步</h3>
-            </div>
-
-            <div class="step-list">
-              <router-link v-if="task" to="/student/experiment" class="step-item step-item-disabled" @click.prevent="enterExperiment">
-                <span class="step-icon">🧪</span>
-                <div class="step-body">
-                  <span class="step-title">开始当前实验</span>
-                  <span class="step-desc">继续本次教师发布任务</span>
-                </div>
-              </router-link>
-
-              <router-link to="/student/wrong-book" class="step-item">
-                <span class="step-icon">📖</span>
-                <div class="step-body">
-                  <span class="step-title">复习错题</span>
-                  <span class="step-desc">查看历史错误与解析</span>
-                </div>
-              </router-link>
-
-              <router-link to="/student/report" class="step-item">
-                <span class="step-icon">📊</span>
-                <div class="step-body">
-                  <span class="step-title">查看学习报告</span>
-                  <span class="step-desc">生成本阶段学习总结</span>
-                </div>
-              </router-link>
-            </div>
-          </div>
-        </aside>
+      <section class="student-summary" aria-label="学习概览">
+        <div><span>累计答题</span><strong>{{ myStats.total }}<small>次</small></strong></div>
+        <div><span>正确率</span><strong>{{ myStats.accuracy }}<small>%</small></strong></div>
+        <div><span>待复习错题</span><strong>{{ myStats.wrong }}<small>道</small></strong></div>
+        <RouterLink to="/student/task" aria-label="查看我的作业"><AppIcon name="arrow" /></RouterLink>
       </section>
+      <div class="student-home-lower">
+        <section class="student-recent-wrong">
+          <div class="student-panel-heading"><h2>最近错题</h2><RouterLink class="student-text-link" to="/student/wrong-book">查看全部<AppIcon name="arrow" /></RouterLink></div>
+          <div v-if="recentWrong.length" class="student-wrong-list">
+            <RouterLink v-for="(record, index) in recentWrong" :key="record.recordId" to="/student/wrong-book" class="student-wrong-row">
+              <span class="student-question-number">{{ String(index + 1).padStart(2, '0') }}</span>
+              <div class="student-wrong-copy"><LatexText :content="record.questionPreview?.slice(0, 80) || '查看题目详情'" /><span>我的答案：{{ record.userAnswer }}</span></div>
+              <span class="student-row-arrow" aria-hidden="true">›</span>
+            </RouterLink>
+          </div>
+          <p v-else class="student-wrong-empty">暂无错题，继续保持。</p>
+        </section>
+        <RouterLink to="/student/experiments" class="student-experiment-card">
+          <div class="student-experiment-label"><AppIcon name="experiments" /><span>虚拟实验室</span><span aria-hidden="true">↗</span></div>
+          <div class="student-lab-art" aria-hidden="true"><i /><span class="student-lab-charge">+</span><span class="student-lab-charge charge-two">−</span></div>
+          <div class="student-experiment-copy"><h2>把物理，放进实验里。</h2><p>自主探索实验，观察规律与变化。</p><span>探索 3D 实验<AppIcon name="arrow" /></span></div>
+        </RouterLink>
+      </div>
     </template>
-
     <AppToast :visible="visible" :type="type" :message="message" />
   </AppShell>
 </template>
@@ -123,12 +75,13 @@ import { useRouter } from 'vue-router';
 import AppShell from '@/layouts/AppShell.vue';
 import AppToast from '@/components/AppToast.vue';
 import LatexText from '@/components/LatexText.vue';
+import AppIcon from '@/components/AppIcon.vue';
 import { useToast } from '@/composables/useToast';
 import { useAuthStore } from '@/stores/auth';
-import { getTeacherEventApi } from '@/api/teacher-event';
-import { getMyAnswersApi, getMyWrongAnswersApi } from '@/api/answer-record';
-import type { TeacherEventResponse } from '@/types/teacher-event';
-import type { AnswerRecordResponse } from '@/types/answer-record';
+import { getStudentTaskResultsApi, type StudentTaskResult } from '@/api/teacher-event';
+import { sortStudentTasks, taskAvailabilityText } from '@/utils/assignmentProgress';
+import { getStudentAnswerSummaryApi, getPracticeReviewPageApi } from '@/api/answer-record';
+import type { AnswerRecordSummary, StudentAnswerSummary } from '@/types/answer-record';
 
 const TASK_ENTRY_EVENT_ID_KEY_PREFIX = 'student_task_entry_event_id';
 
@@ -138,16 +91,15 @@ const { visible, type, message, show } = useToast();
 
 const getTaskEntryEventIdKey = () => `${TASK_ENTRY_EVENT_ID_KEY_PREFIX}_${auth.user?.id ?? 'anonymous'}`;
 
-const links = [
-  { label: '首页', to: '/student/home' },
-  { label: '错题本', to: '/student/wrong-book' },
-  { label: '学习报告', to: '/student/report' },
-];
 
 const loading = ref(true);
-const task = ref<TeacherEventResponse | null>(null);
-const allRecords = ref<AnswerRecordResponse[]>([]);
-const wrongRecords = ref<AnswerRecordResponse[]>([]);
+const tasks = ref<StudentTaskResult[]>([]);
+const sortedTasks = computed(() => sortStudentTasks(tasks.value));
+const openTasks = computed(() => sortedTasks.value.filter(item => item.canResume));
+const currentResult = computed(() => sortedTasks.value[0] ?? null);
+const task = computed(() => currentResult.value?.task ?? null);
+const mySummary = ref<StudentAnswerSummary>({ totalAttempts: 0, correctAttempts: 0, wrongQuestions: 0 });
+const wrongRecords = ref<AnswerRecordSummary[]>([]);
 
 const greeting = computed(() => {
   const h = new Date().getHours();
@@ -159,22 +111,19 @@ const greeting = computed(() => {
 });
 
 const myStats = computed(() => {
-  const total = allRecords.value.length;
-  const correct = allRecords.value.filter(r => r.correct).length;
-  const wrong = wrongRecords.value.length;
+  const { totalAttempts: total, correctAttempts: correct, wrongQuestions: wrong } = mySummary.value;
   const accuracy = total > 0 ? Math.round((correct / total) * 100) : 0;
   return { total, correct, wrong, accuracy };
 });
 
 const recentWrong = computed(() => wrongRecords.value.slice(0, 3));
 
-const parseQuestionIds = (desc: string | null) => {
-  if (!desc?.startsWith('QIDS:')) return [];
-  return desc.slice(5).split(',').map(Number).filter(n => n > 0);
+const taskQuestionCount = computed(() => currentResult.value?.progress.total ?? 0);
+const now = new Date();
+const today = {
+  date: now.toLocaleDateString('zh-CN', { month: 'long', day: 'numeric' }),
+  weekday: now.toLocaleDateString('zh-CN', { weekday: 'long' }),
 };
-
-const taskQuestionCount = computed(() => (task.value?.questionIds ?? parseQuestionIds(task.value?.eventDescription ?? null)).length);
-void taskQuestionCount;
 
 const formatTime = (time: string) =>
   new Date(time).toLocaleString('zh-CN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
@@ -182,429 +131,137 @@ const formatTime = (time: string) =>
 const loadAll = async () => {
   loading.value = true;
   try {
-    const [taskData, myData, wrongData] = await Promise.allSettled([
-      getTeacherEventApi(),
-      getMyAnswersApi(),
-      getMyWrongAnswersApi(),
+    const [taskData, summaryData, wrongData] = await Promise.allSettled([
+      getStudentTaskResultsApi(),
+      getStudentAnswerSummaryApi(),
+      getPracticeReviewPageApi({ page: 1, size: 3 }),
     ]);
-    if (taskData.status === 'fulfilled') task.value = taskData.value;
-    if (myData.status === 'fulfilled') allRecords.value = myData.value.records ?? [];
+    if (taskData.status === 'fulfilled') tasks.value = taskData.value;
+    if ([taskData, summaryData, wrongData].some(result => result.status === 'rejected')) show('部分学习数据加载失败，请稍后刷新', 'error');
+    if (summaryData.status === 'fulfilled') mySummary.value = summaryData.value;
     if (wrongData.status === 'fulfilled') {
-      const seen = new Set<string>();
-      wrongRecords.value = (wrongData.value.records ?? []).filter(r => {
-        if (seen.has(r.questionContent)) return false;
-        seen.add(r.questionContent);
-        return true;
-      });
+      wrongRecords.value = (wrongData.value.records ?? []).filter(r => r.correct === false).slice(0, 3);
     }
   } finally {
     loading.value = false;
   }
 };
 
-const enterExperiment = () => {
-  if (!task.value) {
-    show('当前无可进入的教师任务', 'info');
+const enterTask = () => {
+  if (!task.value || !currentResult.value?.canResume) {
+    show('当前没有可作答的教师任务', 'info');
     return;
   }
   sessionStorage.setItem(getTaskEntryEventIdKey(), String(task.value.id));
-  router.push('/student/experiment');
+  router.push({ path: '/student/question', query: { resume: '1' } });
 };
 
 onMounted(loadAll);
 </script>
 
 <style scoped>
-.home-loading {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 16px;
-  color: var(--text-muted);
+
+.student-home-loading { padding: 80px 0; text-align: center; color: var(--text-muted); }
+.student-welcome { display: flex; justify-content: space-between; align-items: center; gap: 20px; }
+.student-eyebrow { display: block; color: #7c8c9e; font-size: .6875rem; letter-spacing: .07em; margin-bottom: 8px; }
+.student-welcome h1 { font-size: 1.75rem; font-weight: 600; letter-spacing: -.025em; overflow-wrap: anywhere; }
+.student-welcome h1 > span { color: #c09c54; font-size: 1.5rem; margin-left: 12px; font-weight: 400; }
+.student-welcome p { margin-top: 7px; font-size: .8125rem; color: #7c8c9e; }
+.student-today { color: #64748b; font-size: .8125rem; flex-shrink: 0; }
+.student-today > span { color: #8492a3; margin-left: 10px; }
+.student-current-task { border: 1px solid #dae6e0; background: #fff; border-radius: 12px; padding: 32px 36px; min-height: 232px; display: flex; justify-content: space-between; align-items: center; position: relative; overflow: hidden; }
+.student-task-copy { position: relative; z-index: 1; min-width: 0; }
+.student-task-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; color: #7c8c9e; font-size: .75rem; }
+.student-task-tag { background: #e9f5ee; color: #287b56; padding: 3px 8px; border-radius: 4px; font-size: .6875rem; }
+.student-current-task h2 { font-size: 1.5rem; font-weight: 600; line-height: 1.5; margin-top: 15px; letter-spacing: -.025em; overflow-wrap: anywhere; }
+.student-task-copy > p { color: #7c8c9e; font-size: .8125rem; margin-top: 9px; }
+.student-task-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 24px; margin-top: 24px; }
+.student-task-progress { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px 20px; max-width: 360px; margin-top: 16px; color: #527464; font-size: 12px; }
+.student-task-progress progress { flex-basis: 100%; width: 100%; height: 6px; border: 0; border-radius: 6px; overflow: hidden; appearance: none; background: #edf2ef; }
+.student-task-progress progress::-webkit-progress-bar { background: #edf2ef; }
+.student-task-progress progress::-webkit-progress-value { background: #42856b; border-radius: 6px; }
+.student-task-progress progress::-moz-progress-bar { background: #42856b; }
+.student-start, .student-refresh { display: inline-flex; align-items: center; justify-content: center; gap: 26px; border: 1px solid #1d715b; background: #1d715b; color: #fff; padding: 11px 17px; border-radius: 6px; cursor: pointer; font-size: .8125rem; }
+.student-start:hover { background: #125f4c; }
+.student-start { text-decoration: none; }
+.student-refresh { background: #fff; color: #1d715b; }
+.student-start .app-icon { width: 17px; height: 17px; }
+.student-text-link { display: inline-flex; align-items: center; gap: 9px; color: #4e7568; font-size: .75rem; text-decoration: none; white-space: nowrap; }
+.student-text-link > span { color: #7c8c9e; }
+.student-text-link .app-icon { width: 16px; height: 16px; }
+.student-unavailable { font-size: .8125rem; color: #7c8c9e; }
+.student-atom { position: relative; width: 200px; height: 165px; margin: 0 54px 0 30px; flex-shrink: 0; }
+.student-orbit { width: 162px; height: 63px; border: 1px solid #bddacf; border-radius: 50%; position: absolute; top: 40px; left: 12px; transform: rotate(-30deg); }
+.orbit-two { transform: rotate(35deg); }
+.orbit-three { transform: rotate(90deg); }
+.student-nucleus { width: 15px; height: 15px; background: #488d76; border-radius: 50%; position: absolute; top: 64px; left: 86px; box-shadow: 0 0 0 8px #dcece5; }
+.student-electron { width: 6px; height: 6px; background: #52967d; border-radius: 50%; position: absolute; top: 42px; left: 29px; }
+.student-atom > span { font: italic 17px Georgia, serif; color: #6a9682; position: absolute; right: -26px; top: 112px; }
+.student-summary { display: flex; align-items: center; border: 1px solid #e3e8ec; border-radius: 10px; padding: 20px 32px; background: #fff; gap: 35px; margin-top: -8px; }
+.student-summary > div { display: flex; align-items: center; gap: 24px; flex: 1; min-width: 0; border-right: 1px solid #edf0f2; }
+.student-summary > div:nth-child(3) { border: 0; }
+.student-summary > div > span { color: #758598; font-size: .75rem; }
+.student-summary strong { font-size: 1.65rem; font-weight: 600; letter-spacing: -.03em; }
+.student-summary small { font-size: .75rem; color: #7c8c9e; margin-left: 5px; font-weight: 400; }
+.student-summary > a { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; background: #f4f7f6; }
+.student-home-lower { display: grid; grid-template-columns: 1.35fr 1fr; gap: 20px; }
+.student-recent-wrong { border: 1px solid #e3e8ec; border-radius: 10px; background: #fff; min-width: 0; }
+.student-panel-heading { padding: 23px 25px 18px; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.student-panel-heading h2 { font-size: 1rem; font-weight: 600; }
+.student-wrong-row { display: flex; align-items: center; gap: 15px; border-top: 1px solid #f0f2f4; margin: 0 25px; padding: 18px 0; text-decoration: none; }
+.student-question-number { width: 31px; height: 34px; border-radius: 5px; background: #f5f3ef; display: grid; place-items: center; font: .8125rem Georgia, serif; color: #8b8069; flex-shrink: 0; }
+.student-wrong-copy { min-width: 0; color: var(--text); font-size: .875rem; }
+.student-wrong-copy :deep(.latex-text) { display: block; max-height: 3em; overflow: hidden; overflow-wrap: anywhere; }
+.student-wrong-copy > span { display: block; margin-top: 5px; color: #7c8c9e; font-size: .6875rem; }
+.student-row-arrow { margin-left: auto; color: #94a3b8; font-size: 20px; }
+.student-wrong-empty { padding: 35px 25px 50px; color: #7c8c9e; font-size: .875rem; }
+.student-experiment-card { border: 1px solid #dfe8e2; border-radius: 10px; background: #f0f5f2; padding: 23px 26px; min-height: 270px; position: relative; overflow: hidden; text-decoration: none; }
+.student-experiment-card:hover { background: #eaf2ed; }
+.student-experiment-label { display: flex; align-items: center; gap: 7px; color: #60846d; font-size: .75rem; }
+.student-experiment-label > span:last-child { margin-left: auto; font-size: 1rem; }
+.student-experiment-label .app-icon { width: 17px; height: 17px; }
+.student-experiment-copy { padding-top: 65px; position: relative; z-index: 1; }
+.student-experiment-copy h2 { color: #345d4b; font-size: 1.25rem; font-weight: 500; }
+.student-experiment-copy p { color: #698273; font-size: .75rem; margin-top: 7px; }
+.student-experiment-copy > span { display: flex; align-items: center; gap: 12px; color: #557d66; font-size: .75rem; margin-top: 19px; }
+.student-experiment-copy .app-icon { width: 17px; height: 17px; }
+.student-lab-art { position: absolute; right: 26px; top: 64px; width: 140px; height: 100px; opacity: .8; }
+.student-lab-art > i { position: absolute; inset: 12px 0; border: 1px solid #bdcfc2; border-radius: 50%; transform: rotate(-25deg); }
+.student-lab-charge { width: 25px; height: 25px; position: absolute; top: 29px; left: 25px; background: #7ea389; color: #fff; display: grid; place-items: center; border-radius: 50%; font-size: 1rem; }
+.charge-two { left: 89px; background: #c6d4c4; color: #6c8a70; }
+@media (max-width: 1000px) {
+  .student-summary { gap: 20px; padding: 20px 25px; }
+  .student-summary > div { gap: 15px; }
+  .student-atom { margin-right: 0; transform: scale(.9); }
+  .student-home-lower { grid-template-columns: 1.2fr 1fr; }
 }
-
-.loading-ring {
-  width: 36px;
-  height: 36px;
-  border-radius: 999px;
-  border: 3px solid rgba(90, 243, 211, 0.12);
-  border-top-color: var(--brand);
-  animation: spin 0.85s linear infinite;
-}
-
-.overview-card,
-.panel-card,
-.status-panel {
-  position: relative;
-  overflow: hidden;
-  border: 1px solid rgba(151, 172, 249, 0.14);
-  background: linear-gradient(160deg, rgba(10, 16, 34, 0.92), rgba(14, 21, 42, 0.86));
-  box-shadow: 0 24px 60px rgba(4, 8, 20, 0.34);
-}
-
-.overview-card {
-  display: grid;
-  grid-template-columns: minmax(0, 1.5fr) minmax(300px, 0.85fr);
-  gap: 18px;
-  border-radius: 24px;
-  padding: 28px;
-  background:
-    radial-gradient(circle at 16% 18%, rgba(90, 243, 211, 0.14), transparent 24%),
-    radial-gradient(circle at 88% 82%, rgba(255, 176, 124, 0.12), transparent 20%),
-    linear-gradient(135deg, rgba(9, 15, 34, 0.96), rgba(18, 12, 44, 0.92));
-}
-
-.overview-card.idle {
-  background:
-    radial-gradient(circle at 16% 18%, rgba(120, 146, 255, 0.12), transparent 24%),
-    linear-gradient(135deg, rgba(9, 15, 34, 0.96), rgba(12, 18, 36, 0.92));
-}
-
-.overview-main {
-  display: grid;
-  gap: 14px;
-  align-content: center;
-}
-
-.overview-kicker,
-.panel-label {
-  display: inline-flex;
-  width: fit-content;
-  padding: 6px 10px;
-  border-radius: 999px;
-  border: 1px solid rgba(90, 243, 211, 0.22);
-  background: rgba(90, 243, 211, 0.08);
-  font-size: var(--font-size-xs);
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: rgba(183, 248, 235, 0.92);
-}
-
-.overview-title {
-  margin: 0;
-  font-size: clamp(28px, 4.2vw, 42px);
-  line-height: 1.08;
-}
-
-.overview-task-meta {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.task-live-badge {
-  display: inline-flex;
-  padding: 3px 10px;
-  border-radius: 999px;
-  border: 1px solid rgba(90, 243, 211, 0.45);
-  background: rgba(90, 243, 211, 0.1);
-  color: var(--brand);
-  font-size: var(--font-size-xs);
-  font-weight: 800;
-  letter-spacing: 0.08em;
-}
-
-.task-meta,
-.panel-subtitle,
-.status-name,
-.wp-content,
-.wp-correct,
-.text-link {
-  color: var(--text-muted);
-}
-
-.overview-task-title {
-  margin: 0;
-  font-size: clamp(22px, 3.2vw, 34px);
-  line-height: 1.18;
-  color: #f4f7ff;
-}
-
-.overview-actions {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-  margin-top: 4px;
-}
-
-.primary-action,
-.secondary-action {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  min-height: 50px;
-  padding: 0 22px;
-  border-radius: 14px;
-  border: 1px solid transparent;
-  font-size: var(--font-size-md);
-  font-weight: 800;
-  cursor: pointer;
-  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
-}
-
-.primary-action {
-  color: #071018;
-  background: linear-gradient(120deg, rgba(90, 243, 211, 0.95), rgba(255, 199, 122, 0.95));
-  box-shadow: 0 14px 34px rgba(90, 243, 211, 0.24);
-}
-
-.secondary-action {
-  color: var(--text);
-  background: rgba(255, 255, 255, 0.04);
-  border-color: rgba(151, 172, 249, 0.18);
-}
-
-.primary-action:hover,
-.secondary-action:hover,
-.step-item:hover {
-  transform: translateY(-2px);
-}
-
-.start-arrow {
-  font-size: 16px;
-  transition: transform 0.2s;
-}
-
-.primary-action:hover .start-arrow {
-  transform: translateX(4px);
-}
-
-.text-link {
-  text-decoration: none;
-  font-size: var(--font-size-sm);
-}
-
-.overview-side {
-  display: flex;
-}
-
-.status-panel {
-  width: 100%;
-  border-radius: 20px;
-  padding: 18px;
-  display: grid;
-  gap: 16px;
-  background:
-    radial-gradient(circle at 80% 10%, rgba(142, 123, 255, 0.16), transparent 24%),
-    linear-gradient(160deg, rgba(18, 13, 42, 0.92), rgba(10, 16, 32, 0.96));
-}
-
-.status-grid {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 12px;
-}
-
-.status-item {
-  padding: 14px 16px;
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  display: grid;
-  gap: 6px;
-}
-
-.status-value {
-  font-size: 28px;
-  font-weight: 800;
-  color: var(--brand);
-  line-height: 1;
-}
-
-.home-grid {
-  margin-top: 18px;
-  display: grid;
-  grid-template-columns: minmax(0, 1.6fr) minmax(280px, 0.9fr);
-  gap: 18px;
-  align-items: start;
-}
-
-.main-column,
-.side-column {
-  display: grid;
-  gap: 18px;
-}
-
-.panel-card {
-  border-radius: 20px;
-  padding: 18px;
-}
-
-.panel-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 14px;
-}
-
-.panel-head.compact {
-  margin-bottom: 10px;
-}
-
-.panel-title {
-  margin: 0;
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--text);
-}
-
-.panel-subtitle {
-  margin: 6px 0 0;
-  font-size: var(--font-size-sm);
-  line-height: 1.6;
-}
-
-.panel-link {
-  font-size: var(--font-size-sm);
-  color: var(--brand);
-  text-decoration: none;
-  white-space: nowrap;
-}
-
-.wp-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.wp-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 12px 14px;
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.025);
-  font-size: var(--font-size-sm);
-}
-
-.wp-ans {
-  font-family: monospace;
-  font-weight: 700;
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  font-size: var(--font-size-xs);
-}
-
-.wp-ans.wrong {
-  background: rgba(255, 100, 100, 0.15);
-  color: rgba(255, 120, 120, 0.9);
-}
-
-.wp-correct {
-  font-size: var(--font-size-xs);
-  flex-shrink: 0;
-}
-
-.wp-content {
-  flex: 1;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-
-.empty-card {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  min-height: 160px;
-}
-
-.empty-icon {
-  font-size: 34px;
-  flex-shrink: 0;
-}
-
-.step-list {
-  display: grid;
-  gap: 12px;
-}
-
-.step-item {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 16px;
-  border-radius: 16px;
-  border: 1px solid rgba(151, 172, 249, 0.1);
-  background: rgba(255, 255, 255, 0.02);
-  text-decoration: none;
-  transition: all 0.2s ease;
-}
-
-.step-item:hover {
-  border-color: rgba(90, 243, 211, 0.3);
-  background: rgba(90, 243, 211, 0.04);
-}
-
-.step-item-disabled {
-  cursor: pointer;
-}
-
-.step-icon {
-  font-size: 24px;
-  flex-shrink: 0;
-}
-
-.step-body {
-  display: grid;
-  gap: 4px;
-}
-
-.step-title {
-  font-size: 15px;
-  font-weight: 700;
-  color: var(--text);
-}
-
-.step-desc {
-  font-size: var(--font-size-sm);
-  color: var(--text-muted);
-}
-
-@media (max-width: 1180px) {
-  .overview-card,
-  .home-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .status-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-}
-
 @media (max-width: 760px) {
-  .overview-card,
-  .panel-card,
-  .status-panel {
-    padding: 18px;
-  }
-
-  .overview-actions,
-  .panel-head,
-  .wp-item {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .status-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
+  .student-welcome { align-items: flex-start; gap: 12px; }
+  .student-welcome h1 { font-size: 1.5rem; }
+  .student-welcome h1 > span { font-size: 1.25rem; margin-left: 7px; }
+  .student-welcome p { font-size: .75rem; }
+  .student-today { font-size: .6875rem; padding-top: 8px; }
+  .student-today > span { display: block; margin: 5px 0 0; text-align: right; }
+  .student-current-task { padding: 23px; min-height: 232px; }
+  .student-task-meta { gap: 8px; font-size: .6875rem; }
+  .student-current-task h2 { font-size: 1.25rem; }
+  .student-task-copy > p { font-size: .75rem; }
+  .student-task-actions { gap: 18px; }
+  .student-atom { position: absolute; right: -50px; top: 30px; opacity: .2; margin: 0; transform: scale(.8); pointer-events: none; }
+  .student-summary { padding: 17px 18px; gap: 15px; }
+  .student-summary > div { flex-direction: column; align-items: flex-start; gap: 5px; padding-right: 8px; }
+  .student-summary > div > span { font-size: .6875rem; }
+  .student-summary strong { font-size: 1.5rem; }
+  .student-summary small { font-size: .6875rem; }
+  .student-summary > a { display: none; }
+  .student-home-lower { grid-template-columns: 1fr; gap: 16px; }
+  .student-panel-heading { padding: 20px; }
+  .student-panel-heading h2 { font-size: .9375rem; }
+  .student-wrong-row { margin: 0 20px; gap: 12px; padding: 15px 0; }
+  .student-wrong-copy { font-size: .8125rem; }
+  .student-experiment-card { padding: 20px; min-height: 235px; }
+  .student-lab-art { right: 22px; top: 44px; transform: scale(.7); transform-origin: top right; }
+  .student-experiment-copy { padding-top: 70px; }
+  .student-experiment-copy h2 { font-size: 1.1875rem; }
 }
 </style>

@@ -45,6 +45,10 @@ public class DatabaseExceptionParserUtil {
             .compile("Unique index or primary key violation: \"(.+?) ON .+?\\((.+?)\\) VALUES \\('(.+?)'\\)",
                     Pattern.DOTALL);
 
+    // Hibernate 6 / H2 may render "users(username NULLS FIRST) VALUES ( /* id */ 'value' )".
+    private static final Pattern H2_USERNAME_INDEX_PATTERN = Pattern.compile(
+            "users\\(username[^)]*\\)\\s+VALUES\\s+\\([^']*'([^']+)'", Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
+
     /**
      * 解析DataIntegrityViolationException并提取关键信息
      * 
@@ -281,14 +285,10 @@ public class DatabaseExceptionParserUtil {
                 return "题目内容";
             case "title":
                 return "标题";
-            case "url":
-                return "视频播放链接";
             case "user_id":
                 return "用户";
             case "question_id":
                 return "题目";
-            case "video_id":
-                return "视频";
             default:
                 return fieldName;
         }
@@ -302,6 +302,11 @@ public class DatabaseExceptionParserUtil {
      * @throws com.zhixuewuli.common.exception.BusinessException 对应的业务异常
      */
     public static void throwAppropriateBusinessException(DataIntegrityViolationException exception) {
+        String raw = exception.getMessage() == null ? "" : exception.getMessage();
+        Matcher h2Username = H2_USERNAME_INDEX_PATTERN.matcher(raw);
+        if (h2Username.find()) {
+            throw new com.zhixuewuli.common.exception.auth.UserNameDuplicateException(h2Username.group(1));
+        }
         DatabaseConstraintInfo info = parseException(exception);
 
         // 根据字段名抛出对应的业务异常
@@ -314,12 +319,6 @@ public class DatabaseExceptionParserUtil {
                         info.getDuplicateValue());
             case "content":
                 throw new com.zhixuewuli.common.exception.question.QuestionContentDuplicateException(
-                        info.getDuplicateValue());
-            case "title":
-                throw new com.zhixuewuli.common.exception.video.VideoAlreadyExistsException("标题",
-                        info.getDuplicateValue());
-            case "url":
-                throw new com.zhixuewuli.common.exception.video.VideoAlreadyExistsException("播放链接",
                         info.getDuplicateValue());
             default:
                 // 对于其他字段，抛出通用的业务异常

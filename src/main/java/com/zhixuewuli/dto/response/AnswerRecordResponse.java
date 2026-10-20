@@ -111,14 +111,6 @@ public class AnswerRecordResponse {
     @Schema(description = "答题时间", example = "2026-01-15T14:30:00")
     private LocalDateTime answeredAt;
 
-    /**
-     * 错误原因分析
-     * 
-     * 用户答题错误时的原因说明。
-     */
-    @Schema(description = "错误原因", example = "对磁场的概念理解不准确")
-    private String errorReason;
-
     // ==================== 题目详细信息 ====================
 
     /**

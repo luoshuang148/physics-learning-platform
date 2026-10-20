@@ -1,6 +1,6 @@
 import request from '@/utils/request';
-import type { ApiResponse } from '@/types/common';
-import type { AnswerRecordBatchResponse, AnswerRecordResponse, AnswerRecordSubmitPayload, RecordBatchDeletePayload, AnswerStatsResponse } from '@/types/answer-record';
+import type { ApiResponse, PageResult } from '@/types/common';
+import type { AnswerRecordBatchResponse, AnswerRecordResponse, AnswerRecordSubmitPayload, AnswerStatsResponse, AnswerRecordSummary, StudentAnswerSummary } from '@/types/answer-record';
 
 export const submitAnswerApi = async (payload: AnswerRecordSubmitPayload): Promise<AnswerRecordResponse> => {
   const { data } = await request.post<ApiResponse<AnswerRecordResponse>>('/answer-records/student/submit', payload);
@@ -47,14 +47,6 @@ export const getStudentLatestSessionRecordsApi = async (studentId: number): Prom
   return data.data;
 };
 
-export const deleteAnswerRecordApi = async (recordId: string): Promise<void> => {
-  await request.delete<ApiResponse<void>>(`/answer-records/teacher/${recordId}`);
-};
-
-export const batchDeleteAnswerRecordsApi = async (payload: RecordBatchDeletePayload): Promise<void> => {
-  await request.delete<ApiResponse<void>>('/answer-records/teacher/batch', { data: payload });
-};
-
 export const getTotalAnswerCountApi = async (): Promise<number> => {
   const { data } = await request.get<ApiResponse<number>>('/answer-records/teacher/count');
   return data.data;
@@ -66,9 +58,28 @@ export const getAnswerStatsApi = async (): Promise<AnswerStatsResponse> => {
 };
 
 
-export const getAnswerRecordPageApi = async (params: { page: number; size: number; wrongOnly: boolean; studentName: string; eventId?: number }) => {
-  const { data } = await request.get<ApiResponse<import('@/types/common').PageResult<AnswerRecordResponse>>>(
-    '/answer-records/teacher/page', { params });
+export const getMyAnswerPageApi = async (params: { page: number; size: number; wrongOnly?: boolean; keyword?: string }): Promise<PageResult<AnswerRecordSummary>> => {
+  const { data } = await request.get<ApiResponse<PageResult<AnswerRecordSummary>>>('/answer-records/student/history', { params });
+  return data.data;
+};
+
+export const getStudentAnswerSummaryApi = async (): Promise<StudentAnswerSummary> => {
+  const { data } = await request.get<ApiResponse<StudentAnswerSummary>>('/answer-records/student/summary');
+  return data.data;
+};
+
+export const getPracticeReviewPageApi = async (params: { page: number; size: number; keyword?: string }): Promise<PageResult<AnswerRecordSummary>> => {
+  const { data } = await request.get<ApiResponse<PageResult<AnswerRecordSummary>>>('/answer-records/student/practice-review/page', { params });
+  return data.data;
+};
+
+export const getUserAnswerPageApi = async (userId: number, params: { page: number; size: number; wrongOnly?: boolean; keyword?: string }): Promise<PageResult<AnswerRecordSummary>> => {
+  const { data } = await request.get<ApiResponse<PageResult<AnswerRecordSummary>>>('/answer-records/user/' + userId + '/history', { params });
+  return data.data;
+};
+
+export const getAnswerRecordDetailApi = async (recordId: string): Promise<AnswerRecordResponse> => {
+  const { data } = await request.get<ApiResponse<AnswerRecordResponse>>('/answer-records/' + encodeURIComponent(recordId));
   return data.data;
 };
 
@@ -85,4 +96,15 @@ export interface LearningSummary {
 }
 export const getLearningSummaryApi = async (eventId?: number):Promise<LearningSummary> => {
  const {data}=await request.get<ApiResponse<LearningSummary>>('/answer-records/teacher/summary',{params:{eventId}});return data.data;
+};
+
+export interface StudentAnswerStats {
+  userId: number;
+  totalCount: number;
+  wrongCount: number;
+}
+
+export const getStudentAnswerStatsApi = async (): Promise<StudentAnswerStats[]> => {
+  const { data } = await request.get<ApiResponse<StudentAnswerStats[]>>('/answer-records/teacher/student-stats');
+  return data.data;
 };

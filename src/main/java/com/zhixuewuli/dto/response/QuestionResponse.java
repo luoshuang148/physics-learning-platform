@@ -95,7 +95,8 @@ public class QuestionResponse {
      * 表示该题目正确答案的选项标识符。
      * 取值为A、B、C、D中的一个。
      */
-    @Schema(description = "正确答案选项标识", example = "B")
+    @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+    @Schema(description = "正确答案选项标识；活动任务首次作答前不返回", example = "B")
     private String correctOption;
 
     /**
@@ -105,7 +106,8 @@ public class QuestionResponse {
      * 统一使用LaTeX格式，支持复杂的数学推导和公式展示。
      * 可能为空，表示暂无解析。
      */
-    @Schema(description = "题目解析说明（LaTeX格式）", example = "根据牛顿第二定律$F=ma$，可得$a=\\frac{F}{m}=\\frac{10}{2}=5\\,\\mathrm{m/s^2}$")
+    @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+    @Schema(description = "题目解析；活动任务首次作答前不返回", example = "根据牛顿第二定律$F=ma$")
     private String explanation;
 
     /**
@@ -131,9 +133,6 @@ public class QuestionResponse {
      * 示例：{"A": 123, "B": 456, "C": 789, "D": 101}
      * 可能为空，表示暂无视频映射。
      */
-    @Schema(description = "讲解视频映射（选项到视频ID的映射）")
-    private Map<String, Long> explanationVideoMapping;
-
     /**
      * 题目图片Base64编码数据（仅支持PNG格式）
      * 

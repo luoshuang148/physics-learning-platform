@@ -3,14 +3,19 @@ export interface AppShellLink {
   to: string;
 }
 
+export const studentNavLinks: AppShellLink[] = [
+  { label: '首页', to: '/student/home' },
+  { label: '作业', to: '/student/task' },
+  { label: '错题本', to: '/student/wrong-book' },
+  { label: '3D 实验', to: '/student/experiments' },
+];
+
 export const teacherNavLinks: AppShellLink[] = [
   { label: '总览', to: '/teacher/dashboard' },
-  { label: '用户管理', to: '/teacher/users' },
-  { label: '答题记录', to: '/teacher/records' },
+  { label: '班级管理', to: '/teacher/classroom' },
+  { label: '学生名册', to: '/teacher/users' },
   { label: '题库管理', to: '/teacher/questions' },
-  { label: '视频管理', to: '/teacher/videos' },
-  { label: '题目分析', to: '/teacher/errors' },
   { label: '学生学情', to: '/teacher/student-analysis' },
-  { label: '实验任务', to: '/teacher/event-manage' },
+  { label: '任务管理', to: '/teacher/event-manage' },
 ];
 

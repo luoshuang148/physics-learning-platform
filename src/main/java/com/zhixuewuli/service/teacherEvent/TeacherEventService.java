@@ -1,76 +1,53 @@
 package com.zhixuewuli.service.teacherEvent;
 
 import com.zhixuewuli.dto.request.TeacherEventCreateRequest;
+import com.zhixuewuli.dto.response.QuestionResponse;
 import com.zhixuewuli.dto.response.TeacherEventResponse;
 
-/**
- * 教师事件服务接口
- * 
- * 定义教师全局事件管理的核心业务操作，包括事件发布、删除和查询功能。
- * 全局事件在整个系统中唯一，所有用户共享同一个教师事件。
- * 
- * <p>
- * 核心业务规则：
- * </p>
- * <ul>
- * <li>整个系统只能有一个全局事件（is_global=true）</li>
- * <li>发布新事件前必须删除已有事件</li>
- * <li>事件一旦发布不可修改，只能删除后重新发布</li>
- * <li>只有教师可以创建/删除事件，所有认证用户可查询事件</li>
- * </ul>
- * 
- * @author 智学物理开发团队
- * @version 1.0.0
- * @since 2026
- * @see TeacherEventCreateRequest 事件创建请求 DTO
- * @see TeacherEventResponse 事件响应 DTO
- */
+import java.util.List;
+
 public interface TeacherEventService {
     TeacherEventResponse replaceEvent(Long expectedId, TeacherEventCreateRequest request, Long userId);
-    void archiveEvent(Long expectedId,Long userId);
+
+    void archiveEvent(Long expectedId);
+
     TeacherEventResponse getEvent(Long id);
-    java.util.List<com.zhixuewuli.dto.response.QuestionResponse> getEventQuestions(Long id);
-    com.zhixuewuli.common.result.PageResult<TeacherEventResponse> getEventHistory(Long userId, int page, int size);
 
+    TeacherEventResponse getEvent(Long id, Long viewerId);
 
-    /**
-     * 发布教师事件
-     * 
-     * 教师发布新的学习事件作为时间基准点。
-     * 如果全局事件已存在，则抛出 EventAlreadyExistsException 异常。
-     * 
-     * @param request       事件创建请求
-     * @param currentUserId 当前用户 ID（从 JWT 获取，用于验证教师身份）
-     * @return TeacherEventResponse 创建的事件响应
-     * @throws EventAlreadyExistsException            当全局事件已存在时抛出
-     * @throws InsufficientTeacherPermissionException 当用户不是教师时抛出
-     * 
-     * @permission 教师权限
-     * @transactional 需要事务支持
-     */
+    List<QuestionResponse> getEventQuestions(Long id, Long viewerId);
+
+    com.zhixuewuli.common.result.PageResult<TeacherEventResponse> getEventHistory(int page, int size);
+
+    com.zhixuewuli.common.result.PageResult<TeacherEventResponse> getEventHistory(int page, int size, Long teacherId);
+
+    /** Legacy endpoint: create a task. status defaults to PUBLISHED. */
     TeacherEventResponse publishEvent(TeacherEventCreateRequest request, Long currentUserId);
 
-    /**
-     * 删除当前教师的事件
-     * 
-     * 归档当前全局事件，保留答题记录、对话历史和学生报告。
-     * 如果事件不存在，也视为成功（幂等操作）。
-     * 
-     * @param currentUserId 当前用户 ID（从 JWT 获取，用于验证教师身份）
-     * @throws InsufficientTeacherPermissionException 当用户不是教师时抛出
-     * 
-     * @permission 教师权限
-     * @transactional 需要事务支持
-     */
-    void deleteCurrentEvent(Long currentUserId);
+    void deleteCurrentEvent();
 
-    /**
-     * 查询全局事件
-     * 
-     * 查询系统中的全局事件信息。
-     * 如果事件不存在，则返回 null。
-     * 
-     * @return TeacherEventResponse 事件响应，如果不存在则返回 null
-     */
+    /** Legacy single-task endpoint: newest published task or null. */
     TeacherEventResponse getGlobalEvent();
+
+    List<TeacherEventResponse> listTeacherTasks();
+
+    List<TeacherEventResponse> listTeacherTasks(Long teacherId);
+
+    List<TeacherEventResponse> listStudentTasks(Long userId);
+
+    List<com.zhixuewuli.dto.response.StudentTaskResultResponse> listStudentTaskResults(Long userId);
+
+    com.zhixuewuli.dto.response.StudentTaskResultResponse getStudentTaskResult(Long id, Long userId);
+
+    com.zhixuewuli.dto.response.TaskDetailResponse getTaskDetail(Long id, Long userId);
+
+    java.util.List<com.zhixuewuli.dto.response.TaskOverviewResponse> getTaskOverview();
+
+    java.util.List<com.zhixuewuli.dto.response.TaskOverviewResponse> getTaskOverview(Long teacherId);
+
+    TeacherEventResponse updateDraft(Long id, TeacherEventCreateRequest request);
+
+    TeacherEventResponse publishTask(Long id);
+
+    TeacherEventResponse closeTask(Long id);
 }

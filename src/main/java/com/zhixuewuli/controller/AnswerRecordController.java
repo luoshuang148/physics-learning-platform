@@ -1,5 +1,8 @@
 package com.zhixuewuli.controller;
 
+import com.zhixuewuli.common.security.TeacherOnly;
+import com.zhixuewuli.common.security.AuthenticatedUser;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import com.zhixuewuli.common.result.Result;
 import com.zhixuewuli.dto.request.AnswerRecordSubmitRequest;
 import com.zhixuewuli.dto.request.RecordBatchDeleteRequest;
@@ -57,6 +60,12 @@ public class AnswerRecordController {
 
     private final AnswerRecordService answerRecordService;
 
+    @GetMapping("/teacher/student-stats")
+    @TeacherOnly
+    public Result<java.util.List<com.zhixuewuli.dto.response.StudentAnswerStats>> studentStats() {
+        return Result.success(answerRecordService.getStudentAnswerStats());
+    }
+
     /**
      * 提交答题记录（学生功能）
      * 
@@ -78,9 +87,9 @@ public class AnswerRecordController {
     @ResponseStatus(HttpStatus.CREATED)
     public Result<AnswerRecordResponse> submitAnswer(
             @io.swagger.v3.oas.annotations.Parameter(description = "答题记录提交请求参数", required = true) @RequestBody @Valid AnswerRecordSubmitRequest request,
-            HttpServletRequest httpRequest) {
+            @AuthenticationPrincipal AuthenticatedUser user, HttpServletRequest httpRequest) {
 
-        Long currentUserId = (Long) httpRequest.getAttribute("userId");
+        Long currentUserId = user.id();
         String sessionId = (String) httpRequest.getAttribute("sessionId");
 
         AnswerRecordResponse response = answerRecordService.submitAnswerRecord(
@@ -94,6 +103,44 @@ public class AnswerRecordController {
      * 
      * 查询当前登录用户的所有答题历史记录。
      */
+    @GetMapping("/student/history")
+    @Operation(summary = "分页查询我的答题历史", description = "轻量列表，不返回图片和完整解析；详情按记录 ID 加载")
+    public Result<com.zhixuewuli.common.result.PageResult<com.zhixuewuli.dto.response.AnswerRecordSummaryResponse>> history(
+            @RequestParam(defaultValue = "1") int page, @RequestParam(defaultValue = "20") int size,
+            @RequestParam(defaultValue = "false") boolean wrongOnly, @RequestParam(defaultValue = "") String keyword,
+            @AuthenticationPrincipal AuthenticatedUser user) {
+        return Result.success(answerRecordService.getStudentHistory(
+                user.id(), page, size, wrongOnly, keyword));
+    }
+
+    @GetMapping("/student/summary")
+    public Result<com.zhixuewuli.dto.response.StudentAnswerSummary> studentSummary(@AuthenticationPrincipal AuthenticatedUser user) {
+        return Result.success(answerRecordService.getStudentAnswerSummary(user.id()));
+    }
+
+    @GetMapping("/student/practice-review/page")
+    public Result<com.zhixuewuli.common.result.PageResult<com.zhixuewuli.dto.response.AnswerRecordSummaryResponse>> practiceReviewPage(
+            @RequestParam(defaultValue = "1") int page, @RequestParam(defaultValue = "20") int size,
+            @RequestParam(defaultValue = "") String keyword, @AuthenticationPrincipal AuthenticatedUser user) {
+        return Result.success(answerRecordService.getPracticeReviewPage(
+                user.id(), page, size, keyword));
+    }
+
+    @GetMapping("/user/{userId}/history")
+    public Result<com.zhixuewuli.common.result.PageResult<com.zhixuewuli.dto.response.AnswerRecordSummaryResponse>> userHistory(
+            @PathVariable Long userId, @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "20") int size, @RequestParam(defaultValue = "false") boolean wrongOnly,
+            @RequestParam(defaultValue = "") String keyword, @AuthenticationPrincipal AuthenticatedUser user) {
+        return Result.success(answerRecordService.getUserHistory(
+                userId, user.id(), page, size, wrongOnly, keyword));
+    }
+
+    @GetMapping("/{recordId}")
+    public Result<AnswerRecordResponse> answerDetail(@PathVariable String recordId, @AuthenticationPrincipal AuthenticatedUser user) {
+        return Result.success(answerRecordService.getAnswerRecordById(
+                recordId, user.id()));
+    }
+
     @GetMapping("/student/my")
     @Operation(
         summary = "获取我的答题记录",
@@ -103,8 +150,8 @@ public class AnswerRecordController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "未认证")
         }
     )
-    public Result<AnswerRecordBatchResponse> getMyAnswerRecords(HttpServletRequest httpRequest) {
-        Long currentUserId = (Long) httpRequest.getAttribute("userId");
+    public Result<AnswerRecordBatchResponse> getMyAnswerRecords(@AuthenticationPrincipal AuthenticatedUser user) {
+        Long currentUserId = user.id();
         AnswerRecordBatchResponse response = answerRecordService.getCurrentUserAnswerRecords(currentUserId);
         return Result.success(response);
     }
@@ -123,8 +170,8 @@ public class AnswerRecordController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "未认证")
         }
     )
-    public Result<AnswerRecordBatchResponse> getMyWrongAnswers(HttpServletRequest httpRequest) {
-        Long currentUserId = (Long) httpRequest.getAttribute("userId");
+    public Result<AnswerRecordBatchResponse> getMyWrongAnswers(@AuthenticationPrincipal AuthenticatedUser user) {
+        Long currentUserId = user.id();
         AnswerRecordBatchResponse response = answerRecordService.getCurrentUserWrongAnswers(currentUserId);
         return Result.success(response);
     }
@@ -147,9 +194,9 @@ public class AnswerRecordController {
     )
     public Result<AnswerRecordBatchResponse> getUserAnswerRecords(
             @io.swagger.v3.oas.annotations.Parameter(description = "用户 ID", required = true) @PathVariable Long userId,
-            HttpServletRequest httpRequest) {
+            @AuthenticationPrincipal AuthenticatedUser user) {
 
-        Long currentUserId = (Long) httpRequest.getAttribute("userId");
+        Long currentUserId = user.id();
         AnswerRecordBatchResponse response = answerRecordService.getUserAnswerRecords(userId, currentUserId);
         return Result.success(response);
     }
@@ -172,9 +219,9 @@ public class AnswerRecordController {
     )
     public Result<AnswerRecordBatchResponse> getUserWrongAnswers(
             @io.swagger.v3.oas.annotations.Parameter(description = "用户 ID", required = true) @PathVariable Long userId,
-            HttpServletRequest httpRequest) {
+            @AuthenticationPrincipal AuthenticatedUser user) {
 
-        Long currentUserId = (Long) httpRequest.getAttribute("userId");
+        Long currentUserId = user.id();
         AnswerRecordBatchResponse response = answerRecordService.getWrongAnswersByUser(userId, currentUserId);
         return Result.success(response);
     }
@@ -196,11 +243,12 @@ public class AnswerRecordController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "记录不存在")
         }
     )
+    @TeacherOnly
     public Result<Void> deleteAnswerRecord(
             @io.swagger.v3.oas.annotations.Parameter(description = "答题记录 ID", required = true) @PathVariable String recordId,
-            HttpServletRequest httpRequest) {
+            @AuthenticationPrincipal AuthenticatedUser user) {
 
-        Long currentUserId = (Long) httpRequest.getAttribute("userId");
+        Long currentUserId = user.id();
         answerRecordService.deleteAnswerRecord(recordId, currentUserId);
         return Result.success();
     }
@@ -222,11 +270,12 @@ public class AnswerRecordController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "权限不足（非教师身份）")
         }
     )
+    @TeacherOnly
     public Result<Void> batchDelete(
             @io.swagger.v3.oas.annotations.Parameter(description = "批量删除请求参数（包含时间范围）", required = true) @RequestBody @Valid RecordBatchDeleteRequest request,
-            HttpServletRequest httpRequest) {
+            @AuthenticationPrincipal AuthenticatedUser user) {
 
-        Long currentUserId = (Long) httpRequest.getAttribute("userId");
+        Long currentUserId = user.id();
         answerRecordService.batchDeleteByTimeRange(request, currentUserId);
         return Result.success();
     }
@@ -247,8 +296,9 @@ public class AnswerRecordController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "权限不足（非教师身份）")
         }
     )
-    public Result<Long> countTotalAnswers(HttpServletRequest httpRequest) {
-        Long currentUserId = (Long) httpRequest.getAttribute("userId");
+    @TeacherOnly
+    public Result<Long> countTotalAnswers(@AuthenticationPrincipal AuthenticatedUser user) {
+        Long currentUserId = user.id();
         Long totalCount = answerRecordService.countTotalAnswers(currentUserId);
         return Result.success(totalCount);
     }
@@ -262,32 +312,36 @@ public class AnswerRecordController {
     @org.springframework.beans.factory.annotation.Autowired private com.zhixuewuli.repository.AnswerRecordRepository taskAnswerRepository;
     @org.springframework.beans.factory.annotation.Autowired private com.zhixuewuli.common.util.QuestionResponseConverter taskAnswerConverter;
     @GetMapping("/student/task/{eventId}")
-    public Result<AnswerRecordBatchResponse> taskAnswers(@PathVariable Long eventId,HttpServletRequest request){
-        var rows=taskAnswerRepository.findByUserIdAndEventIdOrderByAttemptOrderDesc((Long)request.getAttribute("userId"),eventId);
+    public Result<AnswerRecordBatchResponse> taskAnswers(@PathVariable Long eventId,@AuthenticationPrincipal AuthenticatedUser user){
+        var rows=taskAnswerRepository.findByUserIdAndEventIdOrderByAttemptOrderDesc(user.id(),eventId);
         var data=rows.stream().map(row->taskAnswerConverter.convertToFullResponseDTO(row,row.getQuestion())).toList();
         return Result.success(AnswerRecordBatchResponse.builder().records(data).totalCount((long)data.size()).build());
     }
     @GetMapping("/student/practice-review")
-    public Result<AnswerRecordBatchResponse> practiceReview(HttpServletRequest request){
-        var data=taskAnswerRepository.findPracticeReview((Long)request.getAttribute("userId")).stream()
+    public Result<AnswerRecordBatchResponse> practiceReview(@AuthenticationPrincipal AuthenticatedUser user){
+        Long userId=user.id();
+        long total=taskAnswerRepository.findPracticeReviewPage(userId,"%%",org.springframework.data.domain.PageRequest.of(0,1)).getTotalElements();
+        if(total>100) throw new IllegalArgumentException("错题记录超过100条，请使用分页接口获取");
+        var data=taskAnswerRepository.findPracticeReview(userId).stream()
             .map(row->taskAnswerConverter.convertToFullResponseDTO(row,row.getQuestion())).toList();
         return Result.success(AnswerRecordBatchResponse.builder().records(data).totalCount((long)data.size()).build());
     }
 
     @org.springframework.beans.factory.annotation.Autowired private com.zhixuewuli.service.answerRecord.TaskLearningSummaryService summaries;
     @GetMapping("/teacher/summary")
-    public Result<com.zhixuewuli.dto.response.LearningSummary> summary(@RequestParam(required=false) Long eventId,HttpServletRequest request){
-        return Result.success(summaries.summary((Long)request.getAttribute("userId"),eventId));
+    @TeacherOnly
+    public Result<com.zhixuewuli.dto.response.LearningSummary> summary(@RequestParam(required = false) Long eventId) {
+        return Result.success(summaries.summary(eventId));
     }
 
     @GetMapping("/teacher/page")
     @Operation(summary = "教师分页查询答题记录")
+    @TeacherOnly
     public Result<com.zhixuewuli.common.result.PageResult<AnswerRecordResponse>> getTeacherPage(
             @RequestParam(defaultValue = "1") int page, @RequestParam(defaultValue = "20") int size,
             @RequestParam(defaultValue = "false") boolean wrongOnly,
-            @RequestParam(defaultValue = "") String studentName, @RequestParam(required=false) Long eventId,HttpServletRequest request) {
-        return Result.success(answerRecordService.getTeacherAnswerPage(
-                (Long) request.getAttribute("userId"), page, size, wrongOnly, studentName,eventId));
+            @RequestParam(defaultValue = "") String studentName, @RequestParam(required = false) Long eventId) {
+        return Result.success(answerRecordService.getTeacherAnswerPage(page, size, wrongOnly, studentName,eventId));
     }
 
     @GetMapping("/teacher/all")
@@ -300,8 +354,9 @@ public class AnswerRecordController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "权限不足（非教师身份）")
         }
     )
-    public Result<AnswerRecordBatchResponse> getAllUsersAnswerRecords(HttpServletRequest httpRequest) {
-        Long currentUserId = (Long) httpRequest.getAttribute("userId");
+    @TeacherOnly
+    public Result<AnswerRecordBatchResponse> getAllUsersAnswerRecords(@AuthenticationPrincipal AuthenticatedUser user) {
+        Long currentUserId = user.id();
         AnswerRecordBatchResponse response = answerRecordService.getAllUsersAnswerRecords(currentUserId);
         return Result.success(response);
     }
@@ -322,8 +377,9 @@ public class AnswerRecordController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "权限不足（非教师身份）")
         }
     )
-    public Result<AnswerRecordBatchResponse> getAllUsersWrongAnswers(HttpServletRequest httpRequest) {
-        Long currentUserId = (Long) httpRequest.getAttribute("userId");
+    @TeacherOnly
+    public Result<AnswerRecordBatchResponse> getAllUsersWrongAnswers(@AuthenticationPrincipal AuthenticatedUser user) {
+        Long currentUserId = user.id();
         AnswerRecordBatchResponse response = answerRecordService.getAllUsersWrongAnswers(currentUserId);
         return Result.success(response);
     }
@@ -346,9 +402,9 @@ public class AnswerRecordController {
     )
     public Result<AnswerRecordBatchResponse> getSessionAnswerRecords(
             @io.swagger.v3.oas.annotations.Parameter(description = "会话 ID", required = true) @PathVariable String sessionId,
-            HttpServletRequest httpRequest) {
+            @AuthenticationPrincipal AuthenticatedUser user) {
 
-        Long currentUserId = (Long) httpRequest.getAttribute("userId");
+        Long currentUserId = user.id();
         AnswerRecordBatchResponse response = answerRecordService.getSessionAnswerRecords(sessionId, currentUserId);
         return Result.success("会话答题记录查询成功", response);
     }
@@ -370,11 +426,12 @@ public class AnswerRecordController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "学生不存在或无会话记录")
         }
     )
+    @TeacherOnly
     public Result<AnswerRecordBatchResponse> getStudentLatestSessionRecords(
             @io.swagger.v3.oas.annotations.Parameter(description = "学生用户 ID", required = true) @PathVariable Long studentId,
-            HttpServletRequest httpRequest) {
+            @AuthenticationPrincipal AuthenticatedUser user) {
 
-        Long teacherId = (Long) httpRequest.getAttribute("userId");
+        Long teacherId = user.id();
         AnswerRecordBatchResponse response = answerRecordService.getStudentLatestSessionRecords(studentId, teacherId);
         return Result.success("学生最近会话记录查询成功", response);
     }
@@ -396,11 +453,12 @@ public class AnswerRecordController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "学生不存在或无会话记录")
         }
     )
+    @TeacherOnly
     public Result<AnswerRecordBatchResponse> getStudentLatestSessionRecordsByName(
             @io.swagger.v3.oas.annotations.Parameter(description = "学生真实姓名", required = true) @PathVariable String studentName,
-            HttpServletRequest httpRequest) {
+            @AuthenticationPrincipal AuthenticatedUser user) {
 
-        Long teacherId = (Long) httpRequest.getAttribute("userId");
+        Long teacherId = user.id();
         AnswerRecordBatchResponse response = answerRecordService.getStudentLatestSessionRecordsByName(studentName,
                 teacherId);
         return Result.success("学生最近会话记录查询成功", response);
@@ -423,8 +481,9 @@ public class AnswerRecordController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "权限不足（非教师身份）")
         }
     )
-    public Result<AnswerStatsResponse> getAnswerStats(HttpServletRequest httpRequest) {
-        Long currentUserId = (Long) httpRequest.getAttribute("userId");
+    @TeacherOnly
+    public Result<AnswerStatsResponse> getAnswerStats(@AuthenticationPrincipal AuthenticatedUser user) {
+        Long currentUserId = user.id();
         AnswerStatsResponse response = answerRecordService.getAnswerStats(currentUserId);
         return Result.success(response);
     }

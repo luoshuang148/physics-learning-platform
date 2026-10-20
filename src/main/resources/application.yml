@@ -4,6 +4,29 @@ server:
     context-path: /api/v1
 
 spring:
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      connect-timeout: 2s
+      timeout: 2s
+      repositories:
+        enabled: false
+  # RabbitMQ 批量报告消息（镜像版本固定，凭据只从环境变量读取）
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
+    publisher-confirm-type: correlated
+    publisher-returns: true
+    listener:
+      simple:
+        acknowledge-mode: manual
+        prefetch: ${RABBITMQ_PREFETCH:2}
+        concurrency: ${RABBITMQ_CONCURRENCY:2}
+        auto-startup: ${REPORT_BATCH_ENABLED:true}
   config:
     import: "optional:file:.env[.properties]"
   profiles:
@@ -17,12 +40,18 @@ spring:
   cache:
     type: simple
     cache-names:
-      - videoCache
       - questionCache
       - userCache
       - reportCache
     redis:
       time-to-live: 3600000  # 1小时
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    baseline-version: 8
+    baseline-description: Pre-Flyway V7 schema
+    validate-on-migrate: true
   jpa:
     hibernate:
       ddl-auto: validate              # 各环境只校验，建表及升级通过 SQL 显式执行
@@ -82,6 +111,30 @@ app:
     enabled: ${BOOTSTRAP_TEACHER_ENABLED:false}
     username: ${BOOTSTRAP_TEACHER_USERNAME:}
     password: ${BOOTSTRAP_TEACHER_PASSWORD:}
+  # 批量学生报告（RabbitMQ + Outbox）业务参数
+  report-batch:
+    enabled: ${REPORT_BATCH_ENABLED:true}
+    max-students-per-batch: ${REPORT_BATCH_MAX_STUDENTS:100}
+    max-active-batches-per-teacher: 5
+    item-max-attempts: 3
+    item-lease: 6m
+    retry-base-delay: 30s
+    retry-max-delay: 10m
+    publish-interval: 5s
+    publish-batch-size: 20
+    publish-lease: 30s
+    outbox-max-attempts: 20
+    publish-confirm-timeout: 10s
+    pending-delivery-timeout: 6m
+    recover-interval: 30s
+    recover-batch-size: 50
+    model-timeout: 5m
+    main-exchange: report.batch.exchange
+    main-queue: report.batch.item.queue
+    main-routing-key: report.batch.item
+    dead-letter-exchange: report.batch.dlx
+    dead-letter-queue: report.batch.item.dlq
+    dead-letter-routing-key: report.batch.item.dead
   # LaTeX服务配置
   latex:
     strict-mode: true
@@ -120,12 +173,10 @@ app:
       - /swagger-ui/**
       - /v1/api-docs/**
       - /webjars/**
-      - /videos/**
     session-exclude-paths:
       - /swagger-ui/**
       - /v1/api-docs/**
       - /webjars/**
-      - /videos/**
     jwt-secret: ${APP_JWT_SECRET:zhixuewuli-default-secret-for-dev-only}
 
 # AI 业务配置 (对应 AIBusinessProperties)
@@ -137,22 +188,23 @@ ai:
     session-expiration: 24h
     cleanup-interval: 10m
     context-background: "你是一名经验丰富的高中物理教师，擅长用通俗易懂的方式讲解复杂的物理概念。你的职责是帮助学生理解物理知识，解决学生困惑，并提供针对性的学习建议。请用中文回答，语气要亲切、专业、有耐心。涉及公式的部分，统一使用标准规范的LaTeX格式，例如将所有Unicode箭头替换为LaTeX命令，并且确保公式边界清晰，如应该写成\\cdot t而非\\cdott。"
-    teacher-question-analysis-default-prompt: "请总结归纳学生本题的学习情况，从以下几个角度关注：\r\n1、整体掌握情况（包括正确率、理解程度或学生成绩与掌握情况在班级里的分布等）\r\n2、典型错因和错误思考模式深度分析（可以有依据地结合答题情况与学生自述，适度推理学生错误背后的真相，而不是停留于单纯对学生自述错因的摘要）\r\n3、教学应对建议（包括针对性纠错策略和核心强化知识点与教学方法提示）\r\n4、鼓励在回答中体现具体数据支撑"
+    teacher-question-analysis-default-prompt: "请总结归纳学生本题的学习情况，从以下几个角度关注：\r\n1、整体掌握情况（包括正确率、理解程度或学生成绩与掌握情况在班级里的分布等）\r\n2、结合选项分布和答题情况分析典型错误思考模式，不推测学生未提供的主观想法\r\n3、教学应对建议（包括针对性纠错策略和核心强化知识点与教学方法提示）\r\n4、鼓励在回答中体现具体数据支撑"
 
-    # 模型配置
+    # 模型配置 (智谱免费档)
     real-time-qa-model: "glm-4.1v-thinking-flash"
-    wrong-question-analysis-model: "glm-4.5v"
-    teacher-report-generation-model: "qwen3-235b-a22b-instruct-2507"
-    student-report-generation-model: "qwen3-30b-a3b-instruct-2507"
+    wrong-question-analysis-model: "glm-4.1v-thinking-flash"
+    # 文字复盘使用实测响应更快的免费模型，避免 GLM-4.7-Flash 高峰期排队
+    teacher-report-generation-model: "glm-4-flash-250414"
+    student-report-generation-model: "glm-4-flash-250414"
 
     # 通用参数
     temperature: 0.6
     max-tokens: 8192
 
-    # 阿里云配置 (优先使用 *_AI_API_KEY，兼容旧变量名)
-    aliyun-api-key: ${ALIYUN_AI_API_KEY:${ALIYUN_API_KEY:}}
-    aliyun-base-url: "https://dashscope.aliyuncs.com/compatible-mode/v1"
-    aliyun-default-model: "qwen3-235b-a22b-instruct-2507"
+    # 报告生成复用智谱免费档；未设置或留空时由 AIBusinessProperties 回退到智谱 Key
+    aliyun-api-key: ${ALIYUN_AI_API_KEY:}
+    aliyun-base-url: "https://open.bigmodel.cn/api/paas/v4"
+    aliyun-default-model: "glm-4-flash-250414"
     aliyun-temperature: 0.7
     aliyun-max-tokens: 6144
 

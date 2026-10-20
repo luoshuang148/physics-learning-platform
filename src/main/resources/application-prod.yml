@@ -41,11 +41,6 @@ ai:
     zhipu-api-key: ${ZHIPU_AI_API_KEY}
 
 app:
-  video:
-    storage-path: ${VIDEO_STORAGE_PATH:/data/videos}
-    access-path: /videos
-    max-file-size: 524288000
-
   security:
     jwt-secret: ${APP_JWT_SECRET}
     cors-allowed-origins:

@@ -1,5 +1,7 @@
 package com.zhixuewuli.controller;
 
+import com.zhixuewuli.common.security.AuthenticatedUser;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import com.zhixuewuli.common.result.Result;
 import com.zhixuewuli.dto.request.LoginRequest;
 import com.zhixuewuli.dto.request.RegisterRequest;
@@ -165,8 +167,8 @@ public class AuthController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "登出成功")
         }
     )
-    public Result<String> logout(jakarta.servlet.http.HttpServletRequest request) {
-        authService.logout((Long)request.getAttribute("userId"));
+    public Result<String> logout(@AuthenticationPrincipal AuthenticatedUser user) {
+        authService.logout(user.id());
         // 在JWT无状态模式下，服务器端不需要特殊处理
         // 客户端应负责删除本地存储的令牌
         log.debug("用户登出请求");

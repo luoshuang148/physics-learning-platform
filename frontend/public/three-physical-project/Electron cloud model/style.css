@@ -1,0 +1,459 @@
+/*style.css - 电子云模型界面样式*/
+html,
+body {
+    height: 100%;
+    /* 满屏高度 */
+    margin: 0;
+    /* 去除外边距 */
+    overflow: hidden;
+    /* 完美贴合浏览器边缘,严禁滚动，确保 3D 画面撑满 */
+    background-color: var(--theme-bg);
+    /* 深蓝黑色底色，像宇宙 */
+    font-family: var(--font-family-ui);
+    /* 优先使用统一界面字体 */
+}
+
+/* 3D 渲染画布容器 */
+#c {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+/* 顶部 AI 区域(居中)—————————————————————————————————————————————————— */
+
+/* #top-center-container {
+    position: absolute;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    pointer-events: none;
+    z-index: 100;
+    width: 500px;
+    max-width: 80vw;
+} */
+
+
+/* AI 面板样式 */
+/* #ai-panel {
+    width: 100%; transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    transform-origin: top center; border-top: 4px solid #00e5ff; 
+    border-left: 1px solid rgba(0, 229, 255, 0.3);
+} */
+/* 折叠时的动画效果：淡出、缩小、向上移动，并完全隐藏 */
+#ai-panel.collapsed {
+    opacity: 0;
+    transform: scaleY(0) translateY(-20px);
+    pointer-events: none;
+    margin: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    border: none;
+    height: 0;
+    overflow: hidden;
+}
+
+/* 文字加粗强调色 */
+/* #ai-panel strong {
+    color: #00e5ff;
+    font-size: 18px;
+} */
+
+/* 正文样式 */
+/* #ai-panel p {
+    margin-top: 10px;
+    font-size: 15px;
+    line-height: 1.6;
+    color: #eee;
+} */
+
+/* --- 左侧面板：让内容从顶部开始堆叠，并保持间距 --- */
+#left-panel {
+    position: absolute;
+    left: 20px;
+    top: 20px;
+    bottom: 20px;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    /* 改为从顶部对齐 */
+    gap: 15px;
+    /* 面板之间的固定间距 */
+    width: 300px;
+    pointer-events: none;
+}
+
+/* 右侧面板 */
+#right-panel {
+    position: absolute;
+    left: 330px;
+    top: 20px;
+    bottom: 20px;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    width: 250px;
+    pointer-events: none;
+}
+
+/* 毛玻璃半透明面板 */
+/* --- 移除所有强行撑开高度的属性 --- */
+/* .panel {
+    background: rgba(0, 20, 40, 0.75);
+    backdrop-filter: blur(15px);
+    border: 1px solid rgba(0, 229, 255, 0.4);
+    border-radius: 12px;
+    color: #fff;
+    padding: 20px;
+pointer-events: auto;
+}
+*/
+
+/* h3是左侧面板标题，h4是右侧面板标题（径向），统一蓝色发光风格，但右侧标题更小更柔和 */
+h3,
+h4 {
+    margin: 0 0 15px 0;
+    color: #00e5ff;
+    text-shadow: 0 0 10px rgba(0, 229, 255, 0.6);
+}
+
+h3 {
+    font-size: 18px;
+}
+
+h4 {
+    font-size: 16px;
+    color: #ff00ff;
+}
+
+/* 径向图表标题为紫色 */
+
+/* 轨道按钮样式 */
+.orbit-btn {
+    display: block;
+    width: 100%;
+    margin-bottom: 12px;
+    padding: 12px;
+    background: var(--theme-button-bg);
+    border: 1px solid var(--theme-button-border);
+    color: #fff;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.3s;
+    font-size: 15px;
+    font-weight: bold;
+    letter-spacing: 1px;
+}
+
+.orbit-btn:hover {
+    background: var(--theme-button-bg);
+    box-shadow: 0 0 15px var(--theme-button-shadow);
+    transform: translateY(-2px);
+}
+
+/* 模式切换按钮组 (全貌 vs 采样) */
+.mode-container {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 15px;
+}
+
+.mode-btn {
+    flex: 1;
+    padding: 10px 5px;
+    background: var(--theme-button-bg);
+    border: 1px solid var(--theme-button-border);
+    color: var(--theme-text);
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: bold;
+    font-size: 13px;
+    transition: all 0.3s;
+}
+
+.mode-btn:hover {
+    background: var(--theme-button-bg);
+    box-shadow: 0 0 10px var(--theme-button-shadow);
+}
+
+.mode-btn.active {
+    background: var(--theme-button-bg);
+    color: var(--theme-text);
+    box-shadow: 0 0 15px var(--theme-button-shadow);
+}
+
+/* 剖切滑块美化 */
+.control-group {
+    margin-top: 15px;
+    padding-top: 15px;
+    border-top: 1px dashed rgba(255, 255, 255, 0.3);
+}
+
+.control-group label {
+    display: block;
+    font-size: 14px;
+    color: var(--theme-secondary);
+    margin-bottom: 10px;
+}
+
+input[type="range"] {
+    width: 100%;
+    height: 8px;
+    border-radius: 4px;
+    background: #222;
+    outline: none;
+    -webkit-appearance: none;
+    cursor: pointer;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #fff;
+    border: 3px solid var(--theme-silder-bg);
+    box-shadow: 0 0 10px var(--theme-silder-shadow);
+}
+
+/* 文本信息与图表 */
+.info-box {
+    font-size: 14px;
+    color: #aaa;
+    margin-top: 18px;
+    text-align: center;
+}
+
+#chart-panel p {
+    margin: 0 0 12px 0;
+    font-size: 13px;
+    color: #ccc;
+}
+
+#prob-chart {
+    width: 100%;
+    height: 160px;
+    background: rgba(0, 0, 0, 0.6);
+    border-radius: 6px;
+}
+
+#obs-panel {
+    border-color: #ffaa00;
+    box-shadow: 0 4px 20px rgba(255, 170, 0, 0.2);
+}
+
+#obs-panel h3 {
+    color: #ffaa00;
+    text-shadow: 0 0 10px rgba(255, 170, 0, 0.6);
+}
+
+/* 量子力学指南文本样式 */
+.guide-text {
+    font-size: 15px;
+    line-height: 1.7;
+    color: #eee;
+}
+
+.guide-text ul {
+    padding-left: 20px;
+    margin-top: 8px;
+}
+
+.guide-text li {
+    margin-bottom: 10px;
+}
+
+.guide-text strong {
+    color: #ffaa00;
+}
+
+/* 1. 底层变量覆盖：直接把 GUI 的逻辑颜色改成紫色，从根源干掉蓝色 */
+:root {
+    --lil-gui-accent-color: var(--theme-slider-bg) !important;
+    /* 进度条颜色 */
+    --lil-gui-focus-color: var(--theme-slider-bg) !important;
+    /* 聚焦颜色 */
+    --lil-gui-hover-color: var(--theme-slider-bg) !important;
+    /* 悬停颜色 */
+}
+
+.lil-gui {
+    --font-size: 15px !important;
+    --widget-height: 28px !important;
+    /* 调高控件，防止球被挤扁 */
+    --name-width: 45% !important;
+    --number-color: var(--theme-slider-bg) !important;
+}
+
+/* 2. 轨道重塑：确保轨道可见且不裁剪球体 */
+.lil-gui .slider {
+    background: #111 !important;
+    /* 深色轨道底线 */
+    height: 4px !important;
+    /* 极细线轨道 */
+    border-radius: 2px !important;
+    margin-top: 12px !important;
+    /* 居中校准 */
+    overflow: visible !important;
+    /* 核心：允许圆球溢出轨道边界 */
+}
+
+/* 3. 进度填充层：这是 lil-gui v0.19 的真实类名 */
+/* 我们同时写上 .fill 和 .slider-fg（以防版本变动） */
+.lil-gui .fill,
+.lil-gui .slider-fg {
+    background: var(--theme-slider-bg) !important;
+    /* 强制紫色 */
+    height: 100% !important;
+    position: relative !important;
+    overflow: visible !important;
+}
+
+/* 4. 暴力生成紫心白球：挂载在进度条末端 */
+.lil-gui .fill::after,
+.lil-gui .slider-fg::after {
+    content: '' !important;
+    position: absolute !important;
+    right: -10px !important;
+    /* 球心对齐进度末端 */
+    top: 50% !important;
+    transform: translateY(-50%) !important;
+
+    /* 球体外观 */
+    width: 12px !important;
+    height: 12px !important;
+    background: #ffffff !important;
+    /* 纯白核心，体现高亮 */
+    border: 3px solid var(--theme-slider-bg) !important;
+    /* 紫色强边框 */
+    border-radius: 50% !important;
+
+    /* 霓虹发光扩散感 */
+    box-shadow: 0 0 15px var(--theme-slider-bg), 0 0 5px rgba(255, 255, 255, 1) !important;
+    z-index: 9999 !important;
+    cursor: pointer !important;
+}
+
+/* 5. 交互动态效果 */
+.lil-gui .fill:active::after {
+    transform: translateY(-50%) scale(1.3) !important;
+    /* 拖动时球变大 */
+    box-shadow: 0 0 25px var(--theme-slider-bg) !important;
+}
+
+/* 6. 顺便修复原生 HTML 滑块（X射线剖切那个） */
+/* ========================================================
+   原生剖切滑块 (#slice-slider) 专项强化：实现“紫色填充轨道”
+======================================================== */
+
+/* 修改左侧原生剖切滑块 */
+#slice-slider {
+    -webkit-appearance: none;
+    width: 100%;
+    height: 15px;
+    /* 降低容器高度 */
+    background: transparent;
+    cursor: pointer;
+    overflow: hidden;
+    margin: 10px 0;
+    outline: none;
+}
+
+/* 轨道加粗到 8px */
+#slice-slider::-webkit-slider-runnable-track {
+    height: 8px;
+    background: #222;
+    border-radius: 4px;
+}
+
+/* 球体缩小到 16px，并添加紫色边框和发光效果 */
+#slice-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    height: 16px;
+    width: 16px;
+    background: #ffffff;
+    border: 2px solid var(--theme-slider-bg);
+    /* 边框变细 */
+    border-radius: 50%;
+    margin-top: -3px;
+    /* 居中校准：(8轨道 - 14球)/2 */
+    box-shadow: -500px 0 0 500px var(--theme-slider-bg);
+    /* 保持紫色轨道填充，但球体变小后更和谐 */
+}
+
+/* 日志单条样式 */
+.log-item {
+    margin-bottom: 8px;
+    padding: 6px 10px;
+    background: rgba(0, 0, 0, 0.3);
+    border-left: 2px solid var(--theme-secondary);
+    border-radius: 0 4px 4px 0;
+    animation: logFadeIn 0.3s ease-out;
+}
+
+.log-item .time {
+    color: #888;
+    font-size: 11px;
+    margin-bottom: 5px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    /* 添加一条细微的分隔线 */
+    padding-bottom: 2px;
+}
+
+.log-content {
+    line-height: 1.6;
+    /* 让多行信息排版更舒适 */
+    color: #eee;
+}
+
+.log-item strong {
+    color: var(--theme-accent);
+}
+
+@keyframes logFadeIn {
+    from {
+        opacity: 0;
+        transform: translateX(-10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+/* 隐藏 details 的默认箭头 */
+summary::-webkit-details-marker {
+    display: none;
+}
+
+/* 非全屏紧凑模式：将横向双栏压缩并避免占据中央区域 */
+body.layout-nonfull #left-panel,
+body.layout-compact #left-panel {
+    left: 8px !important;
+    top: 8px !important;
+    bottom: 8px !important;
+    width: clamp(170px, 14vw, 210px) !important;
+}
+
+body.layout-nonfull #right-panel,
+body.layout-compact #right-panel {
+    left: auto;
+    right: 8px !important;
+    top: 8px !important;
+    bottom: 8px !important;
+    width: clamp(150px, 12vw, 185px) !important;
+}
+
+body.layout-nonfull .panel,
+body.layout-compact .panel {
+    padding: 10px !important;
+}
+
+body.layout-nonfull summary,
+body.layout-compact summary {
+    font-size: 14px;
+}

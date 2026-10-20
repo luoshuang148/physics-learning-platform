@@ -151,13 +151,5 @@ public class CustomAssertions {
             return this;
         }
 
-        public AnswerRecordAssert hasErrorReason(String expected) {
-            isNotNull();
-            if (!Objects.equals(actual.getErrorReason(), expected)) {
-                failWithMessage("Expected error reason to be <%s> but was <%s>",
-                        expected, actual.getErrorReason());
-            }
-            return this;
-        }
     }
 }

@@ -80,7 +80,7 @@ class ZhiPuAIAssistantServiceLeakGuardTest extends BaseUnitTest {
     void setUp() {
         when(aiBusinessProperties.getRealTimeQaModel()).thenReturn("glm-test");
 
-        streamUtils = new StreamUtils(aiStreamingProperties);
+        streamUtils = new StreamUtils(aiStreamingProperties, com.zhixuewuli.common.redis.LeaseMocks.create());
         streamUtils.setMaxConnections(32);
         trackingExecutor = new TrackingExecutor();
 

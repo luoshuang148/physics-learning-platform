@@ -183,11 +183,8 @@ public enum ResultCode {
     /** 错题分析服务不可用 */
     QUESTION_ERROR_ANALYSIS_SERVICE_UNAVAILABLE(5601, "错题分析服务不可用"),
 
-    /** 词云分析失败 */
-    WORD_CLOUD_ANALYSIS_FAILED(5602, "词云分析失败"),
 
     /** 分词处理失败 */
-    SEGMENTATION_FAILED(5603, "分词处理失败"),
 
     // ==================== 教师事件模块与实验模块状态码 (x700-x799) ====================
 

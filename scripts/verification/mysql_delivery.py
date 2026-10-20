@@ -8,7 +8,7 @@ if os.environ.get('CONFIRM_ISOLATED_DATABASE')!='1':
 container=os.environ.get('MYSQL_CONTAINER')
 def command(binary):
     if container:return ['docker','exec','-i','-e','MYSQL_PWD',container,binary,'-uroot']
-    cmd=[os.environ.get('MYSQL_BIN_DIR','')+binary,'-u'+os.environ.get('MYSQL_USER','root')]
+    cmd=[str(pathlib.Path(os.environ['MYSQL_BIN_DIR'])/binary) if os.environ.get('MYSQL_BIN_DIR') else binary,'-u'+os.environ.get('MYSQL_USER','root')]
     if os.environ.get('MYSQL_SOCKET'):cmd+=['--socket='+os.environ['MYSQL_SOCKET']]
     else:cmd+=['-h'+os.environ.get('MYSQL_HOST','127.0.0.1'),'-P'+os.environ.get('MYSQL_PORT','3306')]
     return cmd
@@ -21,19 +21,35 @@ def file(name,database=None):return sql((ROOT/name).read_text(),database)
 if args.phase=='upgrade':
     file('src/test/resources/mysql/schema-v1.sql')
     sql("""INSERT INTO users(id,username,password_hash,real_name,user_type,active) VALUES(920001,'migration_teacher','unused-hash','Fixture','TEACHER',true);
+    INSERT INTO users(id,username,password_hash,real_name,user_type,active) VALUES(920003,'migration_student','unused-hash','Migration student','STUDENT',true);
     INSERT INTO questions(id,content,content_hash,options,correct_option,difficulty) VALUES(920001,'Legacy original','migration-fixture','{\"A\":\"a\",\"B\":\"b\"}','A',1);
     INSERT INTO teacher_events(id,teacher_id,teacher_name,event_title,event_description,event_timestamp,is_global) VALUES(920001,920001,'Fixture','Legacy task','QIDS:920001,920002,920001',CURRENT_TIMESTAMP,true);
     INSERT INTO teacher_events(id,teacher_id,teacher_name,event_title,event_description,event_timestamp,is_global) VALUES(920002,920001,'Fixture','Malformed legacy','QIDS:invalid-json',CURRENT_TIMESTAMP,false);
     INSERT INTO answer_records(id,user_id,question_id,session_id,selected_option,correct,answered_at) VALUES('migration-attempt',920001,920001,'legacy','B',false,CURRENT_TIMESTAMP);""",'zhixuewuli')
     file('src/main/resources/sql/upgrades/V2__archive_teaching_events.sql','zhixuewuli')
     file('src/main/resources/sql/upgrades/V3__task_snapshots_and_attempts.sql','zhixuewuli')
+    file('src/main/resources/sql/upgrades/V4__content_addressed_question_images.sql','zhixuewuli')
+    file('src/main/resources/sql/upgrades/V5__remove_retired_learning_features.sql','zhixuewuli')
+    file('src/main/resources/sql/upgrades/V6__parallel_assignments_lifecycle.sql','zhixuewuli')
+    # A known original participant was promoted before the recipient migration.
+    sql("INSERT INTO answer_records(id,user_id,question_id,event_id,session_id,selected_option,correct,answered_at,practice) VALUES('promoted-original',920001,920001,920001,'promoted','B',false,CURRENT_TIMESTAMP,false)",'zhixuewuli')
+    file('src/main/resources/sql/upgrades/V7__assignment_recipients.sql','zhixuewuli')
+    assert sql("SELECT COUNT(*) FROM task_recipients WHERE user_id=920001 AND event_id=920001 AND source='MIGRATED'",'zhixuewuli')=='1'
+    assert sql("SELECT COUNT(*) FROM task_recipients WHERE user_id=920001 AND event_id=920002",'zhixuewuli')=='0'
+    assert sql("SELECT COUNT(*) FROM task_recipients WHERE user_id=920003 AND source='MIGRATED'",'zhixuewuli')=='2'
     assert sql('SELECT GROUP_CONCAT(snapshot_origin ORDER BY position_number) FROM teacher_event_questions','zhixuewuli')=='MIGRATED,MISSING'
+    assert sql("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA='zhixuewuli' AND TABLE_NAME='teacher_events' AND COLUMN_NAME IN ('status','start_at','due_at')",'zhixuewuli')=='3'
+    assert sql("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA='zhixuewuli' AND TABLE_NAME='teacher_events' AND COLUMN_NAME IN ('is_global','active_slot')",'zhixuewuli')=='0'
+    assert sql("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA='zhixuewuli' AND COLUMN_NAME IN ('error_reason','explanation_video_mapping')",'zhixuewuli')=='0'
+    assert sql("SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA='zhixuewuli' AND TABLE_NAME IN ('videos','experiments')",'zhixuewuli')=='0'
+    assert sql("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA='zhixuewuli' AND TABLE_NAME='answer_records' AND COLUMN_NAME='image_ref'",'zhixuewuli')=='1'
+    assert sql("SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA='zhixuewuli' AND TABLE_NAME='question_images'",'zhixuewuli')=='1'
     assert sql("SELECT CONCAT(practice,':',attempt_order) FROM answer_records WHERE id='migration-attempt'",'zhixuewuli')=='1:1'
     assert sql('SELECT event_description FROM teacher_events WHERE id=920001','zhixuewuli')=='QIDS:920001,920002,920001'
     assert sql('SELECT COUNT(*) FROM teacher_event_questions WHERE event_id=920002','zhixuewuli')=='0'
     assert sql('SELECT token_version FROM users WHERE id=920001','zhixuewuli')=='1'
     # Leave an upgraded empty schema for the same service contract tests as the fresh schema.
-    sql('DELETE FROM answer_records;DELETE FROM teacher_event_questions;DELETE FROM teacher_events;DELETE FROM questions;DELETE FROM users;','zhixuewuli')
+    sql('DELETE FROM task_recipients;DELETE FROM answer_records;DELETE FROM teacher_event_questions;DELETE FROM teacher_events;DELETE FROM questions;DELETE FROM users;','zhixuewuli')
     print(json.dumps({'upgrade':'passed','origins':['MIGRATED','MISSING'],'legacyAttemptPreserved':True,'oldTokensInvalidated':True}))
 else:
     tables=sql('SHOW TABLES','zhixuewuli').splitlines()

@@ -66,7 +66,7 @@ public interface UserService {
      * 
      * @permission 教师权限
      */
-    User getUserById(Long userId, Long currentUserId);
+    User getUserById(Long userId);
 
     /**
      * 根据真实姓名获取用户信息
@@ -79,7 +79,7 @@ public interface UserService {
      * 
      * @permission 教师权限
      */
-    User getUserByRealName(String realName, Long currentUserId);
+    User getUserByRealName(String realName);
 
     /**
      * 获取所有用户列表
@@ -90,7 +90,7 @@ public interface UserService {
      * 
      * @permission 教师权限
      */
-    List<User> getAllUsers(Long currentUserId);
+    List<User> getAllUsers();
 
     /**
      * 管理员更新用户信息

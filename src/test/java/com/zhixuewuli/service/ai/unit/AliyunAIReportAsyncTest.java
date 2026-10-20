@@ -7,7 +7,6 @@ import com.zhixuewuli.common.config.properties.AIBusinessProperties;
 import com.zhixuewuli.common.config.properties.AIStreamingProperties;
 import com.zhixuewuli.common.exception.answerrecord.AnswerRecordNotFoundException;
 import com.zhixuewuli.common.util.OptionMappingUtil;
-import com.zhixuewuli.common.util.UserPermissionUtil;
 import com.zhixuewuli.dto.internal.SessionContextInternalDTO;
 import com.zhixuewuli.entity.AnswerRecord;
 import com.zhixuewuli.entity.Question;
@@ -58,8 +57,6 @@ class AliyunAIReportAsyncTest extends AIAsyncTestBase {
     @Mock
     private UserRepository userRepository;
 
-    @Mock
-    private UserPermissionUtil userPermissionUtil;
 
     @Mock
     private OptionMappingUtil optionMappingUtil;
@@ -179,27 +176,13 @@ class AliyunAIReportAsyncTest extends AIAsyncTestBase {
     @DisplayName("教师分析报告 - 验证权限检查")
     void validateTeacherAnalysisRequest_shouldCheckPermissions() {
         // Given: 配置权限检查通过（不抛出异常）
-        doNothing().when(userPermissionUtil).checkTeacherPermission(TEST_USER_ID);
 
         // When: 调用验证方法
         service.validateTeacherAnalysisRequest(TEST_USER_ID);
 
         // Then: 验证权限检查被调用
-        verify(userPermissionUtil).checkTeacherPermission(TEST_USER_ID);
     }
 
-    @Test
-    @DisplayName("教师分析报告 - 验证权限不足时抛出异常")
-    void validateTeacherAnalysisRequest_shouldThrowExceptionWhenNoPermission() {
-        // Given: 配置权限检查抛出异常
-        doThrow(new com.zhixuewuli.common.exception.InsufficientPermissionException("权限不足"))
-                .when(userPermissionUtil).checkTeacherPermission(TEST_USER_ID);
-
-        // When & Then: 验证抛出正确异常
-        org.junit.jupiter.api.Assertions.assertThrows(
-                com.zhixuewuli.common.exception.InsufficientPermissionException.class,
-                () -> service.validateTeacherAnalysisRequest(TEST_USER_ID));
-    }
 
     @Test
     @DisplayName("教师分析报告-验证数据聚合逻辑")

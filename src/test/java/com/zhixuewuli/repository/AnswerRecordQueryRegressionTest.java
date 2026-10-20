@@ -18,8 +18,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 @DataJpaTest(properties = "spring.jpa.properties.hibernate.generate_statistics=true", showSql = false)
 @ActiveProfiles("test")
 @Tag("integration-repository")
-@Import({com.zhixuewuli.service.teacherEvent.TaskQuestionService.class, AnswerRecordServiceImpl.class, UserPermissionUtil.class, QuestionResponseConverter.class,
-        OptionMappingUtil.class, ObjectMapper.class})
+@Import({com.zhixuewuli.service.teacherEvent.TaskRosterService.class, com.zhixuewuli.service.classroom.ClassAccessService.class, com.zhixuewuli.service.teacherEvent.TaskQuestionService.class, AnswerRecordServiceImpl.class, UserPermissionUtil.class, QuestionResponseConverter.class,
+        OptionMappingUtil.class, ObjectMapper.class, com.zhixuewuli.service.question.AnswerAccessPolicy.class,
+        com.zhixuewuli.service.question.QuestionImageStore.class})
 class AnswerRecordQueryRegressionTest {
     @Autowired EntityManager em;
     @Autowired AnswerRecordServiceImpl service;

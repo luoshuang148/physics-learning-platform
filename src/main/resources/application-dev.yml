@@ -8,10 +8,6 @@ spring:
     hibernate:
       ddl-auto: validate
 app:
-  video:
-    storage-path: ${VIDEO_STORAGE_PATH:./data/videos}
-    access-path: /videos
-    max-file-size: 524288000
   security:
     cors-allowed-origins:
       - http://localhost:5173

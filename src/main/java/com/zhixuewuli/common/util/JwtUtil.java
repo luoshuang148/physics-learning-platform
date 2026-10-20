@@ -153,8 +153,21 @@ public class JwtUtil {
                 .getPayload();
         return claims.getSubject();
     }
-    public long getTokenVersion(String token){
-        var claims=Jwts.parser().verifyWith(getSigningKey()).build().parseSignedClaims(token).getPayload();
-        Number version=(Number)claims.get("tokenVersion");return version==null?0:version.longValue();
+    public long getTokenVersion(String token) {
+        return tokenVersion(parseClaims(token));
+    }
+
+    /**
+     * 校验签名与有效期并返回载荷，供每次请求只解析一次令牌。
+     *
+     * @throws JwtException 令牌无效、过期或签名错误时抛出
+     */
+    public Claims parseClaims(String token) {
+        return Jwts.parser().verifyWith(getSigningKey()).build().parseSignedClaims(token).getPayload();
+    }
+
+    public static long tokenVersion(Claims claims) {
+        Number version = (Number) claims.get("tokenVersion");
+        return version == null ? 0L : version.longValue();
     }
 }

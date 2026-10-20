@@ -20,6 +20,17 @@ spring:
       pool-name: TestHikariCP
       register-mbeans: false
   
+  # H2 测试库由 Hibernate create-drop 建表；Flyway 只验证 MySQL 路径
+  flyway:
+    enabled: false
+
+  # 默认测试不连接 broker：监听器不自动启动，健康检查不聚合 RabbitMQ。
+  # 需要真实消息语义的测试（RabbitMqTestSupport）会覆盖这些属性。
+  rabbitmq:
+    listener:
+      simple:
+        auto-startup: false
+
   # JPA配置
   jpa:
     hibernate:
@@ -57,8 +68,15 @@ spring:
   #     - org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration
   #     - org.springframework.boot.actuate.autoconfigure.security.servlet.ManagementWebSecurityAutoConfiguration
 
+management:
+  health:
+    rabbit:
+      enabled: false
+
 # 应用配置
 app:
+  report-batch:
+    enabled: false
   video:
     storage-path: ${java.io.tmpdir}/test-video-uploads
     access-path: /videos

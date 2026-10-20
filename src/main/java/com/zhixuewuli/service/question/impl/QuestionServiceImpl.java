@@ -2,14 +2,11 @@ package com.zhixuewuli.service.question.impl;
 
 import com.zhixuewuli.common.exception.question.QuestionContentDuplicateException;
 import com.zhixuewuli.common.exception.question.QuestionNotFoundException;
-import com.zhixuewuli.common.exception.question.QuestionVideoNotFoundException;
 import com.zhixuewuli.common.util.*;
 import com.zhixuewuli.dto.request.QuestionCreateRequest;
 import com.zhixuewuli.dto.request.QuestionUpdateRequest;
 import com.zhixuewuli.entity.Question;
-import com.zhixuewuli.entity.Video;
 import com.zhixuewuli.repository.QuestionRepository;
-import com.zhixuewuli.repository.VideoRepository;
 import com.zhixuewuli.service.question.QuestionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -59,7 +56,6 @@ import java.util.List;
  * @since 2026
  * @see QuestionService 题目服务接口
  * @see QuestionRepository 题目数据访问接口
- * @see VideoRepository 视频数据访问接口
  */
 @Service
 @Transactional
@@ -68,15 +64,11 @@ import java.util.List;
 public class QuestionServiceImpl implements QuestionService {
 
     private final QuestionRepository questionRepository;
-    private final VideoRepository videoRepository;
-    private final UserPermissionUtil userPermissionUtil;
     private final com.zhixuewuli.repository.TeacherEventQuestionRepository taskQuestionRepository;
     private final com.zhixuewuli.repository.AnswerRecordRepository answerRepository;
 
     @Override
-    public Question createQuestion(QuestionCreateRequest request, Long teacherId) {
-
-        userPermissionUtil.checkTeacherPermission(teacherId);
+    public Question createQuestion(QuestionCreateRequest request) {
 
         log.info("开始创建题目，内容预览: {}",
                 request.getContent().length() > 50 ? request.getContent().substring(0, 50) + "..."
@@ -95,7 +87,6 @@ public class QuestionServiceImpl implements QuestionService {
         question.setCorrectOption(request.getCorrectOption());
         question.setExplanation(request.getExplanation());
         question.setDifficulty(request.getDifficulty());
-        question.setExplanationVideoMapping(request.getExplanationVideoMapping());
         question.setImageBase64(request.getImageBase64());
 
         // 4. 保存到数据库
@@ -106,9 +97,7 @@ public class QuestionServiceImpl implements QuestionService {
     }
 
     @Override
-    public void deleteQuestionById(Long id, Long teacherId) {
-
-        userPermissionUtil.checkTeacherPermission(teacherId);
+    public void deleteQuestionById(Long id) {
 
         log.info("开始删除题目，ID: {}", id);
 
@@ -127,9 +116,7 @@ public class QuestionServiceImpl implements QuestionService {
     }
 
     @Override
-    public Question updateQuestion(QuestionUpdateRequest request, Long teacherId) {
-
-        userPermissionUtil.checkTeacherPermission(teacherId);
+    public Question updateQuestion(QuestionUpdateRequest request) {
 
         log.info("开始更新题目，ID: {}", request.getId());
 
@@ -146,7 +133,6 @@ public class QuestionServiceImpl implements QuestionService {
         existingQuestion.setCorrectOption(request.getCorrectOption());
         existingQuestion.setExplanation(request.getExplanation());
         existingQuestion.setDifficulty(request.getDifficulty());
-        existingQuestion.setExplanationVideoMapping(request.getExplanationVideoMapping());
         existingQuestion.setImageBase64(request.getImageBase64());
 
         // 4. 保存更新

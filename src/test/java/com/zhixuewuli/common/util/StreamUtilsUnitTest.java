@@ -53,7 +53,7 @@ class StreamUtilsUnitTest {
         setFieldValue(aiStreamingProperties, "sseEmitterTimeout", 60000L);
         setFieldValue(aiStreamingProperties, "sseReconnectTime", 5000L);
         
-        streamUtils = new StreamUtils(aiStreamingProperties);
+        streamUtils = new StreamUtils(aiStreamingProperties, com.zhixuewuli.common.redis.LeaseMocks.create());
     }
 
     /**

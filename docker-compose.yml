@@ -1,4 +1,18 @@
 services:
+  redis:
+    image: redis:7.4-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--maxmemory-policy", "noeviction"]
+    ports:
+      - "127.0.0.1:6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - zhixuewuli-network
+
   # MySQL 数据库服务
   mysql:
     image: mysql:8.4
@@ -15,8 +29,6 @@ services:
     volumes:
       # MySQL 数据持久化到数据盘
       - /data/mysql:/var/lib/mysql
-      # 仅在数据库目录首次初始化时自动执行建表脚本
-      - ./src/main/resources/sql/schema_init.sql:/docker-entrypoint-initdb.d/01-schema_init.sql:ro
     command:
       - --character-set-server=utf8mb4
       - --collation-server=utf8mb4_unicode_ci
@@ -29,6 +41,28 @@ services:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_PASSWORD}"]
       interval: 10s
       timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - zhixuewuli-network
+
+  # RabbitMQ：批量学生报告的可靠消息队列（Outbox + 手动确认 + 死信）
+  rabbitmq:
+    image: rabbitmq:3.13-alpine
+    container_name: zhixuewuli-rabbitmq
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-zhixuewuli}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-replace_with_rabbitmq_password}
+    ports:
+      - "127.0.0.1:5672:5672"   # 仅允许本机访问，提高安全性
+    volumes:
+      - /data/rabbitmq:/var/lib/rabbitmq
+    mem_limit: 256m
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 15s
+      timeout: 10s
       retries: 5
       start_period: 30s
     networks:
@@ -47,7 +81,11 @@ services:
     container_name: zhixuewuli-app
     restart: unless-stopped
     depends_on:
+      redis:
+        condition: service_healthy
       mysql:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
     environment:
       TZ: Asia/Shanghai
@@ -55,6 +93,12 @@ services:
       SPRING_DATASOURCE_URL: "jdbc:mysql://${DB_HOST:-mysql}:${DB_PORT:-3306}/${DB_NAME:-zhixuewuli}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai&characterEncoding=utf8&connectionCollation=utf8mb4_unicode_ci"
       DB_USER: ${DB_USER}
       DB_PASSWORD: ${DB_PASSWORD}
+      REDIS_HOST: redis
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USERNAME: ${RABBITMQ_USER:-zhixuewuli}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-replace_with_rabbitmq_password}
+      REPORT_BATCH_ENABLED: ${REPORT_BATCH_ENABLED:-true}
       DB_HOST: mysql
       DB_PORT: 3306
       DB_NAME: zhixuewuli

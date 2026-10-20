@@ -2,7 +2,6 @@ package com.zhixuewuli.service.question;
 
 import com.zhixuewuli.common.exception.question.QuestionContentDuplicateException;
 import com.zhixuewuli.common.exception.question.QuestionNotFoundException;
-import com.zhixuewuli.common.exception.question.QuestionVideoNotFoundException;
 import com.zhixuewuli.dto.request.QuestionCreateRequest;
 import com.zhixuewuli.dto.request.QuestionUpdateRequest;
 import com.zhixuewuli.entity.Question;
@@ -42,7 +41,6 @@ import java.util.List;
  * <ul>
  * <li>{@link QuestionNotFoundException} - 题目不存在</li>
  * <li>{@link QuestionContentDuplicateException} - 题目内容重复</li>
- * <li>{@link QuestionVideoNotFoundException} - 关联视频不存在</li>
  * </ul>
  * 
  * @author 智学物理开发团队
@@ -63,14 +61,13 @@ public interface QuestionService {
      * @param request 题目创建请求
      * @return 创建的题目实体
      * @throws QuestionContentDuplicateException 当题目内容已存在时抛出
-     * @throws QuestionVideoNotFoundException    当关联视频不存在时抛出
      * 
      * @implSpec 验证题目内容的全局唯一性
      * @implSpec 验证关联视频的存在性
      * @implSpec 记录创建操作日志
      * @implSpec 返回完整的题目实体信息
      */
-    Question createQuestion(QuestionCreateRequest request, Long teacherId);
+    Question createQuestion(QuestionCreateRequest request);
 
     /**
      * 根据ID删除题目
@@ -85,7 +82,7 @@ public interface QuestionService {
      * @implSpec 记录删除操作日志
      * @implSpec 支持级联删除关联数据（如答题记录）
      */
-    void deleteQuestionById(Long id, Long teacherId);
+    void deleteQuestionById(Long id);
 
     /**
      * 更新题目信息（全量覆盖）
@@ -97,7 +94,6 @@ public interface QuestionService {
      * @return 更新后的题目实体
      * @throws QuestionNotFoundException         当题目不存在时抛出
      * @throws QuestionContentDuplicateException 当新题目内容已存在时抛出
-     * @throws QuestionVideoNotFoundException    当新的关联视频不存在时抛出
      * 
      * @implSpec 验证题目存在性
      * @implSpec 检查更新后题目内容的唯一性
@@ -105,7 +101,7 @@ public interface QuestionService {
      * @implSpec 采用全量覆盖更新策略
      * @implSpec 记录更新操作日志
      */
-    Question updateQuestion(QuestionUpdateRequest request, Long teacherId);
+    Question updateQuestion(QuestionUpdateRequest request);
 
     /**
      * 根据ID获取题目

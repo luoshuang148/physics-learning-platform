@@ -126,31 +126,40 @@ public class AuthControllerIntegrationTest extends BaseControllerIntegrationTest
                                 .andExpect(jsonPath("$.data.realName").value("Test Student 01"));
         }
 
-        @DisplayName("登录成功 - 使用真实姓名和密码")
+        @DisplayName("登录失败 - 真实姓名不再是登录凭证")
         @Test
-        void testLogin_SuccessByRealName() throws Exception {
-                // Given: 使用真实姓名作为登录标识
-                String realName = "Test Student 01";
-                String password = "password123";
-
+        void testLogin_RealNameIsNotLoginIdentifier() throws Exception {
                 LoginRequest request = new LoginRequest();
-                request.setUsername(realName);
-                request.setPassword(password);
+                request.setUsername("Test Student 01");
+                request.setPassword("password123");
 
-                // When: 发送登录请求
-                ResultActions result = mockMvc.perform(post("/auth/login")
+                mockMvc.perform(post("/auth/login")
                                 .contentType(MediaType.APPLICATION_JSON)
                                 .content(objectMapper.writeValueAsString(request)))
-                                .andDo(print());
+                                .andDo(print())
+                                .andExpect(status().isUnauthorized());
+        }
 
-                // Then: 验证登录成功并返回实际用户名
-                result.andExpect(status().isOk())
-                                .andExpect(jsonPath("$.code").value(200))
-                                .andExpect(jsonPath("$.data.token").exists())
-                                .andExpect(jsonPath("$.data.userId").value(1001))
-                                .andExpect(jsonPath("$.data.username").value("student_test01"))
-                                .andExpect(jsonPath("$.data.userType").value("STUDENT"))
-                                .andExpect(jsonPath("$.data.realName").value(realName));
+        @DisplayName("登录成功 - 他人的姓名与用户名相同不影响原账号")
+        @Test
+        void testLogin_UsernameStillWorksWhenAnotherUserUsesItAsRealName() throws Exception {
+                User other = new User();
+                other.setUsername("name_owner");
+                other.setRealName("student_test01");
+                other.setUserType(User.UserType.STUDENT);
+                other.setActive(true);
+                other.setPasswordHash(passwordUtil.encode("password123"));
+                userRepository.saveAndFlush(other);
+
+                LoginRequest request = new LoginRequest();
+                request.setUsername("student_test01");
+                request.setPassword("password123");
+
+                mockMvc.perform(post("/auth/login")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request)))
+                                .andExpect(status().isOk())
+                                .andExpect(jsonPath("$.data.userId").value(1001));
         }
 
         @DisplayName("登录失败 - 错误的密码")
@@ -294,6 +303,63 @@ public class AuthControllerIntegrationTest extends BaseControllerIntegrationTest
                 // 验证用户已保存到数据库（SQL 脚本 5 个 + 新注册 1 个）
                 Long count = queryForObject("SELECT COUNT(*) FROM users", Long.class);
                 assertThat(count).isEqualTo(6L);
+        }
+
+        @DisplayName("注册成功 - 新用户名与他人真实姓名相同不再被跨字段拦截")
+        @Test
+        void testRegister_UsernameMayEqualAnotherRealName() throws Exception {
+                User named = new User();
+                named.setUsername("cross_name_owner");
+                named.setRealName("shared_cross_name");
+                named.setUserType(User.UserType.STUDENT);
+                named.setActive(true);
+                named.setPasswordHash(passwordUtil.encode("password123"));
+                userRepository.saveAndFlush(named);
+
+                RegisterRequest request = new RegisterRequest();
+                request.setUsername("shared_cross_name");
+                request.setPassword("password123");
+                request.setRealName("另一名学生");
+                request.setUserType(User.UserType.STUDENT);
+
+                mockMvc.perform(post("/auth/register")
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(objectMapper.writeValueAsString(request)))
+                                .andExpect(status().isCreated())
+                                .andExpect(jsonPath("$.data.username").value("shared_cross_name"));
+        }
+
+        @DisplayName("并发注册同名账号 - 只有一个成功，另一个被数据库唯一约束拒绝")
+        @Test
+        @org.springframework.transaction.annotation.Transactional(propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
+        @Sql(scripts = "/sql/cleanup-all.sql", executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD)
+        void testRegister_ConcurrentSameUsername() throws Exception {
+                String username = "race_user_" + System.nanoTime();
+                java.util.concurrent.CountDownLatch start = new java.util.concurrent.CountDownLatch(1);
+                java.util.concurrent.Callable<Integer> register = () -> {
+                        RegisterRequest request = new RegisterRequest();
+                        request.setUsername(username);
+                        request.setPassword("password123");
+                        request.setRealName("并发注册" + username);
+                        request.setUserType(User.UserType.STUDENT);
+                        start.await();
+                        return mockMvc.perform(post("/auth/register")
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content(objectMapper.writeValueAsString(request)))
+                                .andReturn().getResponse().getStatus();
+                };
+                try (var pool = java.util.concurrent.Executors.newFixedThreadPool(2)) {
+                        var first = pool.submit(register);
+                        var second = pool.submit(register);
+                        start.countDown();
+                        java.util.List<Integer> statuses = java.util.List.of(
+                                first.get(10, java.util.concurrent.TimeUnit.SECONDS),
+                                second.get(10, java.util.concurrent.TimeUnit.SECONDS));
+                        assertThat(statuses).containsExactlyInAnyOrder(201, 409);
+                }
+                assertThat(userRepository.findByUsername(username)).isPresent();
+                assertThat(queryForObject("SELECT COUNT(*) FROM users WHERE username='" + username + "'", Long.class))
+                        .isEqualTo(1L);
         }
 
         @DisplayName("注册失败 - 用户名重复")

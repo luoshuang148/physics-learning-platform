@@ -120,14 +120,13 @@ public class AnswerRecordControllerIntegrationTest extends BaseControllerIntegra
         assertThat(userRecords.size()).isEqualTo(7); // SQL 脚本 6 个 + 新建 1 个
     }
 
-    @DisplayName("提交答题记录成功 - 错误答案（带错误原因）")
+    @DisplayName("提交答题记录成功 - 错误答案")
     @Test
-    void testSubmitAnswer_Success_WrongWithErrorReason() throws Exception {
+    void testSubmitAnswer_Success_Wrong() throws Exception {
         // Given: 学生用户和错误答案
         AnswerRecordSubmitRequest request = new AnswerRecordSubmitRequest();
         request.setQuestionId(4002L);
         request.setUserAnswer("A"); // 错误答案
-        request.setErrorReason("对惯性与速度的关系理解错误");
 
         // When: 发送提交请求
         ResultActions result = mockMvc.perform(post("/answer-records/student/submit")
@@ -140,8 +139,7 @@ public class AnswerRecordControllerIntegrationTest extends BaseControllerIntegra
         result.andExpect(status().isCreated())
                 .andExpect(jsonPath("$.code").value(201))
                 .andExpect(jsonPath("$.data.recordId").exists())
-                .andExpect(jsonPath("$.data.correct").value(false))
-                .andExpect(jsonPath("$.data.errorReason").value("对惯性与速度的关系理解错误"));
+                .andExpect(jsonPath("$.data.correct").value(false));
     }
 
     @DisplayName("提交答题记录失败 - 题目不存在")
@@ -254,18 +252,16 @@ public class AnswerRecordControllerIntegrationTest extends BaseControllerIntegra
                         .value(org.hamcrest.Matchers.everyItem(org.hamcrest.Matchers.is(false))));
     }
 
-    @DisplayName("查询我的错题记录成功 - 包含错误原因")
+    @DisplayName("查询我的错题记录成功 - 返回数组")
     @Test
-    void testGetMyWrongAnswers_Success_WithErrorReason() throws Exception {
+    void testGetMyWrongAnswers_ReturnsArray() throws Exception {
         // When: 查询当前用户的错题记录
         ResultActions result = mockMvc.perform(get("/answer-records/student/my/wrong")
                 .header("Authorization", createAuthHeader(STUDENT_ID, STUDENT_USERNAME)))
                 .andDo(print());
 
-        // Then: 验证错误原因字段存在
         result.andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.records[*].errorReason")
-                        .value(org.hamcrest.Matchers.everyItem(org.hamcrest.Matchers.notNullValue())));
+                .andExpect(jsonPath("$.data.records").isArray());
     }
 
     @DisplayName("查询我的错题记录成功 - 无错题时返回空列表")

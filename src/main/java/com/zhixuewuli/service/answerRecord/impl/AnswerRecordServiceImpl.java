@@ -1,5 +1,8 @@
 package com.zhixuewuli.service.answerRecord.impl;
 
+import com.zhixuewuli.dto.response.StudentAnswerStats;
+import org.springframework.data.domain.PageRequest;
+import com.zhixuewuli.common.result.PageResult;
 import com.zhixuewuli.common.exception.*;
 import com.zhixuewuli.common.exception.answerrecord.*;
 import com.zhixuewuli.common.exception.auth.UserNotFoundException;
@@ -10,6 +13,8 @@ import com.zhixuewuli.dto.request.RecordBatchDeleteRequest;
 import com.zhixuewuli.dto.response.AnswerRecordResponse;
 import com.zhixuewuli.dto.response.AnswerRecordBatchResponse;
 import com.zhixuewuli.dto.response.AnswerStatsResponse;
+import com.zhixuewuli.dto.response.AnswerRecordSummaryResponse;
+import com.zhixuewuli.dto.response.StudentAnswerSummary;
 import com.zhixuewuli.entity.AnswerRecord;
 import com.zhixuewuli.entity.Question;
 import com.zhixuewuli.entity.User;
@@ -26,61 +31,45 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
+import java.util.Optional;
+import java.util.function.Supplier;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.zhixuewuli.repository.TeacherEventRepository;
+import com.zhixuewuli.service.teacherEvent.TaskQuestionService;
+import com.zhixuewuli.common.exception.teacherevent.EventAlreadyExistsException;
 
-/**
- * 答题记录服务实现类
- * 
- * 实现答题记录管理的核心业务逻辑，包括权限验证、事务管理和数据一致性保障。
- * 严格按照权限控制原则，确保数据安全和操作合规。
- * 
- * <p>
- * 核心特性：
- * </p>
- * <ul>
- * <li><strong>权限控制</strong>: 严格的用户权限验证机制</li>
- * <li><strong>事务安全</strong>: 完整的事务回滚保障</li>
- * <li><strong>数据一致性</strong>: 异常情况下的数据状态保证</li>
- * <li><strong>操作审计</strong>: 详细的操作日志记录</li>
- * </ul>
- * 
- * <p>
- * 事务管理：
- * </p>
- * <ul>
- * <li>所有写操作使用@Transactional注解</li>
- * <li>配置rollbackFor包含BusinessException和TechnicalException</li>
- * <li>读操作根据需要设置合适的隔离级别</li>
- * </ul>
- * 
- * @author 智学物理开发团队
- * @version 1.0.0
- * @since 2026
- * @see AnswerRecordService 服务接口定义
- */
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class AnswerRecordServiceImpl implements AnswerRecordService {
+    private final com.zhixuewuli.service.teacherEvent.TaskRosterService roster;
 
     private final AnswerRecordRepository answerRecordRepository;
     private final QuestionRepository questionRepository;
     private final UserRepository userRepository;
-    private final com.zhixuewuli.repository.TeacherEventRepository teacherEventRepository;
+    private final TeacherEventRepository teacherEventRepository;
     private final UserPermissionUtil userPermissionUtil;
     private final QuestionResponseConverter questionResponseConverter;
-    private final com.zhixuewuli.service.teacherEvent.TaskQuestionService taskQuestions;
-    private final com.fasterxml.jackson.databind.ObjectMapper snapshotJson;
+    private final TaskQuestionService taskQuestions;
+    private final com.zhixuewuli.service.question.AnswerAccessPolicy answerAccess;
+    private final com.zhixuewuli.service.question.QuestionImageStore questionImages;
+    private final ObjectMapper snapshotJson;
 
     @Override
     @Transactional(readOnly = true)
-    public com.zhixuewuli.common.result.PageResult<AnswerRecordResponse> getTeacherAnswerPage(
-            Long currentUserId, int page, int size, boolean wrongOnly, String studentName) {
-        return getTeacherAnswerPage(currentUserId,page,size,wrongOnly,studentName,null);
+    public List<StudentAnswerStats> getStudentAnswerStats() {
+        return answerRecordRepository.summarizeStudents();
     }
-    @Override @Transactional(readOnly=true)
-    public com.zhixuewuli.common.result.PageResult<AnswerRecordResponse> getTeacherAnswerPage(
-            Long currentUserId,int page,int size,boolean wrongOnly,String studentName,Long eventId) {
-        userPermissionUtil.checkTeacherPermission(currentUserId);
+
+    @Override
+    @Transactional(readOnly = true)
+    public PageResult<AnswerRecordResponse> getTeacherAnswerPage(int page, int size, boolean wrongOnly, String studentName) {
+        return getTeacherAnswerPage(page,size,wrongOnly,studentName,null);
+    }
+    @Override
+    @Transactional(readOnly = true)
+    public PageResult<AnswerRecordResponse> getTeacherAnswerPage(int page,int size,boolean wrongOnly,String studentName,Long eventId) {
         if (page < 1 || size < 1 || size > 100 || (long) (page - 1) * size > Integer.MAX_VALUE) {
             throw new IllegalArgumentException("页码须大于零，每页条数须在1到100之间");
         }
@@ -88,16 +77,17 @@ public class AnswerRecordServiceImpl implements AnswerRecordService {
         if (name.length() > 100) throw new IllegalArgumentException("姓名筛选不得超过100个字符");
         name = "%" + name.replace("!", "!!").replace("%", "!%").replace("_", "!_") + "%";
         var result = answerRecordRepository.findTeacherPage(wrongOnly, name,eventId,
-                org.springframework.data.domain.PageRequest.of(page - 1, size));
+                PageRequest.of(page - 1, size));
         var rows = result.getContent().stream().map(row -> AnswerRecordResponse.builder()
                 .recordId(row.recordId()).userId(row.userId()).questionId(row.questionId())
                 .sessionId(row.sessionId()).userAnswer(row.userAnswer()).correct(row.correct())
-                .answeredAt(row.answeredAt()).timestampUtc(row.timestampUtc()).errorReason(row.errorReason()).studentName(row.studentName())
+                .answeredAt(row.answeredAt()).timestampUtc(row.timestampUtc()).studentName(row.studentName())
                 .questionContent(row.questionContent()).correctAnswer(row.correctAnswer())
-                .questionOptions(questionResponseConverter.parseOptionsFromJson(row.options()))
-                .questionAnalysis(row.analysis()).difficulty(questionResponseConverter.getDifficultyString(row.difficulty()))
+                .questionOptions(null)
+                // Full options and explanation are loaded from the record detail endpoint only.
+                .questionAnalysis(null).difficulty(questionResponseConverter.getDifficultyString(row.difficulty()))
                 .build()).toList();
-        return com.zhixuewuli.common.result.PageResult.<AnswerRecordResponse>builder().records(rows)
+        return PageResult.<AnswerRecordResponse>builder().records(rows)
                 .total(result.getTotalElements()).pages(result.getTotalPages()).currentPage(page).pageSize(size).build();
     }
 
@@ -114,29 +104,43 @@ public class AnswerRecordServiceImpl implements AnswerRecordService {
         boolean practice=eventId==null || "PRACTICE".equals(request.getIntent());
         if(eventId!=null || request.getRequestId()!=null) {
             if(request.getRequestId()==null || request.getRequestId().isBlank()) throw new IllegalArgumentException("任务提交必须提供requestId");
-            userRepository.lockById(currentUserId).orElseThrow(()->new IllegalArgumentException("用户不存在"));
+            User submitter=userRepository.lockById(currentUserId).orElseThrow(()->new IllegalArgumentException("用户不存在"));
+            if(submitter.getUserType()!=User.UserType.STUDENT)
+                throw new InsufficientPermissionException("仅学生可以提交任务作答或补练");
             var previous=answerRecordRepository.findByUserIdAndRequestId(currentUserId,request.getRequestId());
             if(previous.isPresent()) {
                 var old=previous.get();
                 if(!java.util.Objects.equals(old.getEventId(),eventId)||!old.getQuestionId().equals(request.getQuestionId())
-                    ||!old.getUserAnswer().equals(request.getUserAnswer())||old.isPractice()!=practice
-                    ||!java.util.Objects.equals(old.getErrorReason(),request.getErrorReason()))
-                    throw new com.zhixuewuli.common.exception.teacherevent.EventAlreadyExistsException("requestId已用于不同的提交内容");
+                    ||!old.getUserAnswer().equals(request.getUserAnswer())||old.isPractice()!=practice)
+                    throw new EventAlreadyExistsException("requestId已用于不同的提交内容");
                 return convertToFullResponseDTO(old);
             }
         }
+        if(practice && answerAccess.blocksPracticeBeforeAssignment(currentUserId,eventId,request.getQuestionId()))
+            throw new EventAlreadyExistsException("该题属于当前活动任务，请先完成首次作答后再补练");
         if(eventId!=null) {
             if(!practice && answerRecordRepository.existsByUserIdAndEventIdAndQuestionIdAndPracticeFalse(currentUserId,eventId,request.getQuestionId()))
-                throw new com.zhixuewuli.common.exception.teacherevent.EventAlreadyExistsException("本题已完成，请使用补练入口");
-            var event=teacherEventRepository.lockById(eventId).orElseThrow(()->new IllegalArgumentException("教学任务不存在"));
-            if(!Boolean.TRUE.equals(event.getIsGlobal())&&!practice)
-                throw new com.zhixuewuli.common.exception.teacherevent.EventAlreadyExistsException("教学任务已归档，请刷新或选择补练");
+                throw new EventAlreadyExistsException("本题已完成，请使用补练入口");
+            // Shared lock lets different students submit first attempts concurrently; archive/replace takes an exclusive lock.
+            var event = practice
+                    ? teacherEventRepository.findById(eventId).orElseThrow(()->new IllegalArgumentException("教学任务不存在"))
+                    : teacherEventRepository.lockSharedById(eventId).orElseThrow(()->new IllegalArgumentException("教学任务不存在"));
+            if(event.getStatus()==com.zhixuewuli.entity.TeacherEvent.Status.DRAFT)
+                throw new EventAlreadyExistsException("教学任务尚未发布");
+            if(!practice && event.getStatus()!=com.zhixuewuli.entity.TeacherEvent.Status.PUBLISHED)
+                throw new EventAlreadyExistsException("教学任务已截止或归档，请刷新或选择补练");
+            if(!practice && !event.isOpenAt(java.time.LocalDateTime.now(java.time.ZoneOffset.UTC))) {
+                if(event.isScheduledAt(java.time.LocalDateTime.now(java.time.ZoneOffset.UTC)))
+                    throw new EventAlreadyExistsException("教学任务尚未开始");
+                throw new EventAlreadyExistsException("教学任务已截止");
+            }
         }
+        if (eventId!=null && !practice) roster.ensureAnswerer(eventId,currentUserId);
         // Unscoped legacy submissions are free practice and never attach themselves to the current assignment.
         Question taskQuestion=eventId==null ? null : taskQuestions.get(eventId,request.getQuestionId());
         if(taskQuestion!=null) {
             try {if(!snapshotJson.readTree(taskQuestion.getOptions()).has(request.getUserAnswer())) throw new IllegalArgumentException("答案选项无效");}
-            catch(com.fasterxml.jackson.core.JsonProcessingException e){throw new IllegalStateException("任务选项损坏",e);}
+            catch(JsonProcessingException e){throw new IllegalStateException("任务选项损坏",e);}
         }
         try {
             // 1. 验证题目存在性
@@ -154,14 +158,14 @@ public class AnswerRecordServiceImpl implements AnswerRecordService {
             record.setSessionId(sessionId);
             record.setEventId(eventId);
             record.setRequestId(request.getRequestId());record.setPractice(practice || eventId==null);
-            record.setQuestionSnapshot(snapshotJson.writeValueAsString(question));
+            record.setImageRef(questionImages.store(question.getImageBase64()));
+            record.setQuestionSnapshot(snapshotJsonWithoutImage(question));
             record.setContentSnapshot(question.getContent());record.setOptionsSnapshot(question.getOptions());
             record.setCorrectSnapshot(question.getCorrectOption());record.setAnalysisSnapshot(question.getExplanation());record.setDifficultySnapshot(question.getDifficulty());
             record.setUserId(currentUserId);
             record.setQuestionId(request.getQuestionId());
             record.setUserAnswer(request.getUserAnswer());
             record.setCorrect(isCorrect);
-            record.setErrorReason(request.getErrorReason());
             record.setAnsweredAt(LocalDateTime.now(java.time.ZoneOffset.UTC));
 
             // 4. 保存记录
@@ -197,21 +201,90 @@ public class AnswerRecordServiceImpl implements AnswerRecordService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public AnswerRecordBatchResponse getCurrentUserWrongAnswers(Long currentUserId) {
         log.debug("查询当前用户错题记录 - UserId: {}", currentUserId);
-
-        List<AnswerRecord> wrongAnswers = answerRecordRepository.findWrongAnswersByUserId(currentUserId);
-
-        return convertToBatchResponse(wrongAnswers);
+        ensureLegacyHistoryBounded(answerRecordRepository.countWrongByUserId(currentUserId));
+        return convertToBatchResponse(answerRecordRepository.findWrongAnswersByUserId(currentUserId));
     }
 
     @Override
+    @Transactional(readOnly = true)
     public AnswerRecordBatchResponse getCurrentUserAnswerRecords(Long currentUserId) {
         log.debug("查询当前用户答题记录 - UserId: {}", currentUserId);
+        ensureLegacyHistoryBounded(answerRecordRepository.countByUserId(currentUserId));
+        return convertToBatchResponse(answerRecordRepository.findByUserIdOrderByAnsweredAtDesc(currentUserId));
+    }
 
-        List<AnswerRecord> records = answerRecordRepository.findByUserIdOrderByAnsweredAtDesc(currentUserId);
+    @Override
+    @Transactional(readOnly = true)
+    public PageResult<AnswerRecordSummaryResponse> getStudentHistory(
+            Long currentUserId, int page, int size, boolean wrongOnly, String keyword) {
+        return historyPage(currentUserId, page, size, wrongOnly, keyword);
+    }
 
-        return convertToBatchResponse(records);
+    @Override
+    @Transactional(readOnly = true)
+    public PageResult<AnswerRecordSummaryResponse> getPracticeReviewPage(
+            Long currentUserId, int page, int size, String keyword) {
+        var pageable = historyPageable(page, size);
+        var result = answerRecordRepository.findPracticeReviewPage(currentUserId, likeKeyword(keyword), pageable);
+        return pageResult(result, page, size);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PageResult<AnswerRecordSummaryResponse> getUserHistory(
+            Long targetUserId, Long currentUserId, int page, int size, boolean wrongOnly, String keyword) {
+        if (!userRepository.existsById(targetUserId)) {
+            throw new UserNotFoundException(String.format("用户不存在：%d", targetUserId));
+        }
+        if (!userPermissionUtil.canQueryUserData(targetUserId, currentUserId)) {
+            throw new InsufficientPermissionException(currentUserId, "学生只能访问自己的答题记录");
+        }
+        return historyPage(targetUserId, page, size, wrongOnly, keyword);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public StudentAnswerSummary getStudentAnswerSummary(Long currentUserId) {
+        return new StudentAnswerSummary(
+                answerRecordRepository.countByUserId(currentUserId),
+                answerRecordRepository.countCorrectByUserId(currentUserId),
+                answerRecordRepository.countDistinctWrongQuestionsByUserId(currentUserId));
+    }
+
+    private PageResult<AnswerRecordSummaryResponse> historyPage(
+            Long userId, int page, int size, boolean wrongOnly, String keyword) {
+        var result = answerRecordRepository.findHistoryPage(
+                userId, wrongOnly, likeKeyword(keyword), historyPageable(page, size));
+        return pageResult(result, page, size);
+    }
+
+    private PageRequest historyPageable(int page, int size) {
+        if (page < 1 || size < 1 || size > 100 || (long) (page - 1) * size > Integer.MAX_VALUE) {
+            throw new IllegalArgumentException("页码须大于零，每页条数须在1到100之间");
+        }
+        return PageRequest.of(page - 1, size);
+    }
+
+    private PageResult<AnswerRecordSummaryResponse> pageResult(
+            org.springframework.data.domain.Page<AnswerRecordSummaryResponse> result, int page, int size) {
+        return PageResult.<AnswerRecordSummaryResponse>builder()
+                .records(result.getContent()).total(result.getTotalElements()).pages(result.getTotalPages())
+                .currentPage(page).pageSize(size).build();
+    }
+
+    private String likeKeyword(String keyword) {
+        String value = keyword == null ? "" : keyword.trim();
+        if (value.length() > 100) throw new IllegalArgumentException("搜索词不得超过100个字符");
+        return "%" + value.replace("!", "!!").replace("%", "!%").replace("_", "!_") + "%";
+    }
+
+    private void ensureLegacyHistoryBounded(long count) {
+        if (count > 100) {
+            throw new IllegalArgumentException("历史记录超过100条，请使用分页接口获取");
+        }
     }
 
     // === 权限控制查询 ===
@@ -229,10 +302,9 @@ public class AnswerRecordServiceImpl implements AnswerRecordService {
         if (!userPermissionUtil.canQueryUserData(targetUserId, currentUserId)) {
             throw new InsufficientPermissionException(currentUserId, "学生只能访问自己的错题记录");
         }
+        ensureLegacyHistoryBounded(answerRecordRepository.countByUserId(targetUserId));
 
-        List<AnswerRecord> records = answerRecordRepository.findByUserIdOrderByAnsweredAtDesc(targetUserId);
-
-        return convertToBatchResponse(records);
+        return convertToBatchResponse(answerRecordRepository.findByUserIdOrderByAnsweredAtDesc(targetUserId));
     }
 
     @Override
@@ -248,10 +320,9 @@ public class AnswerRecordServiceImpl implements AnswerRecordService {
         if (!userPermissionUtil.canQueryUserData(targetUserId, currentUserId)) {
             throw new InsufficientPermissionException(currentUserId, "学生只能访问自己的答题记录");
         }
+        ensureLegacyHistoryBounded(answerRecordRepository.countWrongByUserId(targetUserId));
 
-        List<AnswerRecord> wrongAnswers = answerRecordRepository.findWrongAnswersByUserId(targetUserId);
-
-        return convertToBatchResponse(wrongAnswers);
+        return convertToBatchResponse(answerRecordRepository.findWrongAnswersByUserId(targetUserId));
     }
 
     // === 教师专属功能 ===
@@ -260,9 +331,6 @@ public class AnswerRecordServiceImpl implements AnswerRecordService {
     @Transactional(rollbackFor = { BusinessException.class, TechnicalException.class })
     public void deleteAnswerRecord(String recordId, Long currentUserId) {
         log.info("删除答题记录 - RecordId: {}, Operator: {}", recordId, currentUserId);
-
-        // 1. 权限验证
-        userPermissionUtil.checkTeacherPermission(currentUserId);
 
         // 2. 验证记录存在性
         AnswerRecord record = answerRecordRepository.findById(recordId)
@@ -289,9 +357,6 @@ public class AnswerRecordServiceImpl implements AnswerRecordService {
     public void batchDeleteByTimeRange(RecordBatchDeleteRequest request, Long currentUserId) {
         log.info("开始批量删除操作 - StartTime: {}, EndTime: {}, Operator: {}",
                 request.getStartTime(), request.getEndTime(), currentUserId);
-
-        // 1. 权限验证
-        userPermissionUtil.checkTeacherPermission(currentUserId);
 
         // 2. 参数验证
         if (request.getStartTime().isAfter(request.getEndTime())) {
@@ -320,9 +385,6 @@ public class AnswerRecordServiceImpl implements AnswerRecordService {
     public Long countTotalAnswers(Long currentUserId) {
         log.debug("统计总答题记录数 - Operator: {}", currentUserId);
 
-        // 权限验证
-        userPermissionUtil.checkTeacherPermission(currentUserId);
-
         return answerRecordRepository.count();
     }
 
@@ -330,24 +392,18 @@ public class AnswerRecordServiceImpl implements AnswerRecordService {
     public AnswerRecordBatchResponse getAllUsersAnswerRecords(Long currentUserId) {
         log.info("查询所有用户答题记录 - Operator: {}", currentUserId);
 
-        // 权限验证
-        userPermissionUtil.checkTeacherPermission(currentUserId);
+        ensureLegacyHistoryBounded(answerRecordRepository.count());
 
-        List<AnswerRecord> records = answerRecordRepository.findAll();
-
-        return convertToBatchResponse(records);
+        return convertToBatchResponse(answerRecordRepository.findAll());
     }
 
     @Override
     public AnswerRecordBatchResponse getAllUsersWrongAnswers(Long currentUserId) {
         log.info("查询所有用户错题记录 - Operator: {}", currentUserId);
 
-        // 权限验证
-        userPermissionUtil.checkTeacherPermission(currentUserId);
+        ensureLegacyHistoryBounded(answerRecordRepository.countWrong());
 
-        List<AnswerRecord> wrongAnswers = answerRecordRepository.findByCorrectFalseOrderByAnsweredAtDesc();
-
-        return convertToBatchResponse(wrongAnswers);
+        return convertToBatchResponse(answerRecordRepository.findByCorrectFalseOrderByAnsweredAtDesc());
     }
 
     // === 会话维度查询功能实现 ===
@@ -357,10 +413,6 @@ public class AnswerRecordServiceImpl implements AnswerRecordService {
         log.info("查询会话答题记录 - SessionId: {}, UserId: {}", sessionId, currentUserId);
 
         try {
-            // 1. 验证用户是否有权访问此会话
-            validateSessionAccess(sessionId, currentUserId);
-
-            // 2. 根据用户类型查询不同的数据
             User user = userRepository.findById(currentUserId)
                     .orElseThrow(() -> new UserNotFoundException(String.format("用户不存在：%d", currentUserId)));
 
@@ -373,11 +425,8 @@ public class AnswerRecordServiceImpl implements AnswerRecordService {
                 records = answerRecordRepository.findBySessionIdAndUserId(sessionId, currentUserId);
             }
 
-            if (records.isEmpty()) {
-                return AnswerRecordBatchResponse.builder()
-                        .records(List.of())
-                        .totalCount(0L)
-                        .build();
+            if (user.getUserType() != User.UserType.TEACHER && records.isEmpty()) {
+                throw new InsufficientPermissionException("权限不足：无法访问该会话");
             }
 
             log.info("会话答题记录查询成功 - 找到{}条记录", records.size());
@@ -394,84 +443,47 @@ public class AnswerRecordServiceImpl implements AnswerRecordService {
 
     @Override
     public AnswerRecordBatchResponse getStudentLatestSessionRecords(Long studentId, Long teacherId) {
-        log.info("查询学生最近会话记录 - StudentId: {}, TeacherId: {}", studentId, teacherId);
+        return latestSessionRecords(teacherId, () -> userRepository.findById(studentId));
+    }
 
+    @Override
+    public AnswerRecordBatchResponse getStudentLatestSessionRecordsByName(String studentName, Long teacherId) {
+        return latestSessionRecords(teacherId, () -> userRepository.findByRealName(studentName));
+    }
+
+    private AnswerRecordBatchResponse latestSessionRecords(Long teacherId,
+            Supplier<Optional<User>> studentLookup) {
         try {
-            // 权限验证：只有教师可以查询学生记录
-            userPermissionUtil.checkTeacherPermission(teacherId);
-
-            // 验证学生是否存在
-            userRepository.findById(studentId)
-                    .orElseThrow(() -> new UserNotFoundException("学生不存在"));
-
-            // 获取学生最近的会话ID
-            String latestSessionId = getLatestSessionIdForUser(studentId);
-
-            if (latestSessionId == null) {
-                return AnswerRecordBatchResponse.builder()
-                        .records(List.of())
-                        .totalCount(0L)
-                        .build();
+            User student = studentLookup.get().orElseThrow(() -> new UserNotFoundException("学生不存在"));
+            if (student.getUserType() != User.UserType.STUDENT) {
+                throw new UserNotFoundException("学生不存在");
             }
-
-            // 查询该会话的所有答题记录
-            List<AnswerRecord> records = answerRecordRepository.findBySessionIdAndUserId(latestSessionId, studentId);
-
-            log.info("学生最近会话记录查询成功 - 找到{}条记录", records.size());
-
-            return convertToBatchResponse(records);
-
+            String sessionId = getLatestSessionIdForUser(student.getId());
+            return convertToBatchResponse(sessionId == null ? List.of()
+                    : answerRecordRepository.findBySessionIdAndUserId(sessionId, student.getId()));
         } catch (BusinessException e) {
             throw e;
         } catch (Exception e) {
-            log.error("学生最近会话记录查询失败 - StudentId: {}, TeacherId: {}", studentId, teacherId, e);
+            log.error("学生最近会话记录查询失败 - TeacherId: {}", teacherId, e);
             throw new TechnicalException("查询学生最近会话记录失败：" + e.getMessage());
         }
     }
 
-    /**
-     * 验证用户对会话的访问权限
-     * 
-     * 采用分层验证机制，明确区分权限问题和资源不存在问题：
-     * 1. 首先进行业务权限验证（身份权限）
-     * 2. 然后进行数据存在性验证（会话是否存在）
-     * 
-     * @param sessionId 会话ID
-     * @param userId    用户ID
-     * @throws SessionAccessException   当用户无权访问会话时抛出
-     * @throws SessionNotFoundException 当会话不存在时抛出
-     */
-    private void validateSessionAccess(String sessionId, Long userId) {
-        // 1. 获取用户信息，判断用户类型
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new UserNotFoundException(String.format("用户不存在：%d", userId)));
-
-        // 2. 教师用户可以访问任意会话
-        if (user.getUserType() == User.UserType.TEACHER) {
-            log.debug("教师用户可访问任意会话 - SessionId: {}, UserId: {}", sessionId, userId);
-            return;
-        }
-
-        // 3. 学生用户只能访问自己的会话（通过检查该会话中是否有该用户的记录）
-        List<AnswerRecord> sessionRecords = answerRecordRepository.findBySessionIdAndUserId(sessionId, userId);
-
-        if (sessionRecords.isEmpty()) {
-            // 学生无权访问该会话（要么会话不存在，要么不属于该学生）
-            throw new InsufficientPermissionException("权限不足：无法访问该会话");
-        }
-    }
-
-    /**
-     * 获取用户最近的会话ID
-     */
     private String getLatestSessionIdForUser(Long userId) {
-        List<String> sessionIds = answerRecordRepository.findDistinctSessionIdsByUserId(userId);
-        return sessionIds.isEmpty() ? null : sessionIds.get(0);
+        // 最近会话由最后一条作答决定；时间相同用唯一的 attemptOrder 稳定排序。
+        List<String> latest = answerRecordRepository.findLatestSessionIdsByUserId(userId, PageRequest.of(0, 1));
+        if (latest.isEmpty() || latest.get(0) == null || latest.get(0).isBlank()) return null;
+        return latest.get(0);
     }
 
-    /**
-     * 将答题记录实体转换为包含完整信息的响应DTO
-     */
+    private String snapshotJsonWithoutImage(Question question) throws JsonProcessingException {
+        var node = snapshotJson.valueToTree(question);
+        if (node instanceof com.fasterxml.jackson.databind.node.ObjectNode object) {
+            object.remove("imageBase64");
+        }
+        return snapshotJson.writeValueAsString(node);
+    }
+
     private AnswerRecordResponse convertToFullResponseDTO(AnswerRecord record) {
         // 获取关联的题目信息
         Question question = record.getQuestionSnapshot()!=null ? null : record.getQuestion();
@@ -482,15 +494,6 @@ public class AnswerRecordServiceImpl implements AnswerRecordService {
         return questionResponseConverter.convertToFullResponseDTO(record, question);
     }
 
-    /**
-     * 将答题记录列表转换为批量响应DTO
-     * 
-     * 统一封装答题记录列表到响应DTO的转换逻辑，
-     * 避免重复代码，提高代码复用性和维护性。
-     * 
-     * @param records 答题记录实体列表
-     * @return 包含转换后记录列表和总数的批量响应DTO
-     */
     private AnswerRecordBatchResponse convertToBatchResponse(List<AnswerRecord> records) {
         List<AnswerRecordResponse> responseRecords = records.stream()
                 .map(this::convertToFullResponseDTO)
@@ -503,57 +506,14 @@ public class AnswerRecordServiceImpl implements AnswerRecordService {
     }
 
     @Override
-    public AnswerRecordBatchResponse getStudentLatestSessionRecordsByName(String studentName, Long teacherId) {
-        log.info("查询学生最近会话记录 - StudentName: {}, TeacherId: {}", studentName, teacherId);
-
-        try {
-            // 权限验证：只有教师可以查询学生记录
-            userPermissionUtil.checkTeacherPermission(teacherId);
-
-            // 根据姓名查找学生（精确匹配）
-            User student = userRepository.findByRealName(studentName)
-                    .orElseThrow(() -> new UserNotFoundException("学生不存在"));
-
-            // 直接复用核心查询逻辑，避免重复的学生存在性验证
-            Long studentId = student.getId();
-
-            // 获取学生最近的会话ID
-            String latestSessionId = getLatestSessionIdForUser(studentId);
-
-            if (latestSessionId == null) {
-                return AnswerRecordBatchResponse.builder()
-                        .records(List.of())
-                        .totalCount(0L)
-                        .build();
-            }
-
-            // 查询该会话的所有答题记录
-            List<AnswerRecord> records = answerRecordRepository.findBySessionIdAndUserId(latestSessionId, studentId);
-
-            log.info("学生最近会话记录查询成功 - 找到{}条记录", records.size());
-
-            return convertToBatchResponse(records);
-
-        } catch (BusinessException e) {
-            throw e;
-        } catch (Exception e) {
-            log.error("学生最近会话记录查询失败 - StudentName: {}, TeacherId: {}", studentName, teacherId, e);
-            throw new TechnicalException("查询学生最近会话记录失败：" + e.getMessage());
-        }
-    }
-
-    @Override
     public AnswerStatsResponse getAnswerStats(Long currentUserId) {
         log.info("获取答题统计数据 - Operator: {}", currentUserId);
 
-        // 权限验证
-        userPermissionUtil.checkTeacherPermission(currentUserId);
-
         // 获取有答题记录的学生人数
-        long answeredStudentCount = answerRecordRepository.countDistinctUserIds();
+        long answeredStudentCount = answerRecordRepository.countDistinctActiveStudentIds();
 
-        // 获取学生总人数
-        long totalStudentCount = userRepository.countByUserType(User.UserType.STUDENT);
+        // 分母同样是当前启用学生，停用账号只保留历史明细，不进入进度人数。
+        long totalStudentCount = userRepository.countByUserTypeAndActiveTrue(User.UserType.STUDENT);
 
         // 计算覆盖率
         double coverageRate = totalStudentCount > 0

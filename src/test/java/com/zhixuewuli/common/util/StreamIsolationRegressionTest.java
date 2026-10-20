@@ -20,7 +20,7 @@ import static org.mockito.Mockito.mock;
 class StreamIsolationRegressionTest extends BaseUnitTest {
     @Test
     void aConversationMayOnlyHaveOneGenerationAtATime() {
-        var streams = new StreamUtils(new AIStreamingProperties());
+        var streams = new StreamUtils(new AIStreamingProperties(), com.zhixuewuli.common.redis.LeaseMocks.create());
         try {
             var first = streams.createConfiguredEmitterWithLimit(10000, 1000);
             var second = streams.createConfiguredEmitterWithLimit(10000, 1000);
@@ -35,7 +35,7 @@ class StreamIsolationRegressionTest extends BaseUnitTest {
 
     @Test
     void aDisconnectedEmitterCannotStartAGenerationLater() {
-        var streams = new StreamUtils(new AIStreamingProperties());
+        var streams = new StreamUtils(new AIStreamingProperties(), com.zhixuewuli.common.redis.LeaseMocks.create());
         try {
             var emitter = streams.createConfiguredEmitterWithLimit(10000, 1000);
             streams.safeCompleteEmitter(emitter);
@@ -46,7 +46,7 @@ class StreamIsolationRegressionTest extends BaseUnitTest {
     @Test
     void saturatedExecutorReleasesTheEmitterInsteadOfThrowingAndLeaking() {
         var properties = new AIStreamingProperties();
-        var streams = new StreamUtils(properties);
+        var streams = new StreamUtils(properties, com.zhixuewuli.common.redis.LeaseMocks.create());
         try {
             var service = new ZhiPuAIAssistantServiceImpl(mock(QuestionRepository.class),
                     mock(AnswerRecordRepository.class), mock(ConversationHistoryRepository.class),
@@ -63,7 +63,7 @@ class StreamIsolationRegressionTest extends BaseUnitTest {
 
     @Test
     void oldCompletionCannotCancelTheNextRequestInTheSameConversation() {
-        var streams = new StreamUtils(new AIStreamingProperties());
+        var streams = new StreamUtils(new AIStreamingProperties(), com.zhixuewuli.common.redis.LeaseMocks.create());
         try {
             var context = context();
             var old = streams.createConfiguredEmitterWithLimit(10000, 1000);

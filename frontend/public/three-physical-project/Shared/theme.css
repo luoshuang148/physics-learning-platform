@@ -1,0 +1,63 @@
+:root {
+    /* 
+    将当前所有颜色均映射为四色主题变量，便于后续修改
+    四色主题变量来自 Shared/color.css
+       --color-primary(主要) --color-secondary(次要)
+       --color-content(内容, 固定白色) --color-accent(重点)
+    */
+
+    /* 背景/面板语义色：由四种颜色映射 */
+    --theme-bg: #00050a;
+    /*深蓝黑色底色，像宇宙*/
+    --theme-panel-bg: color-mix(in srgb, var(--color-primary) 10%, #000 20%);
+    --theme-panel-border: color-mix(in srgb, var(--color-secondary) 40%, transparent);
+    --theme-panel-shadow: color-mix(in srgb, var(--color-secondary) 10%, #000 20%);
+
+    --theme-button-bg: color-mix(in srgb, var(--color-secondary) 20%, #000 20%);
+    --theme-button-border: color-mix(in srgb, var(--color-secondary) 40%, transparent);
+    --theme-button-shadow: color-mix(in srgb, var(--color-secondary) 10%, #000 20%);
+
+    /* 滑动条颜色（固定为清晰高对比色） */
+    --theme-slider-bg: #2ea8ff;
+    --theme-slider-shadow: #8ad8ff;
+
+    --theme-log-title: var(--color-secondary);
+    --theme-log-accent: var(--color-accent);
+
+    /* 历史变量兼容（避免旧页面大量改动） */
+    --theme-cyan: var(--color-secondary);
+    /*原青色： 次要颜色*/
+    --theme-orange: var(--color-accent);
+    /*原橙色： 重点颜色*/
+    --theme-magenta: var(--color-accent);
+    /*原品红色： 重点颜色*/
+    --theme-green: var(--color-secondary);
+    /*原绿色： 次要颜色*/
+
+    --theme-text: var(--color-content);
+    --theme-text-soft: var(--color-content);
+    --theme-text-muted: color-mix(in srgb, var(--color-content) 60%, #000 40%);
+    /*原白色： 内容颜色*/
+    --theme-white: var(--color-content);
+    --theme-black: #000000;
+    --theme-red: var(--color-accent);
+    /*原红色： 重点颜色*/
+    --theme-danger: var(--color-accent);
+    /*原红色： 重点颜色*/
+
+
+    /* 四种基本颜色语义：主要、次要、内容、重点*/
+    --theme-primary: var(--color-primary);
+    --theme-secondary: var(--color-secondary);
+    --theme-content: var(--color-content);
+    --theme-accent: var(--color-accent);
+
+    --font-family-ui: 'PingFang SC', 'Microsoft YaHei', 'Segoe UI', sans-serif;
+    --font-size-title-xl: 22px;
+    --font-size-title-lg: 20px;
+    --font-size-title-md: 18px;
+    --font-size-body: 15px;
+    --font-size-body-sm: 14px;
+    --font-size-caption: 12px;
+    --font-size-caption-sm: 11px;
+}

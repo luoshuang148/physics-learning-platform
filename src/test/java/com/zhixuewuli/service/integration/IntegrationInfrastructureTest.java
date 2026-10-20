@@ -3,11 +3,9 @@ package com.zhixuewuli.service.integration;
 import com.zhixuewuli.common.base.WireMockTestBase;
 import com.zhixuewuli.common.factory.IntegrationTestDataFactory;
 import com.zhixuewuli.entity.User;
-import com.zhixuewuli.entity.Video;
 import com.zhixuewuli.entity.Question;
 import com.zhixuewuli.entity.AnswerRecord;
 import com.zhixuewuli.repository.UserRepository;
-import com.zhixuewuli.repository.VideoRepository;
 import com.zhixuewuli.repository.QuestionRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -37,9 +35,6 @@ class IntegrationInfrastructureTest extends WireMockTestBase {
 
     @Autowired
     private UserRepository userRepository;
-
-    @Autowired
-    private VideoRepository videoRepository;
 
     @Autowired
     private QuestionRepository questionRepository;
@@ -98,21 +93,18 @@ class IntegrationInfrastructureTest extends WireMockTestBase {
 
         // 创建教学场景
         var scenario = factory.createTeachingScenario(teacher.getId(), 3)
-                .withVideo()
                 .withQuestions(2)
                 .withStudents()
                 .withAnswerRecords()
                 .build();
 
         // 验证场景数据
-        assertThat(scenario.getVideo()).isNotNull();
         assertThat(scenario.getQuestions()).hasSize(2);
         assertThat(scenario.getStudents()).hasSize(3);
         assertThat(scenario.getAnswerRecords()).hasSize(6); // 3 学生 × 2 题目
 
         // 验证数据库中有数据
         assertThat(userRepository.count()).isEqualTo(5); // 1 教师 + 3 学生 + 1 初始
-        assertThat(videoRepository.count()).isEqualTo(1);
         assertThat(questionRepository.count()).isEqualTo(2);
     }
 

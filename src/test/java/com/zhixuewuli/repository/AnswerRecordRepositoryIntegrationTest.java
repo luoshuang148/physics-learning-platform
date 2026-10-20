@@ -179,7 +179,7 @@ class AnswerRecordRepositoryIntegrationTest extends BaseIntegrationTest {
         createAnswerRecord(user3, question1, "s6", "A", true);
 
         // When
-        long distinctUserCount = answerRecordRepository.countDistinctUserIds();
+        long distinctUserCount = answerRecordRepository.countDistinctActiveStudentIds();
 
         // Then - 应该返回 3（3 个不同用户有答题记录）
         assertThat(distinctUserCount).isEqualTo(3L);
@@ -192,7 +192,7 @@ class AnswerRecordRepositoryIntegrationTest extends BaseIntegrationTest {
         cleanTable("ANSWER_RECORDS");
 
         // When
-        long distinctUserCount = answerRecordRepository.countDistinctUserIds();
+        long distinctUserCount = answerRecordRepository.countDistinctActiveStudentIds();
 
         // Then - 没有答题记录时返回 0
         assertThat(distinctUserCount).isEqualTo(0L);
@@ -214,7 +214,7 @@ class AnswerRecordRepositoryIntegrationTest extends BaseIntegrationTest {
         createAnswerRecord(user, question2, "s3", "C", true);
 
         // When
-        long distinctUserCount = answerRecordRepository.countDistinctUserIds();
+        long distinctUserCount = answerRecordRepository.countDistinctActiveStudentIds();
 
         // Then - 只返回 1（同一用户去重后只有一个）
         assertThat(distinctUserCount).isEqualTo(1L);
@@ -601,40 +601,6 @@ class AnswerRecordRepositoryIntegrationTest extends BaseIntegrationTest {
         assertThat(records.get(0).getAnsweredAt()).isAfterOrEqualTo(records.get(1).getAnsweredAt());
     }
 
-    // ==================== 错误原因统计测试 ====================
-
-    @Test
-    @Rollback
-    void testCountErrorReasonsByDateRange() {
-        // Given
-        LocalDateTime now = LocalDateTime.now();
-        LocalDateTime start = now.minusDays(1);
-        LocalDateTime end = now.plusDays(1);
-
-        User user1 = createUniqueUser("batch_user", "批量用户");
-        User user2 = createUniqueUser("batch_user", "批量用户");
-        Question question = createUniqueQuestion();
-
-        // 创建带有错误原因的记录
-        AnswerRecord record1 = createAnswerRecord(user1, question, "error_session_1", "A", false);
-        record1.setErrorReason("概念理解错误");
-        answerRecordRepository.save(record1);
-
-        AnswerRecord record2 = createAnswerRecord(user1, createUniqueQuestion(), "error_session_2", "B", false);
-        record2.setErrorReason("概念理解错误");
-        answerRecordRepository.save(record2);
-
-        AnswerRecord record3 = createAnswerRecord(user2, createUniqueQuestion(), "error_session_3", "C", false);
-        record3.setErrorReason("计算错误");
-        answerRecordRepository.save(record3);
-
-        // When
-        List<Object[]> errorStats = answerRecordRepository.countErrorReasonsByDateRange(start, end);
-
-        // Then - 返回 [errorReason, count]
-        assertThat(errorStats).hasSize(2);
-    }
-
     // ==================== 题目统计测试 ====================
 
     @Test
@@ -975,12 +941,10 @@ class AnswerRecordRepositoryIntegrationTest extends BaseIntegrationTest {
         LocalDateTime now = LocalDateTime.now();
 
         AnswerRecord errorRecord1 = createAnswerRecord(student1, question, "student_err_1", "A", false);
-        errorRecord1.setErrorReason("概念不清");
         errorRecord1.setAnsweredAt(now);
         answerRecordRepository.save(errorRecord1);
 
         AnswerRecord errorRecord2 = createAnswerRecord(student2, question, "student_err_2", "B", false);
-        errorRecord2.setErrorReason("审题不仔细");
         errorRecord2.setAnsweredAt(now.minusMinutes(30));
         answerRecordRepository.save(errorRecord2);
 
@@ -990,8 +954,7 @@ class AnswerRecordRepositoryIntegrationTest extends BaseIntegrationTest {
         // When
         List<Object[]> studentErrors = answerRecordRepository.findStudentErrorsByQuestionId(question.getId());
 
-        // Then - 返回 [userId, realName, className, selectedOption, answeredAt,
-        // errorReason]
+        // Then - 返回 [userId, realName, className, selectedOption, answeredAt]
         assertThat(studentErrors).hasSize(2);
     }
 
@@ -999,24 +962,48 @@ class AnswerRecordRepositoryIntegrationTest extends BaseIntegrationTest {
 
     @Test
     @Rollback
-    void testFindDistinctSessionIdsByUserId() {
-        // Given
+    void testFindLatestSessionByAnsweredAtNotSessionIdOrder() {
         User user = createUniqueUser("batch_user", "批量用户");
-        Question question = createUniqueQuestion();
+        LocalDateTime now = LocalDateTime.now();
 
-        // 创建 3 个不同会话的记录
-        createAnswerRecord(user, question, "session_A", "A", true);
-        createAnswerRecord(user, createUniqueQuestion(), "session_B", "B", true);
-        createAnswerRecord(user, createUniqueQuestion(), "session_C", "C", false);
-        // 重复的会话
-        createAnswerRecord(user, createUniqueQuestion(), "session_A", "D", true);
+        AnswerRecord older = createAnswerRecord(user, createUniqueQuestion(), "z_older", "A", true);
+        older.setAnsweredAt(now.minusHours(1));
+        answerRecordRepository.saveAndFlush(older);
 
-        // When
-        List<String> sessionIds = answerRecordRepository.findDistinctSessionIdsByUserId(user.getId());
+        AnswerRecord newer = createAnswerRecord(user, createUniqueQuestion(), "a_newer", "B", true);
+        newer.setAnsweredAt(now);
+        answerRecordRepository.saveAndFlush(newer);
 
-        // Then
-        assertThat(sessionIds).hasSize(3);
-        assertThat(sessionIds).containsExactlyInAnyOrder("session_A", "session_B", "session_C");
+        assertThat(answerRecordRepository.findLatestSessionIdsByUserId(
+                user.getId(), org.springframework.data.domain.PageRequest.of(0, 1)))
+                .containsExactly("a_newer");
+    }
+
+    @Test
+    @Rollback
+    void testFindLatestSessionUsesAttemptOrderWhenTimesTie() {
+        User user = createUniqueUser("batch_user", "批量用户");
+        LocalDateTime sameTime = LocalDateTime.now();
+
+        AnswerRecord first = createAnswerRecord(user, createUniqueQuestion(), "z_first", "A", true);
+        first.setAnsweredAt(sameTime);
+        answerRecordRepository.saveAndFlush(first);
+
+        AnswerRecord second = createAnswerRecord(user, createUniqueQuestion(), "a_second", "B", true);
+        second.setAnsweredAt(sameTime);
+        answerRecordRepository.saveAndFlush(second);
+
+        assertThat(answerRecordRepository.findLatestSessionIdsByUserId(
+                user.getId(), org.springframework.data.domain.PageRequest.of(0, 1)))
+                .containsExactly("a_second");
+    }
+
+    @Test
+    @Rollback
+    void testFindLatestSessionReturnsEmptyWithoutHistory() {
+        User user = createUniqueUser("batch_user", "批量用户");
+        assertThat(answerRecordRepository.findLatestSessionIdsByUserId(
+                user.getId(), org.springframework.data.domain.PageRequest.of(0, 1))).isEmpty();
     }
 
     @Test

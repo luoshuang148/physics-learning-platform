@@ -1,12 +1,7 @@
 <template>
-  <AppShell :subtitle="`AI 问答 · ${auth.user?.realName ?? ''}`" :links="links">
+  <AppShell :subtitle="`AI 问答 · ${auth.user?.realName ?? ''}`">
     <div class="ai-page student-font">
       <section class="ai-hero">
-        <div>
-          <span class="ai-kicker">AI study assistant</span>
-          <h1 class="ai-title">AI 问答</h1>
-          <p class="ai-summary">在同一个页面中完成提问、查看回答与切换问答模式。</p>
-        </div>
         <div class="mode-tabs">
           <button
             class="mode-tab"
@@ -123,12 +118,6 @@ const SESSION_TYPE_MAP: Record<AIMode, string> = {
 const auth = useAuthStore();
 const { state, reset } = useAIStreamState();
 
-const links = [
-  { label: '首页', to: '/student/home' },
-  { label: '错题本', to: '/student/wrong-book' },
-  { label: 'AI 问答', to: '/student/ai' },
-  { label: '学习报告', to: '/student/report' },
-];
 
 const question = ref('');
 const questionId = ref<number | undefined>(undefined);
@@ -458,7 +447,7 @@ const clearCurrentMode = async () => {
 }
 
 .history-error {
-  color: rgba(255, 107, 145, 0.92);
+  color: #b91c1c;
 }
 
 .session-tip {

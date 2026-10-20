@@ -16,7 +16,6 @@ import com.zhixuewuli.repository.QuestionRepository;
 import com.zhixuewuli.repository.StudentReportRepository;
 import com.zhixuewuli.repository.UserRepository;
 import com.zhixuewuli.service.ai.impl.AliyunAIReportServiceImpl;
-import com.zhixuewuli.common.util.UserPermissionUtil;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -78,8 +77,6 @@ class AliyunAIReportSyncTest extends AIServiceSyncTestBase {
     @Mock
     private OptionMappingUtil optionMappingUtil;
 
-    @Mock
-    private UserPermissionUtil userPermissionUtil;
 
     @Spy
     private ObjectMapper objectMapper = new ObjectMapper();
@@ -179,7 +176,6 @@ class AliyunAIReportSyncTest extends AIServiceSyncTestBase {
         Long teacherId = TEST_USER_ID + 1;
 
         // Mock权限验证通过
-        doNothing().when(userPermissionUtil).checkTeacherPermission(teacherId);
 
         // Mock学生用户存在
         when(userRepository.findById(studentId)).thenReturn(Optional.of(mockStudent));
@@ -190,7 +186,7 @@ class AliyunAIReportSyncTest extends AIServiceSyncTestBase {
                 .thenReturn(Optional.of(mockReport));
 
         // When
-        StudentReportResponse result = service.getStudentLatestReport(teacherId, studentId);
+        StudentReportResponse result = service.getStudentLatestReport(studentId);
 
         // Then
         assertThat(result).isNotNull();
@@ -199,7 +195,6 @@ class AliyunAIReportSyncTest extends AIServiceSyncTestBase {
         assertThat(result.getReportCreateTime()).isEqualTo(mockReport.getUpdatedAt());
 
         // 验证依赖调用
-        verify(userPermissionUtil).checkTeacherPermission(teacherId);
         verify(userRepository).findById(studentId);
         verify(studentReportRepository).findLatestByUserId(studentId);
 
@@ -207,82 +202,8 @@ class AliyunAIReportSyncTest extends AIServiceSyncTestBase {
         ensureAIClientNeverCalled();
     }
 
-    @Test
-    @DisplayName("获取学生最新报告-当教师权限不足时抛出异常")
-    void getStudentLatestReport_shouldThrowException_whenInsufficientPermission() {
-        // Given
-        Long studentId = TEST_USER_ID;
-        Long teacherId = TEST_USER_ID + 1;
-
-        // Mock权限验证失败
-        doThrow(new com.zhixuewuli.common.exception.InsufficientPermissionException("权限不足"))
-                .when(userPermissionUtil).checkTeacherPermission(teacherId);
-
-        // When & Then
-        assertThatThrownBy(() -> service.getStudentLatestReport(teacherId, studentId))
-                .isInstanceOf(com.zhixuewuli.common.exception.InsufficientPermissionException.class)
-                .hasMessageContaining("权限不足");
-
-        // 验证权限检查被调用
-        verify(userPermissionUtil).checkTeacherPermission(teacherId);
-        // 不应该查询其他依赖
-        verify(userRepository, never()).findById(anyLong());
-        verify(studentReportRepository, never()).findLatestByUserId(anyLong());
-
-        // 确保AI客户端未被调用
-        ensureAIClientNeverCalled();
-    }
 
     // ========== 私有方法测试 ==========
-
-    @Test
-    @DisplayName("加载题目从答题记录-验证题目查询")
-    void loadQuestionsFromRecords_shouldQueryQuestions() throws Exception {
-        // Given
-        List<Long> questionIds = List.of(TEST_QUESTION_ID, TEST_QUESTION_ID + 1);
-        List<Question> mockQuestions = List.of(mockQuestion);
-
-        when(questionRepository.findByIdIn(any())).thenReturn(mockQuestions);
-
-        // When
-        Object result = com.zhixuewuli.common.util.test.ReflectionTestUtil.invokePrivateMethod(
-                service,
-                "loadQuestionsFromRecords",
-                new Class<?>[] { List.class },
-                mockAnswerRecords);
-
-        // Then
-        assertThat(result).isNotNull();
-        // 验证依赖调用
-        verify(questionRepository).findByIdIn(any());
-
-        // 确保AI客户端未被调用
-        ensureAIClientNeverCalled();
-    }
-
-    @Test
-    @DisplayName("加载题目从答题记录-当无题目时返回空映射")
-    void loadQuestionsFromRecords_shouldReturnEmptyMap_whenNoQuestions() throws Exception {
-        // Given
-        List<AnswerRecord> emptyRecords = List.of();
-
-        // When
-        Object result = com.zhixuewuli.common.util.test.ReflectionTestUtil.invokePrivateMethod(
-                service,
-                "loadQuestionsFromRecords",
-                new Class<?>[] { List.class },
-                emptyRecords);
-
-        // Then
-        assertThat(result).isNotNull();
-        // 不应该调用题目查询
-        verify(questionRepository, never()).findByIdIn(any());
-
-        // 确保AI客户端未被调用
-        ensureAIClientNeverCalled();
-    }
-
-    // ========== 异常场景测试 ==========
 
     @Test
     @DisplayName("获取学生最新报告-当学生不存在时抛出异常")
@@ -292,18 +213,16 @@ class AliyunAIReportSyncTest extends AIServiceSyncTestBase {
         Long teacherId = TEST_USER_ID + 1;
 
         // Mock权限验证通过
-        doNothing().when(userPermissionUtil).checkTeacherPermission(teacherId);
 
         // Mock学生用户不存在
         when(userRepository.findById(studentId)).thenReturn(Optional.empty());
 
         // When & Then
-        assertThatThrownBy(() -> service.getStudentLatestReport(teacherId, studentId))
+        assertThatThrownBy(() -> service.getStudentLatestReport(studentId))
                 .isInstanceOf(com.zhixuewuli.common.exception.auth.UserNotFoundException.class)
                 .hasMessageContaining("学生用户不存在");
 
         // 验证权限检查和用户查询被调用
-        verify(userPermissionUtil).checkTeacherPermission(teacherId);
         verify(userRepository).findById(studentId);
         verify(studentReportRepository, never()).findLatestByUserId(anyLong());
 
@@ -319,7 +238,6 @@ class AliyunAIReportSyncTest extends AIServiceSyncTestBase {
         Long teacherId = TEST_USER_ID + 1;
 
         // Mock权限验证通过和用户存在
-        doNothing().when(userPermissionUtil).checkTeacherPermission(teacherId);
         when(userRepository.findById(studentId)).thenReturn(Optional.of(mockStudent));
 
         // Mock无报告记录
@@ -327,12 +245,11 @@ class AliyunAIReportSyncTest extends AIServiceSyncTestBase {
                 .thenReturn(Optional.empty());
 
         // When & Then
-        assertThatThrownBy(() -> service.getStudentLatestReport(teacherId, studentId))
+        assertThatThrownBy(() -> service.getStudentLatestReport(studentId))
                 .isInstanceOf(com.zhixuewuli.common.exception.answerrecord.AnswerRecordNotFoundException.class)
                 .hasMessageContaining("该学生暂无学习报告记录");
 
         // 验证所有依赖都被调用
-        verify(userPermissionUtil).checkTeacherPermission(teacherId);
         verify(userRepository).findById(studentId);
         verify(studentReportRepository).findLatestByUserId(studentId);
 
@@ -375,17 +292,11 @@ class AliyunAIReportSyncTest extends AIServiceSyncTestBase {
         java.util.Map<Long, Question> questionMap = java.util.Map.of(TEST_QUESTION_ID, mockQuestion);
 
         // When
-        String result = com.zhixuewuli.common.util.test.ReflectionTestUtil.invokePrivateMethod(
-                service,
-                "buildStudentReportPrompt",
-                new Class<?>[] { List.class, java.util.Map.class, String.class },
-                mockAnswerRecords,
-                questionMap,
-                mockStudent.getRealName());
+        String result = com.zhixuewuli.service.ai.report.ReportPreparation.prepare(mockAnswerRecords, questionMap, objectMapper, false, "fixture").prompt();
 
         // Then
         assertThat(result).isNotNull();
-        assertThat(result).contains("学习报告");
+        assertThat(result).contains("本次作业复盘", "原始作答：2", "原始正确：1");
         assertThat(result).doesNotContain(mockStudent.getRealName());
         assertThat(result).contains("题目");
         assertThat(result).contains("答题历史");
@@ -402,13 +313,7 @@ class AliyunAIReportSyncTest extends AIServiceSyncTestBase {
         java.util.Map<Long, String> studentNames = java.util.Map.of(TEST_USER_ID, "测试学生");
 
         // When
-        String result = com.zhixuewuli.common.util.test.ReflectionTestUtil.invokePrivateMethod(
-                service,
-                "buildTeacherAnalysisPrompt",
-                new Class<?>[] { List.class, java.util.Map.class, java.util.Map.class },
-                mockAnswerRecords,
-                questionMap,
-                studentNames);
+        String result = com.zhixuewuli.service.ai.report.ReportPreparation.prepare(mockAnswerRecords, questionMap, objectMapper, true, "fixture").prompt();
 
         // Then
         assertThat(result).isNotNull();
@@ -436,11 +341,11 @@ class AliyunAIReportSyncTest extends AIServiceSyncTestBase {
         com.zhixuewuli.common.util.test.ReflectionTestUtil.invokePrivateMethod(
                 service,
                 "saveStudentReport",
-                new Class<?>[] { Long.class, String.class, Long.class, String.class },
+                new Class<?>[] { Long.class, String.class, Long.class, String.class, String.class },
                 userId,
                 sessionId,
                 null,
-                reportContent);
+                reportContent, "{}");
 
         // Then
         // 验证依赖调用
@@ -459,17 +364,11 @@ class AliyunAIReportSyncTest extends AIServiceSyncTestBase {
         java.util.Map<Long, Question> emptyQuestionMap = java.util.Map.of();
 
         // When
-        String result = com.zhixuewuli.common.util.test.ReflectionTestUtil.invokePrivateMethod(
-                service,
-                "buildStudentReportPrompt",
-                new Class<?>[] { List.class, java.util.Map.class, String.class },
-                emptyRecords,
-                emptyQuestionMap,
-                "该学生");
+        String result = com.zhixuewuli.service.ai.report.ReportPreparation.prepare(emptyRecords, emptyQuestionMap, objectMapper, false, "fixture").prompt();
 
         // Then
         assertThat(result).isNotNull();
-        assertThat(result).contains("学习报告");
+        assertThat(result).contains("本次作业复盘", "原始作答：0");
 
         // 确保AI客户端未被调用
         ensureAIClientNeverCalled();
@@ -487,8 +386,8 @@ class AliyunAIReportSyncTest extends AIServiceSyncTestBase {
 
         org.junit.jupiter.api.Assertions.assertThrows(Exception.class, () ->
         com.zhixuewuli.common.util.test.ReflectionTestUtil.invokePrivateMethod(
-                service, "saveStudentReport", new Class<?>[] { Long.class, String.class, Long.class, String.class },
-                userId, sessionId, null, reportContent));
+                service, "saveStudentReport", new Class<?>[] { Long.class, String.class, Long.class, String.class, String.class },
+                userId, sessionId, null, reportContent, "{}"));
 
         // Then
         verify(userRepository).findById(userId);

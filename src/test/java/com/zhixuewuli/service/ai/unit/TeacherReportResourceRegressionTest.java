@@ -17,13 +17,12 @@ import static org.mockito.ArgumentMatchers.*;
 @Tag("unit")
 class TeacherReportResourceRegressionTest {
     private final AIStreamingProperties config = new AIStreamingProperties();
-    private final StreamUtils streams = new StreamUtils(config);
+    private final StreamUtils streams = new StreamUtils(config, com.zhixuewuli.common.redis.LeaseMocks.create());
     private final AnswerRecordRepository answers = mock(AnswerRecordRepository.class);
     private final AliyunAIClient client = mock(AliyunAIClient.class);
     private final com.zhixuewuli.service.ai.report.ReportInputRepository inputs=mock(com.zhixuewuli.service.ai.report.ReportInputRepository.class);
-    private final AliyunAIReportServiceImpl service = new AliyunAIReportServiceImpl(inputs,client, answers,
-            mock(QuestionRepository.class), mock(StudentReportRepository.class), mock(UserRepository.class),
-            config, new AIBusinessProperties(), mock(OptionMappingUtil.class), mock(UserPermissionUtil.class),
+    private final AliyunAIReportServiceImpl service = new AliyunAIReportServiceImpl(inputs,client, mock(StudentReportRepository.class), mock(UserRepository.class),
+            config, new AIBusinessProperties(),
             streams, new ObjectMapper(), mock(TransactionTemplate.class), Runnable::run);
 
     @AfterEach void close() { streams.destroy(); }

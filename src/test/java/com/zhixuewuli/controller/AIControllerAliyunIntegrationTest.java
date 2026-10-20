@@ -139,13 +139,45 @@ public class AIControllerAliyunIntegrationTest extends BaseControllerIntegration
                 questionIdWithoutErrors = 6003L; // 无错误记录的题目
                 // General teacher analysis now deliberately means the active task, never
                 // a cross-task latest-session blend. Attach this fixture explicitly.
-                jdbcTemplate.update("INSERT INTO teacher_events(id,teacher_id,teacher_name,event_title,event_timestamp,is_global,timestamp_utc) VALUES(890000,5001,'Fixture','Report fixture',CURRENT_TIMESTAMP,true,true)");
+                jdbcTemplate.update("INSERT INTO teacher_events(id,teacher_id,teacher_name,event_title,event_timestamp,status,timestamp_utc) VALUES(890000,5001,'Fixture','Report fixture',CURRENT_TIMESTAMP,'PUBLISHED',true)");
                 jdbcTemplate.update("UPDATE answer_records SET event_id=890000");
         }
 
         // ============================================================
         // GET /ai/student/report 测试 - 学生报告流式生成
         // ============================================================
+
+        @Test
+        void studentReportTimeoutExplainsTheActualFailure() throws Exception {
+                String events = failedStudentReport(new com.zhixuewuli.common.exception.ai.AITimeoutException("upstream timeout"));
+                assertThat(events).contains("event:error", "5502", "超时").doesNotContain("event:complete");
+        }
+
+        @Test
+        void studentReportRateLimitExplainsThatTheModelIsBusy() throws Exception {
+                String events = failedStudentReport(new com.zhixuewuli.common.exception.ai.AIUpstreamException(429));
+                assertThat(events).contains("event:error", "繁忙").doesNotContain("event:complete");
+        }
+
+        @Test
+        void studentReportAuthenticationFailureDoesNotSuggestBlindRetries() throws Exception {
+                String events = failedStudentReport(new com.zhixuewuli.common.exception.ai.AIUpstreamException(401));
+                assertThat(events).contains("event:error", "认证").doesNotContain("event:complete");
+        }
+
+        private String failedStudentReport(Exception failure) throws Exception {
+                doAnswer(invocation -> {
+                        AIStreamCallback callback = invocation.getArgument(2);
+                        callback.onError(failure);
+                        return null;
+                }).when(aliyunAIClient).streamGenerate(anyString(), anyString(), any(AIStreamCallback.class));
+                MvcResult pending = mockMvc.perform(get("/ai/student/report").param("eventId", "890000")
+                                .header("Authorization", createAuthHeader(studentId, studentUsername))
+                                .header("X-Session-Id", "20260315000001_a1b2c3d4e5f67890"))
+                                .andExpect(request().asyncStarted()).andReturn();
+                return mockMvc.perform(asyncDispatch(pending)).andExpect(status().isOk()).andReturn()
+                                .getResponse().getContentAsString(java.nio.charset.StandardCharsets.UTF_8);
+        }
 
         @DisplayName("学生个人报告流式生成成功")
         @Test

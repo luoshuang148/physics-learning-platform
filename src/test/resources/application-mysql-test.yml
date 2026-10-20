@@ -6,7 +6,18 @@ spring:
   jpa:
     hibernate:
       ddl-auto: validate
+  # MySQL 集成测试不连接 broker；消息语义测试使用独立配置覆盖。
+  rabbitmq:
+    listener:
+      simple:
+        auto-startup: false
+management:
+  health:
+    rabbit:
+      enabled: false
 app:
+  report-batch:
+    enabled: false
   security:
     jwt-secret: mysql-integration-test-secret-never-use-in-production
   video:

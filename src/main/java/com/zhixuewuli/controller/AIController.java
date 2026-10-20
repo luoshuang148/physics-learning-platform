@@ -1,5 +1,8 @@
 package com.zhixuewuli.controller;
 
+import com.zhixuewuli.common.security.TeacherOnly;
+import com.zhixuewuli.common.security.AuthenticatedUser;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import com.zhixuewuli.common.result.Result;
 import com.zhixuewuli.entity.ConversationHistory;
 import io.swagger.v3.oas.annotations.Operation;
@@ -78,9 +81,9 @@ public class AIController {
     )
     public SseEmitter streamQuestionAnswer(
             @io.swagger.v3.oas.annotations.Parameter(description = "AI 问答请求参数", required = true) @Valid @RequestBody AIAskRequest request,
-            HttpServletRequest httpRequest) {
+            @AuthenticationPrincipal AuthenticatedUser user, HttpServletRequest httpRequest) {
 
-        Long userId = (Long) httpRequest.getAttribute("userId");
+        Long userId = user.id();
         String sessionId = (String) httpRequest.getAttribute("sessionId");
 
         // 前置校验：失败直接抛出异常，不创建 SSE 连接
@@ -114,9 +117,9 @@ public class AIController {
     )
     public SseEmitter streamWrongQuestionAnalysis(
             @io.swagger.v3.oas.annotations.Parameter(description = "AI 问答请求参数（需包含题目 ID）", required = true) @Valid @RequestBody AIAskRequest request,
-            HttpServletRequest httpRequest) {
+            @AuthenticationPrincipal AuthenticatedUser user, HttpServletRequest httpRequest) {
 
-        Long userId = (Long) httpRequest.getAttribute("userId");
+        Long userId = user.id();
         String sessionId = (String) httpRequest.getAttribute("sessionId");
 
         // 前置校验：失败直接抛出异常，不创建 SSE 连接
@@ -147,8 +150,8 @@ public class AIController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "权限不足（非学生身份）")
         }
     )
-    public SseEmitter streamStudentReport(HttpServletRequest httpRequest, @RequestParam(required = false) Long eventId) {
-        Long userId = (Long) httpRequest.getAttribute("userId");
+    public SseEmitter streamStudentReport(@AuthenticationPrincipal AuthenticatedUser user, HttpServletRequest httpRequest, @RequestParam(required = false) Long eventId) {
+        Long userId = user.id();
         String sessionId = (String) httpRequest.getAttribute("sessionId");
 
         // 前置校验
@@ -173,8 +176,9 @@ public class AIController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "权限不足（非教师身份）")
         }
     )
-    public SseEmitter streamTeacherAnalysis(HttpServletRequest httpRequest, @RequestParam(required = false) Long eventId) {
-        Long userId = (Long) httpRequest.getAttribute("userId");
+    @TeacherOnly
+    public SseEmitter streamTeacherAnalysis(@AuthenticationPrincipal AuthenticatedUser user, @RequestParam(required = false) Long eventId) {
+        Long userId = user.id();
 
         // 前置校验
         aliyunAIReportService.validateTeacherAnalysisRequest(userId);
@@ -199,8 +203,8 @@ public class AIController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "未认证")
         }
     )
-    public Result<List<ConversationHistory>> getSessionHistory(HttpServletRequest request) {
-        Long userId = (Long) request.getAttribute("userId");
+    public Result<List<ConversationHistory>> getSessionHistory(@AuthenticationPrincipal AuthenticatedUser user, HttpServletRequest request) {
+        Long userId = user.id();
         String sessionId = (String) request.getAttribute("sessionId");
         List<ConversationHistory> history = zhiPuAIAssistantService.getSessionHistory(sessionId, userId);
         return Result.success(history);
@@ -215,8 +219,8 @@ public class AIController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "未认证")
         }
     )
-    public Result<Void> clearSession(HttpServletRequest request) {
-        Long userId = (Long) request.getAttribute("userId");
+    public Result<Void> clearSession(@AuthenticationPrincipal AuthenticatedUser user, HttpServletRequest request) {
+        Long userId = user.id();
         String sessionId = (String) request.getAttribute("sessionId");
         zhiPuAIAssistantService.clearSession(sessionId, userId);
         return Result.success();
@@ -243,13 +247,11 @@ public class AIController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "学生不存在或无报告数据")
         }
     )
+    @TeacherOnly
     public Result<StudentReportResponse> getStudentLatestReport(
             @io.swagger.v3.oas.annotations.Parameter(description = "学生用户 ID", required = true) @PathVariable Long studentId,
-            HttpServletRequest request, @RequestParam(required = false) Long eventId) {
-
-        Long teacherId = (Long) request.getAttribute("userId");
-
-        StudentReportResponse response = aliyunAIReportService.getStudentLatestReport(teacherId, studentId, eventId);
+            @RequestParam(required = false) Long eventId) {
+        StudentReportResponse response = aliyunAIReportService.getStudentLatestReport(studentId, eventId);
         return Result.success(response);
     }
 

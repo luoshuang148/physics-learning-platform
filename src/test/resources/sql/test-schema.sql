@@ -22,19 +22,6 @@ CREATE TABLE IF NOT EXISTS users (
 );
 
 -- 2. 视频表
-CREATE TABLE IF NOT EXISTS videos (
-    id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    title VARCHAR(255) NOT NULL UNIQUE,
-    url VARCHAR(255) NOT NULL UNIQUE,
-    knowledge_point VARCHAR(255),
-    cover_url VARCHAR(255),
-    duration INT,
-    description TEXT,
-    question_id BIGINT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-);
-
 -- 3. 题目表
 CREATE TABLE IF NOT EXISTS questions (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
@@ -44,7 +31,6 @@ CREATE TABLE IF NOT EXISTS questions (
     correct_option VARCHAR(50) NOT NULL,
     explanation LONGTEXT,
     difficulty INT DEFAULT 1,
-    explanation_video_mapping LONGTEXT,
     image_base64 LONGTEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -60,7 +46,6 @@ CREATE TABLE IF NOT EXISTS answer_records (
     session_id VARCHAR(255) NOT NULL,
     selected_option VARCHAR(255) NOT NULL,
     correct BOOLEAN,
-    error_reason VARCHAR(255),
     answered_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -96,15 +81,19 @@ CREATE TABLE IF NOT EXISTS teacher_events (
     event_title VARCHAR(20) NOT NULL,
     event_description VARCHAR(100),
     event_timestamp TIMESTAMP NOT NULL,
-    is_global BOOLEAN DEFAULT TRUE,
+    status VARCHAR(20) NOT NULL DEFAULT 'PUBLISHED',
+    start_at TIMESTAMP NULL,
+    due_at TIMESTAMP NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     
     CONSTRAINT fk_teacher_events_users FOREIGN KEY (teacher_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
--- 创建全局事件查询索引
-CREATE INDEX idx_is_global ON teacher_events(is_global);
+-- 教学任务状态索引
+CREATE INDEX idx_teacher_events_status ON teacher_events(status);
+CREATE INDEX idx_teacher_events_status_start ON teacher_events(status, start_at);
+CREATE INDEX idx_teacher_events_status_due ON teacher_events(status, due_at);
 
 -- 7. 学生报告表
 CREATE TABLE IF NOT EXISTS student_reports (
@@ -121,7 +110,6 @@ CREATE TABLE IF NOT EXISTS student_reports (
 
 -- 创建索引
 CREATE INDEX idx_users_class_user_active ON users(class_name, user_type, active);
-CREATE INDEX idx_videos_created_at ON videos(created_at);
 CREATE INDEX idx_questions_created_at ON questions(created_at);
 CREATE INDEX idx_answer_records_question_answered ON answer_records(question_id, answered_at);
 CREATE INDEX idx_answer_records_user_answered ON answer_records(user_id, answered_at);

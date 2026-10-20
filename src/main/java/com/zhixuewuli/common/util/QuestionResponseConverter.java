@@ -42,6 +42,7 @@ public class QuestionResponseConverter {
 
     private final OptionMappingUtil optionMappingUtil;
     private final com.fasterxml.jackson.databind.ObjectMapper snapshotJson;
+    private final com.zhixuewuli.service.question.QuestionImageStore questionImages;
 
     /**
      * 将答题记录实体转换为包含完整信息的响应DTO
@@ -58,6 +59,10 @@ public class QuestionResponseConverter {
             try { question=snapshotJson.readValue(record.getQuestionSnapshot(),Question.class); }
             catch(Exception error){throw new IllegalStateException("作答快照损坏",error);}
         }
+        // New snapshots omit imageBase64 and point at the immutable shared image row.
+        if (question != null && record.getImageRef() != null) {
+            question.setImageBase64(questionImages.load(record.getImageRef()));
+        }
         if (question == null) {
             throw new QuestionNotFoundException("题目不存在");
         }
@@ -73,7 +78,6 @@ public class QuestionResponseConverter {
                 .userAnswer(record.getUserAnswer())
                 .correct(record.getCorrect())
                 .answeredAt(record.getAnsweredAt()).timestampUtc(record.isTimestampUtc())
-                .errorReason(record.getErrorReason())
                 .questionContent(question.getContent())
                 .questionOptions(optionsMap)
                 .correctAnswer(question.getCorrectOption())

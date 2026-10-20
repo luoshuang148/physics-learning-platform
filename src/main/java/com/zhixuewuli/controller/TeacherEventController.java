@@ -1,5 +1,8 @@
 package com.zhixuewuli.controller;
 
+import com.zhixuewuli.common.security.TeacherOnly;
+import com.zhixuewuli.common.security.AuthenticatedUser;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import com.zhixuewuli.common.exception.InsufficientPermissionException;
 import com.zhixuewuli.common.result.Result;
 import com.zhixuewuli.dto.request.TeacherEventCreateRequest;
@@ -8,7 +11,6 @@ import com.zhixuewuli.service.teacherEvent.TeacherEventService;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -19,16 +21,16 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 /**
  * 教师事件管理控制器
  * 
- * 提供教师全局事件管理的 RESTful API 接口。
- * 实现事件发布、删除和查询功能，全局事件在整个系统中唯一。
+ * 提供教师教学任务管理的 RESTful API 接口。
+ * 单班内允许并行任务，任务按草稿、已发布、已截止、已归档流转。
  * 
  * <p>
  * 接口设计特点：
  * </p>
  * <ul>
  * <li>无状态设计：所有操作基于 JWT 中的用户身份</li>
- * <li>全局事件唯一：整个系统共享同一个教师事件</li>
- * <li>简洁 API：无需传递事件 ID，操作针对全局事件</li>
+ * <li>并行任务：同一班级可同时存在多个已发布任务</li>
+ * <li>生命周期：草稿、发布、截止、归档</li>
  * <li>标准响应：统一使用 Result 包装响应数据</li>
  * <li>完整文档：集成 Swagger API 文档</li>
  * </ul>
@@ -48,12 +50,14 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 public class TeacherEventController {
 
     private final TeacherEventService teacherEventService;
+    private final com.zhixuewuli.service.classroom.ClassAccessService classAccess;
 
     @GetMapping("/history")
+    @TeacherOnly
     public Result<com.zhixuewuli.common.result.PageResult<TeacherEventResponse>> history(
             @RequestParam(defaultValue = "1") int page, @RequestParam(defaultValue = "20") int size,
-            HttpServletRequest request) {
-        return Result.success(teacherEventService.getEventHistory((Long) request.getAttribute("userId"), page, size));
+            @AuthenticationPrincipal AuthenticatedUser user) {
+        return Result.success(teacherEventService.getEventHistory(page, size, user.id()));
     }
 
 
@@ -61,7 +65,7 @@ public class TeacherEventController {
      * 发布教师事件
      * 
      * 教师发布新的学习事件作为时间基准点。
-     * 如果全局事件已存在，将返回 409 Conflict 错误码。
+     * 默认直接发布；传入 status=DRAFT 可保存草稿。
      * 
      * @param request       事件创建请求
      * @param authorization Authorization 头部，包含 JWT 令牌
@@ -80,24 +84,25 @@ public class TeacherEventController {
     @PostMapping
     @Operation(
         summary = "发布教师事件",
-        description = "教师发布新的学习事件作为时间基准点，如果全局事件已存在将返回 409 错误码",
+        description = "教师创建教学任务，默认直接发布，也可以保存为草稿",
         responses = {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "201", description = "发布成功"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "参数错误"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "未认证"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "权限不足（非教师身份）"),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "409", description = "全局事件已存在")
+            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "任务参数不合法")
         }
     )
     @ResponseStatus(HttpStatus.CREATED)
+    @TeacherOnly
     public Result<TeacherEventResponse> publishEvent(
             @io.swagger.v3.oas.annotations.Parameter(description = "事件创建请求参数", required = true) @RequestBody @Valid TeacherEventCreateRequest request,
-            HttpServletRequest httpRequest) {
+            @AuthenticationPrincipal AuthenticatedUser user) {
     
-        log.info("收到发布全局事件请求");
+        log.info("收到创建教学任务请求");
     
         // 从请求属性中获取用户 ID（由拦截器解析 JWT 提供）
-        Long currentUserId = (Long) httpRequest.getAttribute("userId");
+        Long currentUserId = user.id();
     
         TeacherEventResponse response = teacherEventService.publishEvent(request, currentUserId);
         return Result.created("事件发布成功", response);
@@ -106,7 +111,7 @@ public class TeacherEventController {
     /**
      * 删除当前事件
      * 
-     * 归档当前事件，保留学习记录和报告。
+     * 归档最新发布任务，保留学习记录和报告。
      * 删除操作幂等：事件不存在也视为成功。
      * 
      * @param authorization Authorization 头部，包含 JWT 令牌
@@ -119,29 +124,26 @@ public class TeacherEventController {
      */
     @DeleteMapping
     @Operation(
-        summary = "归档当前事件",
-        description = "归档当前事件并保留学习数据，操作幂等",
+        summary = "归档最新发布任务",
+        description = "兼容旧入口：归档最新发布任务并保留学习数据，操作幂等",
         responses = {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "删除成功"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "未认证"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "权限不足（非教师身份）")
         }
     )
-    public Result<Void> deleteCurrentEvent(HttpServletRequest httpRequest, @RequestParam Long expectedEventId) {
-    
-        log.info("收到删除全局事件请求");
-    
-        // 从请求属性中获取用户 ID（由拦截器解析 JWT 提供）
-        Long currentUserId = (Long) httpRequest.getAttribute("userId");
-    
-        teacherEventService.archiveEvent(expectedEventId,currentUserId);
+    @TeacherOnly
+    public Result<Void> deleteCurrentEvent(@RequestParam Long expectedEventId, @AuthenticationPrincipal AuthenticatedUser user) {
+        log.info("收到归档任务请求");
+        requireTeacherOfEvent(expectedEventId, user.id());
+        teacherEventService.archiveEvent(expectedEventId);
         return Result.success();
     }
 
     /**
      * 查询当前事件
      * 
-     * 查询全局事件信息。所有认证用户可访问。
+     * 查询最新发布任务，用于兼容旧调用；新前端使用 /all 或 /available。
      * 如果事件不存在，将返回 null 数据。
      * 
      * @param authorization Authorization 头部，包含 JWT 令牌
@@ -155,31 +157,104 @@ public class TeacherEventController {
     @GetMapping
     @Operation(
         summary = "查询当前事件",
-        description = "查询全局事件信息，所有认证用户可访问，如果事件不存在则 data 为 null",
+        description = "查询最新发布任务，用于兼容旧调用；不存在时 data 为 null",
         responses = {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "查询成功"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "未认证")
         }
     )
-    public Result<TeacherEventResponse> getCurrentEvent(HttpServletRequest httpRequest) {
+    public Result<TeacherEventResponse> getCurrentEvent() {
 
-        log.info("收到查询全局事件请求");
+        log.info("收到查询最新任务请求");
 
         // 不再需要传递 userId，直接调用 getGlobalEvent()
         TeacherEventResponse response = teacherEventService.getGlobalEvent();
         return Result.success(response);
     }
 
+    @GetMapping("/overview")
+    @Operation(summary = "教师总览任务组合", description = "批量返回各任务完成率、正确率、未交人数与截止信息")
+    @TeacherOnly
+    public Result<java.util.List<com.zhixuewuli.dto.response.TaskOverviewResponse>> overview(@AuthenticationPrincipal AuthenticatedUser user) {
+        return Result.success(teacherEventService.getTaskOverview(user.id()));
+    }
+
+    @GetMapping("/all")
+    @Operation(summary = "教师任务列表", description = "返回当前教师所有未归档任务，支持并行任务管理")
+    @TeacherOnly
+    public Result<java.util.List<TeacherEventResponse>> allTasks(@AuthenticationPrincipal AuthenticatedUser user) {
+        return Result.success(teacherEventService.listTeacherTasks(user.id()));
+    }
+
+    @GetMapping("/available")
+    @Operation(summary = "学生可用任务列表", description = "返回已发布任务，包含未开始、进行中和已截止状态")
+    public Result<java.util.List<TeacherEventResponse>> availableTasks(@AuthenticationPrincipal AuthenticatedUser user) {
+        return Result.success(teacherEventService.listStudentTasks(user.id()));
+    }
+
+    @GetMapping("/student-tasks")
+    public Result<java.util.List<com.zhixuewuli.dto.response.StudentTaskResultResponse>> studentTaskResults(@AuthenticationPrincipal AuthenticatedUser user) {
+        return Result.success(teacherEventService.listStudentTaskResults(user.id()));
+    }
+
+    @GetMapping("/{id}/my-result")
+    public Result<com.zhixuewuli.dto.response.StudentTaskResultResponse> myTaskResult(@PathVariable Long id, @AuthenticationPrincipal AuthenticatedUser user) {
+        return Result.success(teacherEventService.getStudentTaskResult(id, user.id()));
+    }
+
+    @PutMapping("/{id}/draft")
+    @TeacherOnly
+    public Result<TeacherEventResponse> updateDraft(@PathVariable Long id, @Valid @RequestBody TeacherEventCreateRequest payload,
+            @AuthenticationPrincipal AuthenticatedUser user) {
+        requireTeacherOfEvent(id, user.id());
+        return Result.success(teacherEventService.updateDraft(id, payload));
+    }
+
+    @PostMapping("/{id}/publish")
+    @TeacherOnly
+    public Result<TeacherEventResponse> publishDraft(@PathVariable Long id, @AuthenticationPrincipal AuthenticatedUser user) {
+        requireTeacherOfEvent(id, user.id());
+        return Result.success(teacherEventService.publishTask(id));
+    }
+
+    @PostMapping("/{id}/close")
+    @TeacherOnly
+    public Result<TeacherEventResponse> closeTask(@PathVariable Long id, @AuthenticationPrincipal AuthenticatedUser user) {
+        requireTeacherOfEvent(id, user.id());
+        return Result.success(teacherEventService.closeTask(id));
+    }
+
+    @GetMapping("/{id}/stats")
+    @Operation(summary = "作业详情统计", description = "单次作业的参与/完成/未交、学生汇总和每题正确率")
+    @TeacherOnly
+    public Result<com.zhixuewuli.dto.response.TaskDetailResponse> taskStats(@PathVariable Long id, @AuthenticationPrincipal AuthenticatedUser user) {
+        return Result.success(teacherEventService.getTaskDetail(id, user.id()));
+    }
+
     @GetMapping("/{id}")
-    public Result<TeacherEventResponse> getEvent(@PathVariable Long id){return Result.success(teacherEventService.getEvent(id));}
+    public Result<TeacherEventResponse> getEvent(@PathVariable Long id, @AuthenticationPrincipal AuthenticatedUser user){
+        return Result.success(teacherEventService.getEvent(id, user.id()));
+    }
     @GetMapping("/{id}/questions")
-    public Result<java.util.List<com.zhixuewuli.dto.response.QuestionResponse>> getQuestions(@PathVariable Long id){return Result.success(teacherEventService.getEventQuestions(id));}
+    public Result<java.util.List<com.zhixuewuli.dto.response.QuestionResponse>> getQuestions(@PathVariable Long id,@AuthenticationPrincipal AuthenticatedUser user){
+        return Result.success(teacherEventService.getEventQuestions(id,user.id()));
+    }
     @PutMapping("/{id}/replace")
-    public Result<TeacherEventResponse> replace(@PathVariable Long id,@Valid @RequestBody TeacherEventCreateRequest payload,HttpServletRequest request){
-        return Result.success(teacherEventService.replaceEvent(id,payload,(Long)request.getAttribute("userId")));
+    @TeacherOnly
+    public Result<TeacherEventResponse> replace(@PathVariable Long id,@Valid @RequestBody TeacherEventCreateRequest payload,@AuthenticationPrincipal AuthenticatedUser user){
+        requireTeacherOfEvent(id, user.id());
+        return Result.success(teacherEventService.replaceEvent(id,payload,user.id()));
     }
     @DeleteMapping("/{id}")
-    public Result<Void> archive(@PathVariable Long id,HttpServletRequest request){
-        teacherEventService.archiveEvent(id,(Long)request.getAttribute("userId"));return Result.success();
+    @TeacherOnly
+    public Result<Void> archive(@PathVariable Long id, @AuthenticationPrincipal AuthenticatedUser user) {
+        requireTeacherOfEvent(id, user.id());
+        teacherEventService.archiveEvent(id);
+        return Result.success();
+    }
+
+    private void requireTeacherOfEvent(Long id, Long teacherId) {
+        TeacherEventResponse event = teacherEventService.getEvent(id);
+        if (event.getClassId() != null) classAccess.requireTeacher(event.getClassId(), teacherId);
     }
 }

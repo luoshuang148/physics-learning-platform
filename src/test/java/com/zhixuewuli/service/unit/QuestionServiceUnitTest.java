@@ -84,7 +84,7 @@ class QuestionServiceUnitTest extends BaseUnitTest {
         });
     
         // When
-        Question result = questionService.createQuestion(request, teacherId);
+        Question result = questionService.createQuestion(request);
     
         // Then
         assertThat(result)
@@ -94,7 +94,6 @@ class QuestionServiceUnitTest extends BaseUnitTest {
     
         assertThat(result.getId()).isEqualTo(1001L);
     
-        verify(userPermissionUtil).checkTeacherPermission(teacherId);
         verify(questionRepository).existsByContent("一个新的物理题目内容");
         verify(questionRepository).save(any(Question.class));
     }
@@ -110,33 +109,14 @@ class QuestionServiceUnitTest extends BaseUnitTest {
         when(questionRepository.existsByContent("已存在的题目内容")).thenReturn(true);
     
         // When & Then
-        assertThatThrownBy(() -> questionService.createQuestion(request, teacherId))
+        assertThatThrownBy(() -> questionService.createQuestion(request))
                 .isInstanceOf(QuestionContentDuplicateException.class)
                 .hasMessage("题目内容已存在：已存在的题目内容");
     
-        verify(userPermissionUtil).checkTeacherPermission(teacherId);
         verify(questionRepository).existsByContent("已存在的题目内容");
         verify(questionRepository, never()).save(any(Question.class));
     }
 
-    @Test
-    void createQuestion_shouldThrowInsufficientPermissionException_whenPermissionDenied() {
-        // Given
-        QuestionCreateRequest request = new QuestionCreateRequest();
-        request.setContent("权限受限题目");
-        request.setOptions("{\"A\":\"选项 A\",\"B\":\"选项 B\"}");
-        request.setCorrectOption("A");
-        doThrow(new InsufficientPermissionException("仅教师可创建题目"))
-                .when(userPermissionUtil).checkTeacherPermission(teacherId);
-
-        // When & Then
-        assertThatThrownBy(() -> questionService.createQuestion(request, teacherId))
-                .isInstanceOf(InsufficientPermissionException.class);
-
-        verify(userPermissionUtil).checkTeacherPermission(teacherId);
-        verify(questionRepository, never()).existsByContent(any());
-        verify(questionRepository, never()).save(any(Question.class));
-    }
 
     @Test
     void createQuestion_shouldPersistOptionalFields_whenProvided() {
@@ -147,7 +127,6 @@ class QuestionServiceUnitTest extends BaseUnitTest {
         request.setCorrectOption("B");
         request.setExplanation("可选解析");
         request.setDifficulty(2);
-        request.setExplanationVideoMapping("{\"B\":1001}");
         request.setImageBase64("base64-image");
 
         when(questionRepository.existsByContent("包含可选字段的题目")).thenReturn(false);
@@ -158,10 +137,9 @@ class QuestionServiceUnitTest extends BaseUnitTest {
         });
 
         // When
-        Question result = questionService.createQuestion(request, teacherId);
+        Question result = questionService.createQuestion(request);
 
         // Then
-        assertThat(result.getExplanationVideoMapping()).isEqualTo("{\"B\":1001}");
         assertThat(result.getImageBase64()).isEqualTo("base64-image");
     }
 
@@ -174,10 +152,9 @@ class QuestionServiceUnitTest extends BaseUnitTest {
         when(questionRepository.findById(questionId)).thenReturn(Optional.of(mockQuestion));
 
         // When
-        questionService.deleteQuestionById(questionId, teacherId);
+        questionService.deleteQuestionById(questionId);
 
         // Then
-        verify(userPermissionUtil).checkTeacherPermission(teacherId);
         verify(questionRepository).findById(questionId);
         verify(questionRepository).delete(mockQuestion);
     }
@@ -189,30 +166,14 @@ class QuestionServiceUnitTest extends BaseUnitTest {
         when(questionRepository.findById(questionId)).thenReturn(Optional.empty());
 
         // When & Then
-        assertThatThrownBy(() -> questionService.deleteQuestionById(questionId, teacherId))
+        assertThatThrownBy(() -> questionService.deleteQuestionById(questionId))
                 .isInstanceOf(QuestionNotFoundException.class)
                 .hasMessage("题目不存在，ID: 9999");
 
-        verify(userPermissionUtil).checkTeacherPermission(teacherId);
         verify(questionRepository).findById(questionId);
         verify(questionRepository, never()).delete(any(Question.class));
     }
 
-    @Test
-    void deleteQuestionById_shouldThrowInsufficientPermissionException_whenPermissionDenied() {
-        // Given
-        Long questionId = 1000L;
-        doThrow(new InsufficientPermissionException("仅教师可删除题目"))
-                .when(userPermissionUtil).checkTeacherPermission(teacherId);
-
-        // When & Then
-        assertThatThrownBy(() -> questionService.deleteQuestionById(questionId, teacherId))
-                .isInstanceOf(InsufficientPermissionException.class);
-
-        verify(userPermissionUtil).checkTeacherPermission(teacherId);
-        verify(questionRepository, never()).findById(anyLong());
-        verify(questionRepository, never()).delete(any(Question.class));
-    }
 
     // ==================== updateQuestion 测试 ====================
 
@@ -234,7 +195,7 @@ class QuestionServiceUnitTest extends BaseUnitTest {
         when(questionRepository.save(any(Question.class))).thenAnswer(invocation -> invocation.getArgument(0));
     
         // When
-        Question result = questionService.updateQuestion(request, teacherId);
+        Question result = questionService.updateQuestion(request);
     
         // Then
         assertThat(result)
@@ -244,7 +205,6 @@ class QuestionServiceUnitTest extends BaseUnitTest {
             
         assertThat(result.getOptions()).isEqualTo("{\"A\":\"新选项 A\",\"B\":\"新选项 B\",\"C\":\"新选项 C\",\"D\":\"新选项 D\"}");
             
-        verify(userPermissionUtil).checkTeacherPermission(teacherId);
         verify(questionRepository).findById(1000L);
         verify(questionRepository).save(existingQuestion);
     }
@@ -261,31 +221,14 @@ class QuestionServiceUnitTest extends BaseUnitTest {
         when(questionRepository.findById(9999L)).thenReturn(Optional.empty());
     
         // When & Then
-        assertThatThrownBy(() -> questionService.updateQuestion(request, teacherId))
+        assertThatThrownBy(() -> questionService.updateQuestion(request))
                 .isInstanceOf(QuestionNotFoundException.class)
                 .hasMessage("题目不存在，ID: 9999");
     
-        verify(userPermissionUtil).checkTeacherPermission(teacherId);
         verify(questionRepository).findById(9999L);
         verify(questionRepository, never()).save(any(Question.class));
     }
 
-    @Test
-    void updateQuestion_shouldThrowInsufficientPermissionException_whenPermissionDenied() {
-        // Given
-        QuestionUpdateRequest request = new QuestionUpdateRequest();
-        request.setId(1000L);
-        doThrow(new InsufficientPermissionException("仅教师可更新题目"))
-                .when(userPermissionUtil).checkTeacherPermission(teacherId);
-
-        // When & Then
-        assertThatThrownBy(() -> questionService.updateQuestion(request, teacherId))
-                .isInstanceOf(InsufficientPermissionException.class);
-
-        verify(userPermissionUtil).checkTeacherPermission(teacherId);
-        verify(questionRepository, never()).findById(anyLong());
-        verify(questionRepository, never()).save(any(Question.class));
-    }
 
     @Test
     void updateQuestion_shouldSetNullFields_whenRequestContainsNullValues() {
@@ -297,7 +240,6 @@ class QuestionServiceUnitTest extends BaseUnitTest {
         request.setCorrectOption(null);
         request.setExplanation(null);
         request.setDifficulty(null);
-        request.setExplanationVideoMapping(null);
         request.setImageBase64(null);
 
         Question existingQuestion = TestDataFactory.createQuestion();
@@ -309,7 +251,7 @@ class QuestionServiceUnitTest extends BaseUnitTest {
         when(questionRepository.save(any(Question.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         // When
-        Question result = questionService.updateQuestion(request, teacherId);
+        Question result = questionService.updateQuestion(request);
 
         // Then
         assertThat(result.getContent()).isNull();
@@ -317,12 +259,11 @@ class QuestionServiceUnitTest extends BaseUnitTest {
         assertThat(result.getCorrectOption()).isNull();
         assertThat(result.getExplanation()).isNull();
         assertThat(result.getDifficulty()).isNull();
-        assertThat(result.getExplanationVideoMapping()).isNull();
         assertThat(result.getImageBase64()).isNull();
     }
 
     @Test
-    void updateQuestion_shouldOverwriteImageAndVideoMapping_whenProvided() {
+    void updateQuestion_shouldOverwriteImage_whenProvided() {
         // Given
         QuestionUpdateRequest request = new QuestionUpdateRequest();
         request.setId(1000L);
@@ -331,22 +272,19 @@ class QuestionServiceUnitTest extends BaseUnitTest {
         request.setCorrectOption("A");
         request.setExplanation("更新解析");
         request.setDifficulty(5);
-        request.setExplanationVideoMapping("{\"A\":2002}");
         request.setImageBase64("new-image-base64");
 
         Question existingQuestion = TestDataFactory.createQuestion();
         existingQuestion.setId(1000L);
-        existingQuestion.setExplanationVideoMapping("{\"A\":1001}");
         existingQuestion.setImageBase64("old-image");
 
         when(questionRepository.findById(1000L)).thenReturn(Optional.of(existingQuestion));
         when(questionRepository.save(any(Question.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         // When
-        Question result = questionService.updateQuestion(request, teacherId);
+        Question result = questionService.updateQuestion(request);
 
         // Then
-        assertThat(result.getExplanationVideoMapping()).isEqualTo("{\"A\":2002}");
         assertThat(result.getImageBase64()).isEqualTo("new-image-base64");
     }
 

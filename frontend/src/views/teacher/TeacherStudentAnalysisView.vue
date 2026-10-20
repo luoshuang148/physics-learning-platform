@@ -1,22 +1,15 @@
 <template>
-  <AppShell :subtitle="`学生学情分析 · ${auth.user?.realName ?? ''}`" :links="links">
+  <AppShell :subtitle="`学生学情分析 · ${auth.user?.realName ?? ''}`">
     <div class="student-analysis-page teacher-font">
       <section class="analysis-hero">
-        <div>
-          <span class="analysis-kicker">Student insight workspace</span>
-          <h1 class="analysis-title">学生学情分析</h1>
-          <p class="analysis-summary">按学生查看答题记录、错题记录与个人学习报告，快速判断每位学生的学习状态。</p>
-        </div>
         <div class="hero-stats">
           <div class="hero-stat-card">
             <span class="hero-stat-label">学生人数</span>
             <strong class="hero-stat-value">{{ filteredStudents.length }}</strong>
-            <span class="hero-stat-note">当前筛选结果</span>
           </div>
           <div class="hero-stat-card warm">
             <span class="hero-stat-label">平均错误率</span>
             <strong class="hero-stat-value">{{ averageErrorRateText }}</strong>
-            <span class="hero-stat-note">基于当前筛选学生</span>
           </div>
         </div>
       </section>
@@ -38,7 +31,7 @@
         <aside class="student-list-panel">
           <div class="panel-head">
             <div>
-              <div class="panel-kicker">Students</div>
+              <div class="panel-kicker">学生列表</div>
               <div class="panel-title">学生列表</div>
             </div>
             <span class="panel-count">{{ filteredStudents.length }} / {{ studentRows.length }}</span>
@@ -97,7 +90,7 @@
             <section class="report-card">
               <div class="panel-head">
                 <div>
-                  <div class="panel-kicker">Learning report</div>
+                  <div class="panel-kicker">学习报告</div>
                   <div class="panel-title">学生学习报告</div>
                 </div>
                 <span v-if="reportTimeText" class="report-time">{{ reportTimeText }}</span>
@@ -105,10 +98,8 @@
 
               <div v-if="reportLoading" class="panel-empty">正在读取学生学习报告…</div>
               <div v-else-if="reportMessage" class="report-placeholder">
-                <div class="report-placeholder-icon">📝</div>
                 <div>
                   <h3>{{ reportMessage.title }}</h3>
-                  <p>{{ reportMessage.desc }}</p>
                 </div>
               </div>
               <div v-else class="report-output">
@@ -129,35 +120,38 @@
                   <button class="mode-btn" :class="{ active: recordMode === 'all' }" @click="recordMode = 'all'">全部记录</button>
                   <button class="mode-btn" :class="{ active: recordMode === 'wrong' }" @click="recordMode = 'wrong'">错题记录</button>
                 </div>
-                <div class="records-summary">共 {{ displayedRecords.length }} 条{{ recordMode === 'wrong' ? '错题' : '记录' }}</div>
+                <div class="records-summary">共 {{ recordTotal }} 条{{ recordMode === 'wrong' ? '错题' : '记录' }}</div>
               </div>
 
               <div v-if="recordsLoading" class="panel-empty">正在加载学生作答记录…</div>
-              <div v-else-if="displayedRecords.length === 0" class="panel-empty">{{ emptyRecordMessage }}</div>
+              <div v-else-if="records.length === 0" class="panel-empty">{{ emptyRecordMessage }}</div>
               <div v-else class="record-layout">
                 <div class="record-list-panel inner">
                   <div class="panel-head compact">
                     <div>
-                      <div class="panel-kicker">Records</div>
+                      <div class="panel-kicker">记录列表</div>
                       <div class="panel-title">记录列表</div>
                     </div>
-                    <span class="panel-count">{{ displayedRecords.length }}</span>
+                    <span class="panel-count">已显示 {{ records.length }} / {{ recordTotal }}</span>
                   </div>
                   <div class="record-list">
                     <button
-                      v-for="record in displayedRecords"
+                      v-for="record in records"
                       :key="record.recordId"
                       class="record-item"
                       :class="{ active: selectedRecord?.recordId === record.recordId, wrong: !record.correct, correct: record.correct }"
-                      @click="selectedRecord = record"
+                      @click="selectRecord(record)"
                     >
                       <div class="record-item-top">
                         <span class="record-badge">{{ record.correct ? '正确' : '错题' }}</span>
                         <span class="record-time">{{ formatDate(record.answeredAt) }}</span>
                       </div>
-                      <div class="record-question"><LatexText :content="crop(record.questionContent, 56)" /></div>
-                      <div class="record-meta">题目 #{{ record.questionId }} · 我答 {{ record.userAnswer }} · 正确 {{ record.correctAnswer }}</div>
+                      <div class="record-question"><LatexText :content="crop(record.questionPreview, 56)" /></div>
+                      <div class="record-meta">题目 #{{ record.questionId }} · 我答 {{ record.userAnswer }}</div>
                     </button>
+                  </div>
+                  <div v-if="recordPage < recordPages" class="records-pager">
+                    <button class="mode-btn" :disabled="recordsLoading" @click="loadMoreRecords">加载更多</button>
                   </div>
                 </div>
 
@@ -166,7 +160,7 @@
                   <template v-else>
                     <div class="panel-head compact detail-head">
                       <div>
-                        <div class="panel-kicker">Inspection</div>
+                        <div class="panel-kicker">记录详情</div>
                         <div class="panel-title">记录详情</div>
                       </div>
                       <span class="detail-record-status" :class="selectedRecord.correct ? 'ok-text' : 'fail-text'">
@@ -184,7 +178,6 @@
                       <div class="detail-card">
                         <div class="detail-row"><span>难度</span><strong>{{ selectedRecord.difficulty || '未标注' }}</strong></div>
                         <div class="detail-row"><span>记录类型</span><strong>{{ selectedRecord.correct ? '正常记录' : '错题记录' }}</strong></div>
-                        <div class="detail-row"><span>错误原因</span><strong>{{ selectedRecord.errorReason || '未填写' }}</strong></div>
                       </div>
                     </div>
 
@@ -226,18 +219,19 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue';
-import { teacherNavLinks } from '@/constants/navigation';
 import AppShell from '@/layouts/AppShell.vue';
 import LatexText from '@/components/LatexText.vue';
 import StreamOutput from '@/components/StreamOutput.vue';
 import AppToast from '@/components/AppToast.vue';
 import { useToast } from '@/composables/useToast';
 import { useAuthStore } from '@/stores/auth';
+import { useClassroomStore } from '@/stores/classroom';
+import { getClassStudentsApi } from '@/api/classroom';
 import { getAllUsersApi } from '@/api/user';
-import { getUserAnswerRecordsApi, getUserWrongAnswerRecordsApi } from '@/api/answer-record';
+import { getUserAnswerPageApi, getAnswerRecordDetailApi, getStudentAnswerStatsApi } from '@/api/answer-record';
 import { getStudentLatestReportApi } from '@/api/ai';
 import type { UserResponse } from '@/types/user';
-import type { AnswerRecordResponse } from '@/types/answer-record';
+import type { AnswerRecordResponse, AnswerRecordSummary } from '@/types/answer-record';
 
 interface StudentInsightRow extends UserResponse {
   totalCount: number;
@@ -247,11 +241,11 @@ interface StudentInsightRow extends UserResponse {
 }
 
 const auth = useAuthStore();
+const classroom = useClassroomStore();
 const { visible, type, message, show } = useToast();
 
-const links = teacherNavLinks;
 
-const loading = ref(true);
+const loading = ref(false);
 const recordsLoading = ref(false);
 const reportLoading = ref(false);
 const searchText = ref('');
@@ -259,8 +253,12 @@ const classFilter = ref('');
 const recordMode = ref<'all' | 'wrong'>('all');
 const studentRows = ref<StudentInsightRow[]>([]);
 const selectedStudent = ref<StudentInsightRow | null>(null);
-const allRecords = ref<AnswerRecordResponse[]>([]);
-const wrongRecords = ref<AnswerRecordResponse[]>([]);
+const records = ref<AnswerRecordSummary[]>([]);
+const recordPage = ref(1);
+const recordPages = ref(0);
+const recordTotal = ref(0);
+const recordSize = 20;
+let selectionVersion = 0;
 const selectedRecord = ref<AnswerRecordResponse | null>(null);
 const reportContent = ref('');
 const reportCreateTime = ref('');
@@ -291,7 +289,6 @@ const averageErrorRateText = computed(() => {
   return `${(total / filteredStudents.value.length).toFixed(1)}%`;
 });
 
-const displayedRecords = computed(() => recordMode.value === 'wrong' ? wrongRecords.value : allRecords.value);
 const emptyRecordMessage = computed(() => recordMode.value === 'wrong' ? '该学生当前没有错题记录。' : '该学生当前没有答题记录。');
 const reportTimeText = computed(() => reportCreateTime.value ? `生成时间：${formatDate(reportCreateTime.value)}` : '');
 
@@ -310,115 +307,126 @@ const rateClass = (rate: number) => {
   return 'rate-low';
 };
 
-const buildStudentRow = async (student: UserResponse): Promise<StudentInsightRow> => {
+const selectRecord = async (record: AnswerRecordSummary) => {
   try {
-    const [allData, wrongData] = await Promise.all([
-      getUserAnswerRecordsApi(student.id),
-      getUserWrongAnswerRecordsApi(student.id),
-    ]);
-    const totalCount = allData.records?.length ?? 0;
-    const wrongCount = wrongData.records?.length ?? 0;
-    const errorRate = totalCount ? (wrongCount / totalCount) * 100 : 0;
-    return {
-      ...student,
-      totalCount,
-      wrongCount,
-      errorRate,
-      errorRateText: `${errorRate.toFixed(1)}%`,
-    };
-  } catch {
-    return {
-      ...student,
-      totalCount: 0,
-      wrongCount: 0,
-      errorRate: 0,
-      errorRateText: '0.0%',
-    };
+    selectedRecord.value = await getAnswerRecordDetailApi(record.recordId);
+  } catch (error: any) {
+    selectedRecord.value = null;
+    show(error?.response?.data?.message ?? '读取记录详情失败', 'error');
   }
 };
 
-const applySelectedRecords = () => {
-  selectedRecord.value = displayedRecords.value[0] ?? null;
-};
-
-const loadStudentRecords = async (studentId: number) => {
+const loadStudentRecords = async (studentId: number, version: number, targetPage = 1, append = false) => {
   recordsLoading.value = true;
   try {
-    const [allData, wrongData] = await Promise.all([
-      getUserAnswerRecordsApi(studentId),
-      getUserWrongAnswerRecordsApi(studentId),
-    ]);
-    allRecords.value = allData.records ?? [];
-    wrongRecords.value = wrongData.records ?? [];
-    applySelectedRecords();
+    const data = await getUserAnswerPageApi(studentId, {
+      page: targetPage,
+      size: recordSize,
+      wrongOnly: recordMode.value === 'wrong',
+    });
+    if (version !== selectionVersion) return;
+    const incoming = (data.records ?? []).filter(row => !records.value.some(existing => existing.recordId === row.recordId));
+    records.value = append ? [...records.value, ...incoming] : incoming;
+    recordPage.value = data.currentPage;
+    recordPages.value = data.pages;
+    recordTotal.value = data.total;
+    if (!append) {
+      const first = records.value[0];
+      if (first) await selectRecord(first);
+      else selectedRecord.value = null;
+    }
   } catch (error: any) {
-    allRecords.value = [];
-    wrongRecords.value = [];
-    applySelectedRecords();
+    if (version !== selectionVersion) return;
+    records.value = [];
+    selectedRecord.value = null;
     show(error?.response?.data?.message ?? '读取学生作答记录失败', 'error');
   } finally {
-    recordsLoading.value = false;
+    if (version === selectionVersion) recordsLoading.value = false;
   }
 };
 
-const loadStudentReport = async (studentId: number, totalCount: number) => {
+const loadMoreRecords = async () => {
+  if (!selectedStudent.value || recordsLoading.value) return;
+  await loadStudentRecords(selectedStudent.value.id, selectionVersion, recordPage.value + 1, true);
+};
+
+const loadStudentReport = async (studentId: number, totalCount: number, version: number) => {
   reportLoading.value = true;
   reportContent.value = '';
   reportCreateTime.value = '';
   reportMessage.value = null;
 
+  const emptyReport = totalCount > 0
+    ? { title: '暂未生成学习报告', desc: '该学生已有答题记录，但还没有生成个人学习报告。' }
+    : { title: '该学生尚未开始作答', desc: '学生还没有答题记录，因此暂时没有可读取的学习报告。' };
+
   try {
     const report = await getStudentLatestReportApi(studentId);
+    if (version !== selectionVersion) return;
     if (!report?.latestReportContent?.trim()) {
-      reportMessage.value = totalCount > 0
-        ? { title: '暂未生成学习报告', desc: '该学生已有答题记录，但还没有生成个人学习报告。' }
-        : { title: '该学生尚未开始作答', desc: '学生还没有答题记录，因此暂时没有可读取的学习报告。' };
+      reportMessage.value = emptyReport;
       return;
     }
     reportContent.value = report.latestReportContent;
     reportCreateTime.value = report.reportCreateTime;
   } catch (error: any) {
+    if (version !== selectionVersion) return;
     const raw = error?.response?.data?.message ?? error?.message ?? '';
     if (raw.includes('无答题记录') || raw.includes('没有报告') || raw.includes('未生成') || raw.includes('not found')) {
-      reportMessage.value = totalCount > 0
-        ? { title: '暂未生成学习报告', desc: '该学生已有答题记录，但还没有生成个人学习报告。' }
-        : { title: '该学生尚未开始作答', desc: '学生还没有答题记录，因此暂时没有可读取的学习报告。' };
+      reportMessage.value = emptyReport;
       return;
     }
     reportMessage.value = { title: '该学生尚未生成学习报告哦', desc: '当前无法获取该学生的学习报告，请稍后再试。' };
   } finally {
-    reportLoading.value = false;
+    if (version === selectionVersion) reportLoading.value = false;
   }
 };
 
 const selectStudent = async (student: StudentInsightRow) => {
+  const version = ++selectionVersion;
   selectedStudent.value = student;
+  records.value = [];
+  recordTotal.value = 0;
+  selectedRecord.value = null;
   recordMode.value = 'all';
   await Promise.all([
-    loadStudentRecords(student.id),
-    loadStudentReport(student.id, student.totalCount),
+    loadStudentRecords(student.id, version),
+    loadStudentReport(student.id, student.totalCount, version),
   ]);
 };
 
 watch(recordMode, () => {
-  applySelectedRecords();
+  if (!selectedStudent.value || recordsLoading.value) return;
+  records.value = [];
+  selectedRecord.value = null;
+  void loadStudentRecords(selectedStudent.value.id, ++selectionVersion);
 });
 
-onMounted(async () => {
+const loadInsights = async () => {
+  if (loading.value) return;
   loading.value = true;
   try {
-    const users = await getAllUsersApi();
-    const students = users.filter(user => user.userType === 'STUDENT');
-    studentRows.value = await Promise.all(students.map(buildStudentRow));
-    if (studentRows.value.length) {
-      await selectStudent(studentRows.value[0]);
-    }
+    if (!classroom.classes.length) await classroom.loadClasses();
+    const classId = classroom.activeClassId;
+    if (!classId) { studentRows.value = []; return; }
+    const [members, users, statistics] = await Promise.all([
+      getClassStudentsApi(classId), getAllUsersApi(), getStudentAnswerStatsApi(),
+    ]);
+    const memberIds = new Set(members.map(row => row.userId));
+    const byUser = new Map(statistics.map(row => [row.userId, row]));
+    studentRows.value = users.filter(user => user.userType === 'STUDENT' && memberIds.has(user.id)).map(student => {
+      const { totalCount = 0, wrongCount = 0 } = byUser.get(student.id) ?? {};
+      const errorRate = totalCount ? wrongCount / totalCount * 100 : 0;
+      return { ...student, totalCount, wrongCount, errorRate, errorRateText: `${errorRate.toFixed(1)}%` };
+    });
+    if (studentRows.value.length) await selectStudent(studentRows.value[0]);
   } catch (error: any) {
     show(error?.response?.data?.message ?? '加载学生列表失败', 'error');
-  } finally {
-    loading.value = false;
-  }
-});
+  } finally { loading.value = false; }
+};
+
+watch(() => classroom.activeClassId, () => { loadInsights().catch(() => {}); });
+onMounted(loadInsights);
 </script>
 
 <style scoped>
@@ -616,7 +624,7 @@ onMounted(async () => {
 .detail-student-name,
 .question-title {
   font-weight: 800;
-  color: #eef4ff;
+  color: #172033;
 }
 
 .student-rate,
@@ -631,17 +639,17 @@ onMounted(async () => {
 .rate-high,
 .fail-text,
 .record-item.wrong .record-badge {
-  color: rgba(255, 152, 152, 0.96);
+  color: #b91c1c;
 }
 
 .rate-mid {
-  color: rgba(255, 198, 112, 0.96);
+  color: #b45309;
 }
 
 .rate-low,
 .ok-text,
 .record-item.correct .record-badge {
-  color: rgba(120, 220, 150, 0.96);
+  color: #15803d;
 }
 
 .student-detail-panel {
@@ -841,6 +849,48 @@ onMounted(async () => {
   .detail-card-grid {
     grid-template-columns: 1fr;
   }
+}
+
+/* 浅色主题适配：学生姓名与学习报告输出 */
+.student-name,
+.detail-student-name {
+  color: #172033;
+}
+
+.report-output :deep(.stream-box) {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+}
+
+.report-output :deep(.stream-content),
+.report-output :deep(.reasoning-content) {
+  background: #ffffff;
+  border-color: #e2e8f0;
+  color: #334155;
+}
+
+.report-output :deep(.reasoning-box) {
+  background: #f8fafc;
+  border-color: #e2e8f0;
+}
+
+.report-output :deep(.reasoning-box summary) {
+  color: #334155;
+}
+
+.report-output :deep(.stream-empty-title) {
+  color: #172033;
+}
+
+.report-output :deep(.markdown-body h1),
+.report-output :deep(.markdown-body h2),
+.report-output :deep(.markdown-body h3),
+.report-output :deep(.markdown-body h4) {
+  color: #172033;
+}
+
+.report-output :deep(.markdown-body strong) {
+  color: #0f766e;
 }
 </style>
 

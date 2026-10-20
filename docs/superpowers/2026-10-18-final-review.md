@@ -5,7 +5,7 @@ Reviewer: fresh gpt-6-astra agent, read-only, base e32fefa through cd71569. Defa
 Accepted Important findings (fixed in one regression-driven pass):
 1. Stale User entity login save can restore pre-logout tokenVersion; use conditional lastLogin update, fail zero updated rows, prevent unrelated user saves overwriting security fields.
 2. Practice and assignment share cache and cached doneMap overrides server truth; scope owner/event/intent and only recover drafts.
-3. Lost successful response loses edited errorReason with same requestId; freeze/persist complete payload before dispatch and reconcile server success.
+3. Lost successful response loses the frozen submission payload with same requestId; persist the complete payload before dispatch and reconcile server success.
 4. Concurrent report find-then-insert permits duplicate scope rows; preserve generations safely and tolerate existing duplicates.
 5. New UTC LocalDateTime lacks offset, displays early in Shanghai; offset-bearing wire format with explicit legacy-time handling.
 6. Duplicate old QIDS causes V3 partial migration; deterministic dedup preserves first position and raw description, test missing/malformed data.
@@ -22,7 +22,7 @@ Declined-to-judge rulings: no live model accuracy/injection certification withou
 ## Verification of the fix pass
 
 - 1: `AuthRevocationConcurrencyTest` observed stale login restore 1→0; unrelated profile path also failed with DynamicUpdate removed. Conditional version-aware lastLogin update rejects stale authentication, and dynamic dirty writes protect unchanged security fields. Both regressions now pass.
-- 2–3: `submission-recovery.spec.ts` observed missing frozen errorReason and practice overwriting original wrong state. Full persisted payload, scoped drafts and server reconciliation now pass both browser regressions.
+- 2–3: `submission-recovery.spec.ts` observed a missing frozen payload and practice overwriting original wrong state. Full persisted payload, scoped drafts and server reconciliation now pass both browser regressions.
 - 4: `ReportGenerationConcurrencyTest` reproduced duplicate-scope lookup failure; immutable generation rows pass concurrent saves and third regeneration without overwriting evidence.
 - 5: `LearningTimestampContractTest` first failed missing UTC offset; now UTC has Z and legacy local values remain explicit. Fresh/V3 schemas and projections carry the distinction.
 - 6: real isolated MySQL upgrade first failed duplicate-key 1062 with duplicate QIDS. The same duplicate/missing/malformed fixture now upgrades; raw descriptions and attempts remain intact.

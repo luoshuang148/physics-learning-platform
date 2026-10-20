@@ -7,6 +7,7 @@ import com.zhixuewuli.common.config.properties.AIBusinessProperties;
 import com.zhixuewuli.common.exception.ai.AIResponseParseException;
 import com.zhixuewuli.common.exception.ai.AIServiceUnavailableException;
 import com.zhixuewuli.common.exception.ai.AITimeoutException;
+import com.zhixuewuli.common.exception.ai.AIUpstreamException;
 
 import lombok.extern.slf4j.Slf4j;
 import okhttp3.*;
@@ -94,6 +95,9 @@ public class AliyunAIClient extends AbstractStreamingClient {
         } catch (IOException e) {
             logStreamError(model, e);
             callback.onError(new AIServiceUnavailableException("AI服务不可用: " + e.getMessage(), e));
+        } catch (AIServiceUnavailableException e) {
+            logStreamError(model, e);
+            callback.onError(e);
         } catch (Exception e) {
             logStreamError(model, e);
             callback.onError(new AIServiceUnavailableException("AI客户端异常: " + e.getMessage(), e));
@@ -125,6 +129,9 @@ public class AliyunAIClient extends AbstractStreamingClient {
         } catch (IOException e) {
             logStreamError(model, e);
             callback.onError(new AIServiceUnavailableException("AI服务不可用: " + e.getMessage(), e));
+        } catch (AIServiceUnavailableException e) {
+            logStreamError(model, e);
+            callback.onError(e);
         } catch (Exception e) {
             logStreamError(model, e);
             callback.onError(new AIServiceUnavailableException("AI客户端异常: " + e.getMessage(), e));
@@ -132,10 +139,85 @@ public class AliyunAIClient extends AbstractStreamingClient {
     }
 
     /**
+     * 阻塞式内容生成：供后台批量任务在事务外调用。
+     *
+     * <p>复用流式管线（重试一次、GLM thinking 关闭等），把全部内容收集为字符串；
+     * 通过看门狗线程在超时后取消底层 HTTP 调用，并抛出 {@link AITimeoutException}。</p>
+     *
+     * @param prompt  完整提示词
+     * @param model   模型名称
+     * @param timeout 调用超时
+     * @return 修复格式后的完整模型输出
+     */
+    public String generateBlocking(String prompt, String model, java.time.Duration timeout) {
+        StringBuilder collected = new StringBuilder();
+        java.util.concurrent.atomic.AtomicReference<Exception> failure = new java.util.concurrent.atomic.AtomicReference<>();
+        java.util.concurrent.atomic.AtomicReference<Runnable> cancelAction = new java.util.concurrent.atomic.AtomicReference<>();
+        java.util.concurrent.atomic.AtomicBoolean timedOut = new java.util.concurrent.atomic.AtomicBoolean(false);
+
+        Thread watchdog = new Thread(() -> {
+            try {
+                Thread.sleep(timeout.toMillis());
+                timedOut.set(true);
+                Runnable cancel = cancelAction.get();
+                if (cancel != null) cancel.run();
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+            }
+        }, "report-batch-ai-watchdog");
+        watchdog.setDaemon(true);
+
+        try {
+            watchdog.start();
+            streamGenerate(prompt, model, new AIStreamCallback() {
+                @Override
+                public void onCancel(Runnable action) {
+                    cancelAction.set(action);
+                    if (timedOut.get()) action.run();
+                }
+
+                @Override
+                public boolean isCancelled() {
+                    return timedOut.get();
+                }
+
+                @Override
+                public void onContent(String content, boolean isLast) {
+                    if (content != null && !content.isEmpty()) {
+                        collected.append(com.zhixuewuli.common.util.StreamContentFixer.fix(content));
+                    }
+                }
+
+                @Override
+                public void onComplete(int promptTokens, int completionTokens, int totalTokens) {
+                    log.debug("后台报告生成完成 - 模型: {}, tokens: {}/{}/{}", model,
+                            promptTokens, completionTokens, totalTokens);
+                }
+
+                @Override
+                public void onError(Exception error) {
+                    failure.set(error);
+                }
+            });
+        } finally {
+            watchdog.interrupt();
+        }
+
+        if (timedOut.get()) throw new AITimeoutException("后台报告生成超时（" + timeout.toMinutes() + " 分钟）");
+        Exception error = failure.get();
+        if (error != null) {
+            if (error instanceof RuntimeException runtime) throw runtime;
+            throw new com.zhixuewuli.common.exception.ai.AIServiceUnavailableException(error.getMessage());
+        }
+        if (collected.isEmpty()) throw new AIServiceUnavailableException("模型未返回报告内容");
+        return collected.toString();
+    }
+
+    /**
      * 构建生成请求
      * 符合阿里云百炼OpenAI兼容模式规范：
      * - 使用标准的messages格式
-     * - 阿里云特有参数（enable_thinking等）放入extra_body
+     * - 直接发送 HTTP JSON，temperature/max_tokens 位于根层级
      * - 添加 stream_options 以获取用量
      */
     private String buildGenerateRequest(String prompt, String model) throws Exception {
@@ -156,26 +238,7 @@ public class AliyunAIClient extends AbstractStreamingClient {
         messages.add(userMessage);
         request.put("messages", messages);
 
-        // ===== 阿里云特有参数放入 extra_body =====
-        Map<String, Object> extraBody = new HashMap<>();
-
-        // 温度参数
-        extraBody.put("temperature",
-                aiBusinessProperties.getAliyunTemperature() != null
-                        ? aiBusinessProperties.getAliyunTemperature()
-                        : aiBusinessProperties.getTemperature());
-
-        // 最大输出token数
-        extraBody.put("max_tokens",
-                aiBusinessProperties.getAliyunMaxTokens() != null
-                        ? aiBusinessProperties.getAliyunMaxTokens()
-                        : aiBusinessProperties.getMaxTokens());
-
-        // 只有当 extraBody 非空时才放入请求
-        if (!extraBody.isEmpty()) {
-            request.put("extra_body", extraBody);
-        }
-
+        addGenerationParameters(request, model);
         return objectMapper.writeValueAsString(request);
     }
 
@@ -204,27 +267,25 @@ public class AliyunAIClient extends AbstractStreamingClient {
         // 直接使用传入的多模态消息列表
         request.put("messages", messages);
 
-        // ===== 阿里云特有参数放入 extra_body =====
-        Map<String, Object> extraBody = new HashMap<>();
+        addGenerationParameters(request, model);
+        return objectMapper.writeValueAsString(request);
+    }
 
-        // 温度参数
-        extraBody.put("temperature",
+    private void addGenerationParameters(Map<String, Object> request, String model) {
+        request.put("temperature",
                 aiBusinessProperties.getAliyunTemperature() != null
                         ? aiBusinessProperties.getAliyunTemperature()
                         : aiBusinessProperties.getTemperature());
 
-        // 最大输出token数
-        extraBody.put("max_tokens",
+        request.put("max_tokens",
                 aiBusinessProperties.getAliyunMaxTokens() != null
                         ? aiBusinessProperties.getAliyunMaxTokens()
                         : aiBusinessProperties.getMaxTokens());
 
-        // 只有当 extraBody 非空时才放入请求
-        if (!extraBody.isEmpty()) {
-            request.put("extra_body", extraBody);
+        // Reports consume the generated text; GLM-4.7 otherwise spends the output budget thinking.
+        if (model != null && model.startsWith("glm-4.7")) {
+            request.put("thinking", Map.of("type", "disabled"));
         }
-
-        return objectMapper.writeValueAsString(request);
     }
 
     private void executeStreamingRequest(String requestBody, AIStreamCallback callback, String model)
@@ -238,40 +299,44 @@ public class AliyunAIClient extends AbstractStreamingClient {
                 .addHeader("Content-Type", "application/json")
                 .build();
 
-        okhttp3.Call call = httpClient.newCall(request);
-        callback.onCancel(call::cancel);
-        if (callback.isCancelled()) { call.cancel(); return; }
-        try (Response response = call.execute()) {
-            if (!response.isSuccessful()) {
-                String errorMsg = "AI服务返回错误状态: " + response.code();
-                if (response.code() == 401) {
-                    errorMsg += " (认证失败，请检查API密钥配置)";
-                } else if (response.code() >= 500) {
-                    errorMsg += " (服务器内部错误)";
-                } else if (response.code() == 429) {
-                    errorMsg += " (请求频率过高，请稍后重试)";
-                }
-                throw new AIServiceUnavailableException(errorMsg);
-            }
+        for (int attempt = 0; attempt < 2; attempt++) {
+            okhttp3.Call call = httpClient.newCall(request);
+            callback.onCancel(call::cancel);
+            if (callback.isCancelled()) { call.cancel(); return; }
+            boolean receivedHeaders = false;
+            try (Response response = call.execute()) {
+                receivedHeaders = true;
+                if (!response.isSuccessful()) throw new AIUpstreamException(response.code());
 
-            ResponseBody body = response.body();
-            if (body != null) {
-                int bufferSize = aiStreamingProperties.getBufferSize() != null
-                        ? aiStreamingProperties.getBufferSize()
-                        : 8192;
-                try (BufferedReader reader = new BufferedReader(body.charStream(), bufferSize)) {
-                    processStreamingResponse(reader, callback);
+                ResponseBody body = response.body();
+                if (body != null) {
+                    int bufferSize = aiStreamingProperties.getBufferSize() != null
+                            ? aiStreamingProperties.getBufferSize() : 8192;
+                    try (BufferedReader reader = new BufferedReader(body.charStream(), bufferSize)) {
+                        processStreamingResponse(reader, callback);
+                    }
+                } else {
+                    callback.onComplete(0, 0, 0);
                 }
-            } else {
-                // 响应体为空，直接完成
-                callback.onComplete(0, 0, 0);
+                logStreamComplete(model, System.currentTimeMillis() - startTime);
+                return;
+            } catch (AIUpstreamException error) {
+                if (attempt > 0 || (error.getStatus() != 429 && error.getStatus() < 500)) throw error;
+                log.warn("报告模型暂不可用，准备重试一次 - 模型: {}, HTTP状态: {}", model, error.getStatus());
+            } catch (SocketTimeoutException error) {
+                // Once a response starts, replaying it could duplicate generated paragraphs.
+                if (receivedHeaders || attempt > 0) throw error;
+                log.warn("报告模型首响应超时，准备重试一次 - 模型: {}", model);
+            } catch (IOException error) {
+                if (callback.isCancelled()) { callback.onComplete(0, 0, 0); return; }
+                throw error;
             }
-
-            long duration = System.currentTimeMillis() - startTime;
-            logStreamComplete(model, duration);
-        } catch (IOException error) {
-            if (callback.isCancelled()) callback.onComplete(0, 0, 0);
-            else throw error;
+            if (callback.isCancelled()) return;
+            try { Thread.sleep(1000); }
+            catch (InterruptedException error) {
+                Thread.currentThread().interrupt();
+                throw new java.io.InterruptedIOException("AI请求已中断");
+            }
         }
     }
 

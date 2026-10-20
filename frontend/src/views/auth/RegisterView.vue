@@ -1,7 +1,7 @@
 <template>
   <AuthLayout>
     <h2 class="auth-title">创建账号</h2>
-    <p class="auth-sub">创建学生学习账号</p>
+
 
     <form class="form" @submit.prevent="onSubmit">
       <label>用户名</label>
@@ -11,12 +11,12 @@
       <input v-model="form.password" type="password" placeholder="至少 6 位" />
 
       <label>真实姓名</label>
-      <input v-model="form.realName" placeholder="例如：张三" />
+      <input v-model="form.realName"  />
 
       <label>班级（可选）</label>
-      <input v-model="form.className" placeholder="例如：高三 (1) 班" />
+      <input v-model="form.className"  />
 
-      <p class="teacher-code-tip">注册后为学生账号。教师身份请联系平台已有教师授权。</p>
+
 
       <button class="neon-btn primary" type="submit" :disabled="loading">
         {{ loading ? '注册中…' : '注册' }}
@@ -82,6 +82,6 @@ const onSubmit = async () => {
 .teacher-code-tip {
   margin: -4px 0 2px;
   font-size: var(--font-size-sm);
-  color: rgba(151, 172, 249, 0.78);
+  color: #64748b;
 }
 </style>

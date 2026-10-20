@@ -100,8 +100,6 @@ public class QuestionErrorConverter {
                 dto.setAnswerTime((java.time.LocalDateTime) answerTimeObj);
             }
 
-            dto.setErrorReason((String) row[5]);
-
             return dto;
         } catch (Exception e) {
             log.error("学生错误详情数据转换失败：{}", Arrays.toString(row), e);
@@ -203,7 +201,6 @@ public class QuestionErrorConverter {
                     }
                     dto.setUserAnswer(record.getUserAnswer());
                     dto.setAnswerTime(record.getAnsweredAt());
-                    dto.setErrorReason(record.getErrorReason());
                     return dto;
                 })
                 .collect(Collectors.toList());

@@ -10,12 +10,10 @@ import com.zhixuewuli.common.exception.question.QuestionNotFoundException;
 import com.zhixuewuli.common.exception.answerrecord.AnswerRecordNotFoundException;
 import com.zhixuewuli.common.result.ResultCode;
 import com.zhixuewuli.common.util.AIStreamExecutor;
-import com.zhixuewuli.common.util.HanLPWordCloudUtil;
 import com.zhixuewuli.common.util.OptionMappingUtil;
 import com.zhixuewuli.common.util.QuestionErrorConverter;
 import com.zhixuewuli.common.util.StreamContentFixer;
 import com.zhixuewuli.common.util.StreamUtils;
-import com.zhixuewuli.common.util.UserPermissionUtil;
 import com.zhixuewuli.dto.internal.ConversationType;
 import com.zhixuewuli.dto.internal.SessionContextInternalDTO;
 import com.zhixuewuli.dto.request.AIAskRequest;
@@ -49,7 +47,6 @@ public class QuestionErrorAnalysisServiceImpl implements QuestionErrorAnalysisSe
     private final com.zhixuewuli.service.ai.report.ReportInputRepository reportInputs;
     private final AnswerRecordRepository answerRecordRepository;
     private final QuestionRepository questionRepository;
-    private final UserPermissionUtil userPermissionUtil;
     private final QuestionErrorConverter errorConverter;
     private final OptionMappingUtil optionMappingUtil;
     private final SessionManager sessionManager;
@@ -64,7 +61,6 @@ public class QuestionErrorAnalysisServiceImpl implements QuestionErrorAnalysisSe
     public List<QuestionErrorSummaryResponse> getAllQuestionErrorStatistics(Long teacherId) {
         log.info("开始查询题目错误统计 - TeacherId: {}", teacherId);
         try {
-            userPermissionUtil.checkTeacherPermission(teacherId);
             List<Object[]> statistics = answerRecordRepository.findQuestionErrorStatisticsOptimized();
             List<QuestionErrorSummaryResponse> result = errorConverter.convertQuestionErrorSummaries(statistics);
             log.info("题目错误统计查询完成 - 找到{}道有错误的题目", result.size());
@@ -90,8 +86,6 @@ public class QuestionErrorAnalysisServiceImpl implements QuestionErrorAnalysisSe
         log.info("获取题目错误详情 - QuestionId: {}, TeacherId: {}", questionId, teacherId);
 
         try {
-            // 1. 权限验证
-            userPermissionUtil.checkTeacherPermission(teacherId);
             log.info("权限验证通过");
 
             // 2. 验证题目存在
@@ -111,20 +105,8 @@ public class QuestionErrorAnalysisServiceImpl implements QuestionErrorAnalysisSe
                     .convertStudentErrorDetails(studentErrors);
             log.info("转换完成，返回 {} 个学生", studentList.size());
 
-            // 5. 从查询结果中提取错误原因（避免第二次查询）
-            List<String> errorReasons = studentErrors.stream()
-                    .map(row -> (String) row[5]) // error_reason 在第 5 个位置
-                    .filter(reason -> reason != null && !reason.trim().isEmpty())
-                    .collect(java.util.stream.Collectors.toList());
-
-            // 6. 生成词云数据
-            Map<String, Integer> wordCloud = HanLPWordCloudUtil.analyzeErrorReasons(errorReasons);
-            log.info("词云生成完成，包含 {} 个词", wordCloud.size());
-
-            // 7. 构建响应
             return QuestionErrorDetailsResponse.builder()
                     .studentList(studentList)
-                    .wordCloud(wordCloud)
                     .build();
         } catch (Exception e) {
             log.error("获取题目错误详情失败 - QuestionId: {}, Error: {}", questionId, e.getMessage(), e);
@@ -138,9 +120,6 @@ public class QuestionErrorAnalysisServiceImpl implements QuestionErrorAnalysisSe
             String sessionId) {
         AIStreamExecutor.executeStream("教师题目分析", teacherId, emitter, streamUtils, () -> {
             log.info("教师题目分析开始 - 教师ID: {}, 会话ID: {}, 题目ID: {}", teacherId, sessionId, request.getQuestionId());
-
-            // 1. 权限验证
-            userPermissionUtil.checkTeacherPermission(teacherId);
 
             // 2. 验证题目存在答题记录
             Long questionId = request.getQuestionId();

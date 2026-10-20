@@ -72,6 +72,6 @@ public interface AliyunAIReportService {
      * @throws com.zhixuewuli.common.exception.auth.UserNotFoundException                 当用户不存在时抛出
      * @throws com.zhixuewuli.common.exception.answerrecord.AnswerRecordNotFoundException 当学生无报告记录时抛出
      */
-    StudentReportResponse getStudentLatestReport(Long teacherId, Long studentId);
-    StudentReportResponse getStudentLatestReport(Long teacherId, Long studentId, Long eventId);
+    StudentReportResponse getStudentLatestReport(Long studentId);
+    StudentReportResponse getStudentLatestReport(Long studentId, Long eventId);
 }

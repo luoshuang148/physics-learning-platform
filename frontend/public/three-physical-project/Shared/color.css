@@ -1,0 +1,72 @@
+/*
+  颜色系统说明
+  - 四种角色色：--color-primary(主要)、--color-secondary(次要)、--color-content(内容)、--color-accent(重点)
+  - 内容色固定为白色：#ffffff
+  - 通过切换 html 或 body 上的 data-theme 值进行主题切换
+    例如：document.documentElement.setAttribute('data-theme', 'maimang-qingye')
+*/
+
+:root {
+  /* 默认主题：古纸鎏金 */
+  --color-primary: #7953b1;
+  --color-secondary: #ffc209;
+  --color-content: #ffffff;
+  --color-accent: #dedede;
+}
+
+/* 古纸鎏金 */
+[data-theme='guzhi-liujin'] {
+  --color-primary: #f0debf;
+  --color-secondary: #f6c12c;
+  --color-content: #ffffff;
+  --color-accent: #b22a2a;
+}
+
+/* 麦浪青野 */
+[data-theme='mailang-qingye'] {
+  --color-primary: #f1ece0;
+  --color-secondary: #117c0d;
+  --color-content: #ffffff;
+  --color-accent: #fac75e;
+}
+
+/* 纸宗森绿 */
+[data-theme='zhizong-senlv'] {
+  --color-primary: #faf3e9;
+  --color-secondary: #a8703f;
+  --color-content: #ffffff;
+  --color-accent: #5c614d;
+}
+
+/* 紫鸢金灰 */
+[data-theme='ziyuan-jinhui'] {
+  --color-primary: #7953b1;
+  --color-secondary: #ffc209;
+  --color-content: #ffffff;
+  --color-accent: #dedede;
+}
+
+/* 青空深海 */
+[data-theme='qingkong-shenhai'] {
+  --color-primary: #a1feef;
+  --color-secondary: #658ae4;
+  --color-content: #ffffff;
+  --color-accent: #28314e;
+}
+
+/* 可选：语义化映射，便于业务层直接使用 */
+.theme-primary {
+  color: var(--color-primary);
+}
+
+.theme-secondary {
+  color: var(--color-secondary);
+}
+
+.theme-content {
+  color: var(--color-content);
+}
+
+.theme-accent {
+  color: var(--color-accent);
+}

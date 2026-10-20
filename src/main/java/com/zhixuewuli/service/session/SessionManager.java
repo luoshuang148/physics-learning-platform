@@ -67,7 +67,11 @@ public class SessionManager {
     public SessionContextInternalDTO getOrCreateSession(String sessionId, Long userId,
             ConversationType conversationType, Long questionId,
             Supplier<String> initialContextSupplier) {
-        Long eventId = teacherEventRepository.findByIsGlobalTrue().map(com.zhixuewuli.entity.TeacherEvent::getId).orElse(null);
+        var now = java.time.LocalDateTime.now(java.time.ZoneOffset.UTC);
+        var published = teacherEventRepository.findPublishedTasks();
+        Long eventId = published.stream().filter(task -> task.isOpenAt(now)).findFirst()
+                .or(() -> published.stream().findFirst())
+                .map(com.zhixuewuli.entity.TeacherEvent::getId).orElse(null);
         return getOrCreateSession(sessionId, userId, conversationType, questionId, eventId, initialContextSupplier);
     }
 
@@ -195,16 +199,6 @@ public class SessionManager {
         }
         long historyCount = conversationHistoryRepository.countBySessionIdAndIsActive(sessionId, true);
         return historyCount > 0;
-    }
-
-    /**
-     * 检查是否在测试环境中
-     * 通过检查是否有特定系统属性或类路径来判断
-     */
-    private boolean isTestEnvironment() {
-        return System.getProperty("spring.profiles.active") != null &&
-                System.getProperty("spring.profiles.active").contains("test") ||
-                Thread.currentThread().getContextClassLoader().getResource("application-test.yml") != null;
     }
 
     /**

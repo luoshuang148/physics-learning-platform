@@ -1,5 +1,5 @@
 <template>
-  <AppShell :subtitle="`题库管理 · ${auth.user?.realName ?? ''}`" :links="links">
+  <AppShell :subtitle="`题库管理 · ${auth.user?.realName ?? ''}`">
 
     <div class="qm-layout">
 
@@ -7,7 +7,7 @@
         <div class="qm-list-head">
           <div class="qm-list-head-top">
             <span class="qm-list-title">题目列表</span>
-            <span class="qm-list-count">{{ filteredQuestions.length }} / {{ questions.length }}</span>
+            <span class="qm-list-count">共 {{ total }} 道</span>
             <button class="new-btn" @click="openCreate">＋ 新建题目</button>
           </div>
           <div class="qm-list-filters">
@@ -24,13 +24,12 @@
         </div>
 
         <div v-if="loading" class="qm-loading">加载中…</div>
-        <div v-else-if="filteredQuestions.length === 0" class="qm-empty">
-          <div class="empty-icon">📭</div>
+        <div v-else-if="questions.length === 0" class="qm-empty">
           <p>{{ questions.length === 0 ? '题库暂无题目' : '无匹配题目' }}</p>
         </div>
         <div v-else class="qm-list">
           <div
-            v-for="q in filteredQuestions" :key="q.id"
+            v-for="q in questions" :key="q.id"
             class="qm-item"
             :class="{ active: editing?.id === q.id }"
             @click="openEdit(q)"
@@ -40,23 +39,15 @@
               <span class="qm-correct">答案 {{ q.correctOption }}</span>
               <span v-if="q.difficulty" class="qm-diff" :class="diffClass(q.difficulty)">D{{ q.difficulty }}</span>
               <div class="qm-item-actions" @click.stop>
-                <button class="icon-act edit" @click="openEdit(q)" title="编辑">✏️</button>
-                <button class="icon-act del" @click="confirmDelete(q.id)" title="删除">🗑️</button>
+                <button class="icon-act edit" @click="openEdit(q)" title="编辑">编辑</button>
+                <button class="icon-act del" @click="confirmDelete(q.id)" title="删除">删除</button>
               </div>
             </div>
             <div class="qm-item-content"><LatexText :content="q.content?.slice(0,80) ?? ''" /></div>
-            <div v-if="q.imageBase64" class="qm-item-image-wrap">
-              <img :src="q.imageBase64" alt="题目图片" class="qm-item-image" />
-            </div>
-            <div class="qm-item-opts">
-              <span v-for="(_, key) in q.options" :key="key" class="qm-opt-chip" :class="{ correct: key === q.correctOption }">
-                {{ key }}</span>
-            </div>
-            <div v-if="optionVideoSummary(q.explanationVideoMapping).length" class="qm-video-map">
-              <span class="qm-video-chip" v-for="item in optionVideoSummary(q.explanationVideoMapping)" :key="item">{{ item }}</span>
-            </div>
+            <span v-if="q.hasImage" class="muted">含配图 · 编辑时查看</span>
           </div>
         </div>
+        <div class="catalog-pager"><button class="ghost-btn" :disabled="loading || page <= 1" @click="changePage(-1)">上一页</button><span>{{ page }} / {{ pages || 1 }}</span><button class="ghost-btn" :disabled="loading || page >= pages" @click="changePage(1)">下一页</button><button class="ghost-btn" :disabled="loading" @click="load">刷新</button></div>
       </div>
 
       <div v-if="showForm" class="qm-form-panel" :class="{ visible: showForm }">
@@ -93,7 +84,7 @@
             <div v-if="form.imageBase64" class="image-preview-card">
               <img :src="form.imageBase64" alt="题目图片预览" class="image-preview" />
               <div class="image-preview-actions">
-                <span class="image-preview-tip">已加载题目图片</span>
+
                 <button class="image-remove-btn" type="button" @click="clearImage">移除图片</button>
               </div>
             </div>
@@ -112,41 +103,20 @@
                       <div class="preview-content"><LatexText :content="optionInputs[key]" /></div>
                     </div>
                   </div>
-                  <div class="field-stack">
-                    <select
-                      :value="optionVideoSelections[key] === null ? '' : String(optionVideoSelections[key])"
-                      @change="optionVideoSelections[key] = ($event.target as HTMLSelectElement).value === '' ? null : Number(($event.target as HTMLSelectElement).value)"
-                      class="opt-input opt-video-select"
-                    >
-                      <option value="">请选择要关联的视频</option>
-                      <option v-for="video in videos" :key="video.id" :value="String(video.id)">
-                        #{{ video.id }} · {{ video.title }}
-                      </option>
-                    </select>
-                  </div>
                 </div>
                 <span v-if="form.correctOption === key" class="opt-correct-mark">✓</span>
               </div>
             </div>
-            <div class="form-hint">点击字母按钮设置正确答案；每个选项可单独绑定一个现有视频</div>
           </div>
 
-          <div class="form-row">
-            <div class="form-section half">
-              <div class="form-label">难度</div>
-              <div class="diff-picker">
-                <button v-for="d in [1,2,3,4,5]" :key="d"
-                  class="diff-pick-btn"
-                  :class="{ active: form.difficulty === d }"
-                  @click="form.difficulty = d"
-                >{{ d }}</button>
-              </div>
-            </div>
-            <div class="form-section half">
-              <div class="form-label">视频资源</div>
-              <div class="video-summary" :class="{ loading: videoLoading }">
-                {{ videoLoading ? '视频列表加载中…' : videos.length ? `当前可选 ${videos.length} 个视频资源` : '当前没有可选视频，请先到视频管理创建视频' }}
-              </div>
+          <div class="form-section">
+            <div class="form-label">难度</div>
+            <div class="diff-picker">
+              <button v-for="d in [1,2,3,4,5]" :key="d"
+                class="diff-pick-btn"
+                :class="{ active: form.difficulty === d }"
+                @click="form.difficulty = d"
+              >{{ d }}</button>
             </div>
           </div>
 
@@ -185,37 +155,30 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue';
+import { reactive, ref } from 'vue';
 import AppShell from '@/layouts/AppShell.vue';
 import AppToast from '@/components/AppToast.vue';
 import LatexText from '@/components/LatexText.vue';
 import { useToast } from '@/composables/useToast';
 import { useAuthStore } from '@/stores/auth';
-import { createQuestionApi, deleteQuestionApi, getAllQuestionsApi, updateQuestionApi } from '@/api/question';
-import { getAllVideosApi } from '@/api/video';
-import type { QuestionResponse } from '@/types/question';
-import type { VideoResponse } from '@/types/video';
-import { teacherNavLinks } from '@/constants/navigation';
+import { useQuestionCatalog } from '@/composables/useQuestionCatalog';
+import { createQuestionApi, deleteQuestionApi, getQuestionByIdApi, updateQuestionApi } from '@/api/question';
+import type { QuestionResponse, QuestionCatalogRow } from '@/types/question';
 
 const auth = useAuthStore();
 const { visible, type, message, show } = useToast();
 
-const links = teacherNavLinks;
 const optionKeys = ['A', 'B', 'C', 'D'] as const;
 type OptionKey = typeof optionKeys[number];
 
-const questions = ref<QuestionResponse[]>([]);
-const videos = ref<VideoResponse[]>([]);
-const loading = ref(true);
-const videoLoading = ref(false);
+const { rows: questions, loading, page, total, pages, search: searchText, difficulty: diffFilter, load, changePage } = useQuestionCatalog(show);
+let editSequence = 0;
 const submitting = ref(false);
 const imageReading = ref(false);
 const isDragOver = ref(false);
 const showForm = ref(false);
 const editing = ref<QuestionResponse | null>(null);
 const deleteTargetId = ref<number | null>(null);
-const searchText = ref('');
-const diffFilter = ref(0);
 
 const form = reactive({
   content: '',
@@ -226,31 +189,6 @@ const form = reactive({
 });
 
 const optionInputs = reactive<Record<OptionKey, string>>({ A: '', B: '', C: '', D: '' });
-const optionVideoSelections = reactive<Record<OptionKey, number | null>>({ A: null, B: null, C: null, D: null });
-
-const getSelectedVideoTitle = (videoId: number | null) => {
-  if (!videoId) return '';
-  return videos.value.find((video) => video.id === videoId)?.title ?? '';
-};
-
-const filteredQuestions = computed(() => {
-  let list = [...questions.value].sort((a, b) => b.id - a.id);
-  if (diffFilter.value > 0) list = list.filter(q => q.difficulty === diffFilter.value);
-  const s = searchText.value.trim().toLowerCase();
-  if (s) list = list.filter(q => String(q.id).includes(s) || q.content?.toLowerCase().includes(s));
-  return list;
-});
-
-const optionVideoSummary = (mapping: QuestionResponse['explanationVideoMapping']) => {
-  if (!mapping) return [];
-  return optionKeys
-    .map((key) => {
-      const videoId = mapping[key] ?? null;
-      if (!videoId) return null;
-      return `${key}→${getSelectedVideoTitle(videoId) || `#${videoId}`}`;
-    })
-    .filter((item): item is string => Boolean(item));
-};
 
 const diffClass = (d: number | null) => {
   if (!d) return '';
@@ -269,19 +207,20 @@ const resetForm = () => {
   optionInputs.B = '';
   optionInputs.C = '';
   optionInputs.D = '';
-  optionVideoSelections.A = null;
-  optionVideoSelections.B = null;
-  optionVideoSelections.C = null;
-  optionVideoSelections.D = null;
 };
 
 const openCreate = () => {
+  ++editSequence;
   editing.value = null;
   resetForm();
   showForm.value = true;
 };
 
-const openEdit = (q: QuestionResponse) => {
+const openEdit = async (row: QuestionCatalogRow) => {
+  const owner = ++editSequence;
+  try {
+  const q = await getQuestionByIdApi(row.id);
+  if (owner !== editSequence) return;
   editing.value = q;
   form.content = q.content;
   form.correctOption = q.correctOption;
@@ -292,14 +231,12 @@ const openEdit = (q: QuestionResponse) => {
   optionInputs.B = q.options?.B ?? '';
   optionInputs.C = q.options?.C ?? '';
   optionInputs.D = q.options?.D ?? '';
-  optionVideoSelections.A = q.explanationVideoMapping?.A ?? null;
-  optionVideoSelections.B = q.explanationVideoMapping?.B ?? null;
-  optionVideoSelections.C = q.explanationVideoMapping?.C ?? null;
-  optionVideoSelections.D = q.explanationVideoMapping?.D ?? null;
   showForm.value = true;
+  } catch { if (owner === editSequence) show('题目详情加载失败，请重试', 'error'); }
 };
 
 const closeForm = () => {
+  ++editSequence;
   showForm.value = false;
   editing.value = null;
   resetForm();
@@ -361,11 +298,6 @@ const handleImageDrop = async (event: DragEvent) => {
 };
 
 const buildOptionsJson = () => JSON.stringify({ A: optionInputs.A, B: optionInputs.B, C: optionInputs.C, D: optionInputs.D });
-const buildExplanationVideoMappingJson = () => JSON.stringify(
-  Object.fromEntries(
-    optionKeys.map((key) => [key, optionVideoSelections[key]])
-  )
-);
 
 const submit = async () => {
   if (!form.content.trim()) { show('请填写题目内容', 'info'); return; }
@@ -380,7 +312,6 @@ const submit = async () => {
       correctOption: form.correctOption,
       explanation: form.explanation || undefined,
       difficulty: form.difficulty,
-      explanationVideoMapping: buildExplanationVideoMappingJson(),
       imageBase64: form.imageBase64 || undefined,
     };
     if (editing.value) {
@@ -415,30 +346,10 @@ const doDelete = async () => {
   }
 };
 
-const load = async () => {
-  loading.value = true;
-  videoLoading.value = true;
-  try {
-    const [questionList, videoList] = await Promise.all([
-      getAllQuestionsApi(),
-      getAllVideosApi(),
-    ]);
-    questions.value = questionList;
-    videos.value = videoList;
-  } catch (e: any) {
-    questions.value = [];
-    videos.value = [];
-    show(e?.response?.data?.message ?? '题目或视频列表加载失败', 'error');
-  } finally {
-    loading.value = false;
-    videoLoading.value = false;
-  }
-};
-
-onMounted(load);
 </script>
 
 <style scoped>
+.catalog-pager { display:flex; flex-wrap:wrap; align-items:center; justify-content:center; gap:12px; padding:18px; color:#64748b; font-size:12px; }
 .qm-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -544,9 +455,9 @@ onMounted(load);
   border-radius: 999px;
   border: 1px solid rgba(255,255,255,0.08);
 }
-.diff-easy { color: rgba(120,220,150,0.9); }
-.diff-mid { color: rgba(255,180,60,0.9); }
-.diff-hard { color: rgba(255,100,100,0.9); }
+.diff-easy { color: #15803d; }
+.diff-mid { color: #b45309; }
+.diff-hard { color: #b91c1c; }
 .qm-item-actions { margin-left: auto; display: flex; gap: 6px; }
 .icon-act {
   width: 28px;
@@ -581,21 +492,7 @@ onMounted(load);
   color: var(--text-muted);
   background: rgba(151,172,249,0.08);
 }
-.qm-opt-chip.correct { color: rgba(120,220,150,0.95); background: rgba(120,220,150,0.1); }
-.qm-video-map {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-  margin-top: 8px;
-}
-.qm-video-chip {
-  padding: 3px 8px;
-  border-radius: 999px;
-  font-size: 11px;
-  color: rgba(90,243,211,0.95);
-  background: rgba(90,243,211,0.1);
-}
-
+.qm-opt-chip.correct { color: #15803d; background: #ecfdf5; }
 .qm-form-panel {
   border: 1px solid rgba(151,172,249,0.15);
   border-radius: 14px;
@@ -627,7 +524,7 @@ onMounted(load);
 .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .half { min-width: 0; }
 .form-label { font-size: 12px; color: var(--text-muted); }
-.form-required { color: #ff6b91; }
+.form-required { color: #dc2626; }
 .form-textarea,
 .form-input,
 .opt-input {
@@ -644,8 +541,8 @@ onMounted(load);
   gap: 10px;
   padding: 14px;
   border-radius: 14px;
-  border: 1px dashed rgba(90,243,211,0.32);
-  background: linear-gradient(180deg, rgba(90,243,211,0.08), rgba(151,172,249,0.05));
+  border: 1px dashed rgba(15,118,110,0.35);
+  background: #f8fdfb;
   cursor: pointer;
 }
 .image-upload-box.uploading {
@@ -653,9 +550,9 @@ onMounted(load);
   pointer-events: none;
 }
 .image-upload-box.dragging {
-  border-color: rgba(90,243,211,0.7);
-  background: linear-gradient(180deg, rgba(90,243,211,0.16), rgba(151,172,249,0.08));
-  box-shadow: 0 0 0 3px rgba(90,243,211,0.12);
+  border-color: #0f766e;
+  background: #ecfdf5;
+  box-shadow: 0 0 0 3px rgba(15,118,110,0.12);
 }
 .image-file-input {
   display: none;
@@ -665,7 +562,7 @@ onMounted(load);
   gap: 4px;
 }
 .image-upload-copy strong {
-  color: #d9fff4;
+  color: #0f766e;
   font-size: 13px;
 }
 .image-upload-copy span {
@@ -702,19 +599,10 @@ onMounted(load);
 .image-remove-btn {
   padding: 8px 12px;
   border-radius: 10px;
-  border: 1px solid rgba(255,107,145,0.35);
-  background: rgba(255,107,145,0.12);
-  color: #ff9ab4;
+  border: 1px solid #fecaca;
+  background: #fef2f2;
+  color: #b91c1c;
   cursor: pointer;
-}
-.opt-video-proxy {
-  cursor: pointer;
-}
-.opt-video-proxy.is-empty {
-  color: rgba(214,224,255,0.5);
-}
-.opt-video-proxy::placeholder {
-  color: rgba(214,224,255,0.5);
 }
 .form-textarea { resize: vertical; }
 .form-textarea:focus,
@@ -744,37 +632,12 @@ onMounted(load);
   gap: 6px;
   position: relative;
 }
-.opt-video-menu {
-  position: absolute;
-  top: calc(100% + 6px);
-  left: 0;
-  right: 0;
-  z-index: 20;
-  max-height: 220px;
-  overflow-y: auto;
-  border-radius: 10px;
-  border: 1px solid rgba(151,172,249,0.16);
-  background: var(--select-option-bg);
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.28);
-}
-.opt-video-menu-item {
-  width: 100%;
-  padding: 10px 12px;
-  border: 0;
-  background: transparent;
-  color: var(--select-option-text);
-  text-align: left;
-  cursor: pointer;
-}
-.opt-video-menu-item:hover {
-  background: rgba(151,172,249,0.12);
-}
 .field-tip {
   padding: 8px 12px;
   border-radius: 10px;
-  border: 1px solid rgba(151,172,249,0.12);
-  background: linear-gradient(180deg, rgba(151,172,249,0.08), rgba(151,172,249,0.04));
-  color: rgba(214,224,255,0.72);
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  color: #475569;
   font-size: 12px;
   line-height: 1.5;
 }
@@ -788,26 +651,11 @@ onMounted(load);
   cursor: pointer;
 }
 .opt-key-btn.correct,
-.opt-row.correct .opt-input,
-.opt-row.correct .opt-video-proxy {
+ .opt-row.correct .opt-input {
   border-color: rgba(120,220,150,0.35);
 }
-.opt-correct-mark { color: rgba(120,220,150,0.95); font-weight: 700; }
+.opt-correct-mark { color: #15803d; font-weight: 700; }
 .form-hint { font-size: 11px; color: var(--text-muted); opacity: 0.7; }
-.video-summary {
-  min-height: 42px;
-  display: flex;
-  align-items: center;
-  padding: 0 12px;
-  border-radius: 10px;
-  border: 1px dashed rgba(151,172,249,0.2);
-  background: rgba(255,255,255,0.03);
-  color: var(--text-muted);
-  font-size: 12px;
-}
-.video-summary.loading {
-  opacity: 0.75;
-}
 .diff-picker { display: flex; gap: 6px; flex-wrap: wrap; }
 .diff-pick-btn {
   width: 34px;
@@ -841,14 +689,14 @@ onMounted(load);
   cursor: pointer;
 }
 .cancel-btn {
-  border: 1px solid rgba(151,172,249,0.16);
-  background: rgba(255,255,255,0.03);
-  color: var(--text-muted);
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  color: #475569;
 }
 .submit-btn {
-  border: 1px solid rgba(90,243,211,0.5);
-  background: linear-gradient(120deg, rgba(90,243,211,0.9), rgba(124,245,221,0.85));
-  color: #061016;
+  border: 1px solid #0f766e;
+  background: #0f766e;
+  color: #ffffff;
 }
 .submit-btn:disabled { opacity: 0.65; cursor: not-allowed; }
 
@@ -866,17 +714,17 @@ onMounted(load);
 .dialog {
   width: min(100%, 360px);
   border-radius: 14px;
-  border: 1px solid rgba(151,172,249,0.18);
-  background: linear-gradient(160deg, rgba(20,25,50,0.98), rgba(12,16,34,0.98));
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
   padding: 18px;
 }
-.dialog-title { font-size: 18px; font-weight: 700; color: var(--text-primary); }
-.dialog-body { margin-top: 10px; font-size: var(--font-size-sm); color: var(--text-muted); line-height: 1.7; }
+.dialog-title { font-size: 18px; font-weight: 700; color: #172033; }
+.dialog-body { margin-top: 10px; font-size: var(--font-size-sm); color: #64748b; line-height: 1.7; }
 .dialog-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }
 .danger-btn {
-  border: 1px solid rgba(255,107,145,0.45);
-  background: rgba(255,107,145,0.14);
-  color: #ff8fab;
+  border: 1px solid #fecaca;
+  background: #fef2f2;
+  color: #b91c1c;
 }
 
 .ai-mask { z-index: 140; }

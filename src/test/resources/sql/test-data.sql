@@ -7,10 +7,7 @@ DELETE FROM conversation_history;
 DELETE FROM teacher_events;
 DELETE FROM users;
 DELETE FROM questions;
-DELETE FROM videos;
-
 -- 重置自增序列（H2语法）
-ALTER TABLE videos ALTER COLUMN id RESTART WITH 1;
 ALTER TABLE questions ALTER COLUMN id RESTART WITH 1;
 ALTER TABLE users ALTER COLUMN id RESTART WITH 100;
 ALTER TABLE conversation_history ALTER COLUMN id RESTART WITH 1;
@@ -22,25 +19,8 @@ ALTER TABLE student_reports ALTER COLUMN id RESTART WITH 1;
 -- ====================================================================
 
 -- 1. 视频测试数据 (15条)
-INSERT INTO videos (id, title, url, knowledge_point, duration, description, question_id, created_at, updated_at) VALUES
-(1,  '抛体运动基础',                'https://example.com/video1.mp4',  '抛体运动', 320, '抛体运动的定义、分类及基本分析方法', 1,  CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()),
-(2,  '平抛运动的分解',              'https://example.com/video2.mp4',  '抛体运动', 300, '将平抛运动分解为水平匀速和竖直自由落体', 2, CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()),
-(3,  '斜面约束下的抛体运动',        'https://example.com/video3.mp4',  '斜面约束', 340, '物体在斜面上方抛出，受到斜面几何约束的运动特点', 3, CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()),
-(4,  '沿斜面方向的运动分解',        'https://example.com/video4.mp4',  '分解方法', 280, '将重力加速度沿斜面方向和垂直斜面方向分解', 4, CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()),
-(5,  '垂直斜面方向的运动分解',      'https://example.com/video5.mp4',  '分解方法', 290, '垂直斜面方向的运动独立分析，用于求最大距离', 5, CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()),
-(6,  '位移偏角与速度偏角的关系',    'https://example.com/video6.mp4',  '抛体运动', 310, '平抛运动中位移与速度方向角的关系推导', NULL, CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()),
-(7,  '斜面上平抛运动的时间计算',    'https://example.com/video7.mp4',  '斜面约束', 330, '利用位移分解求物体落在斜面上的时间', NULL, CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()),
-(8,  '斜面上平抛运动的最大距离',    'https://example.com/video8.mp4',  '斜面约束', 350, '垂直斜面方向运动分析求离开斜面的最远距离', NULL, CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()),
-(9,  '斜面抛体运动的综合应用',      'https://example.com/video9.mp4',  '综合问题', 360, '结合斜面约束的复杂抛体问题解题策略', NULL, CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()),
-(10, '类平抛运动与斜面',            'https://example.com/video10.mp4', '抛体运动', 300, '在恒定合力下类似平抛的运动处理方法', NULL, CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()),
-(11, '利用分解法解决斜面问题',      'https://example.com/video11.mp4', '分解方法', 320, '通过合理分解将曲线运动转化为直线运动', NULL, CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()),
-(12, '抛体运动实验演示',            'https://example.com/video12.mp4', '实验', 280, '实际抛体运动实验录像与数据分析', NULL, CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()),
-(13, '斜面约束的数学表达',          'https://example.com/video13.mp4', '数学工具', 260, '用几何和代数描述斜面约束条件', NULL, CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()),
-(14, '抛体运动在生活中的应用',      'https://example.com/video14.mp4', '应用', 290, '体育、工程中的抛体运动实例', NULL, CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()),
-(15, '抛体运动复习专题',            'https://example.com/video15.mp4', '复习', 400, '抛体运动知识点梳理与典型例题', NULL, CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP());
-
 -- 2. 题目测试数据 (5 条)
-INSERT INTO questions (id, content, content_hash, options, correct_option, explanation, difficulty, explanation_video_mapping, image_base64, created_at, updated_at) VALUES
+INSERT INTO questions (id, content, content_hash, options, correct_option, explanation, difficulty, image_base64, created_at, updated_at) VALUES
 (1, '在倾角为$\\theta$的斜面上，将一小球以水平初速度$v_0$抛出，小球最终落在斜面上。忽略空气阻力，则小球从抛出到落在斜面上的时间$t$为？',
     'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
     '{"A": "$t=\\frac{2v_0\\tan\\theta}{g}$", "B": "$t=\\frac{v_0\\tan\\theta}{g}$", "C": "$t=\\frac{2v_0}{g\\tan\\theta}$", "D": "$t=\\frac{v_0}{g\\tan\\theta}$"}',
@@ -90,46 +70,37 @@ INSERT INTO users (id, username, password_hash, user_type, real_name, class_name
 (114, 'researcher001', '$2a$10$ibH4m19t8jF/i2o9NRKLye6.HyN5GzZMlYqDDzxE/EaYN02yh3RKm', 'TEACHER', '科研人员', '研究组', TRUE, NULL, CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP());
 
 -- 4. 答题记录测试数据 (30条)
-INSERT INTO answer_records (id, user_id, question_id, session_id, selected_option, correct, error_reason, answered_at, created_at, updated_at) VALUES
-('rec_100_1', 100, 1, 'session_test', 'A', TRUE, NULL, DATEADD('DAY', -1, CURRENT_TIMESTAMP()), CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()),
-('rec_100_2', 100, 2, 'session_test', 'B', FALSE, '将加速度误认为g，忽略了sinθ因子', DATEADD('DAY', -1, CURRENT_TIMESTAMP()), CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()),
-('rec_100_3', 100, 3, 'session_test', 'A', TRUE, NULL, DATEADD('DAY', -1, CURRENT_TIMESTAMP()), CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()),
-
-('rec_101_1', 101, 1, 'session_test', 'A', TRUE, NULL, DATEADD('DAY', -2, CURRENT_TIMESTAMP()), CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()),
-('rec_101_2', 101, 2, 'session_test', 'A', TRUE, NULL, DATEADD('DAY', -2, CURRENT_TIMESTAMP()), CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()),
-('rec_101_3', 101, 4, 'session_test', 'C', FALSE, '混淆了垂直斜面和平行斜面的分解', DATEADD('DAY', -2, CURRENT_TIMESTAMP()), CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()),
-
-('rec_102_1', 102, 1, 'session_test', 'C', FALSE, '时间公式记反，应为2v₀tanθ/g', DATEADD('DAY', -3, CURRENT_TIMESTAMP()), CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()),
-('rec_102_2', 102, 3, 'session_test', 'A', TRUE, NULL, DATEADD('DAY', -3, CURRENT_TIMESTAMP()), CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()),
-('rec_102_3', 102, 5, 'session_test', 'B', TRUE, NULL, DATEADD('DAY', -3, CURRENT_TIMESTAMP()), CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()),
-
-('rec_103_1', 103, 2, 'session_test', 'A', TRUE, NULL, DATEADD('DAY', -4, CURRENT_TIMESTAMP()), CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()),
-('rec_103_2', 103, 4, 'session_test', 'A', TRUE, NULL, DATEADD('DAY', -4, CURRENT_TIMESTAMP()), CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()),
-('rec_103_3', 103, 5, 'session_test', 'D', FALSE, '未正确分解速度到垂直斜面方向', DATEADD('DAY', -4, CURRENT_TIMESTAMP()), CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()),
-
-('rec_104_1', 104, 1, 'session_test', 'A', TRUE, NULL, DATEADD('DAY', -5, CURRENT_TIMESTAMP()), CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()),
-('rec_104_2', 104, 3, 'session_test', 'B', FALSE, '误认为tanα=tanθ', DATEADD('DAY', -5, CURRENT_TIMESTAMP()), CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()),
-('rec_104_3', 104, 4, 'session_test', 'A', TRUE, NULL, DATEADD('DAY', -5, CURRENT_TIMESTAMP()), CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()),
-
-('rec_105_1', 105, 2, 'session_test', 'C', FALSE, '错用cosθ代替sinθ', DATEADD('DAY', -6, CURRENT_TIMESTAMP()), CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()),
-('rec_105_2', 105, 3, 'session_test', 'A', TRUE, NULL, DATEADD('DAY', -6, CURRENT_TIMESTAMP()), CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()),
-('rec_105_3', 105, 5, 'session_test', 'B', TRUE, NULL, DATEADD('DAY', -6, CURRENT_TIMESTAMP()), CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()),
-
-('rec_106_1', 106, 1, 'session_test', 'A', TRUE, NULL, DATEADD('DAY', -7, CURRENT_TIMESTAMP()), CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()),
-('rec_106_2', 106, 4, 'session_test', 'A', TRUE, NULL, DATEADD('DAY', -7, CURRENT_TIMESTAMP()), CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()),
-('rec_106_3', 106, 5, 'session_test', 'A', FALSE, '误将最大距离公式记错', DATEADD('DAY', -7, CURRENT_TIMESTAMP()), CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()),
-
-('rec_107_1', 107, 2, 'session_test', 'A', TRUE, NULL, DATEADD('DAY', -8, CURRENT_TIMESTAMP()), CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()),
-('rec_107_2', 107, 3, 'session_test', 'A', TRUE, NULL, DATEADD('DAY', -8, CURRENT_TIMESTAMP()), CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()),
-('rec_107_3', 107, 4, 'session_test', 'D', FALSE, '垂直斜面方向加速度分析错误', DATEADD('DAY', -8, CURRENT_TIMESTAMP()), CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()),
-
-('rec_108_1', 108, 1, 'session_test', 'B', FALSE, '忘记乘以2', DATEADD('DAY', -9, CURRENT_TIMESTAMP()), CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()),
-('rec_108_2', 108, 2, 'session_test', 'A', TRUE, NULL, DATEADD('DAY', -9, CURRENT_TIMESTAMP()), CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()),
-('rec_108_3', 108, 5, 'session_test', 'B', TRUE, NULL, DATEADD('DAY', -9, CURRENT_TIMESTAMP()), CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()),
-
-('rec_109_1', 109, 3, 'session_test', 'A', TRUE, NULL, DATEADD('DAY', -10, CURRENT_TIMESTAMP()), CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()),
-('rec_109_2', 109, 4, 'session_test', 'C', FALSE, '将sinθ与cosθ位置颠倒', DATEADD('DAY', -10, CURRENT_TIMESTAMP()), CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()),
-('rec_109_3', 109, 5, 'session_test', 'B', TRUE, NULL, DATEADD('DAY', -10, CURRENT_TIMESTAMP()), CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP());
+INSERT INTO answer_records (id, user_id, question_id, session_id, selected_option, correct, answered_at, created_at, updated_at) VALUES
+('rec_100_1', 100, 1, 'session_test', 'A', TRUE, DATEADD('DAY', -1, CURRENT_TIMESTAMP()), CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()),
+('rec_100_2', 100, 2, 'session_test', 'B', FALSE, DATEADD('DAY', -1, CURRENT_TIMESTAMP()), CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()),
+('rec_100_3', 100, 3, 'session_test', 'A', TRUE, DATEADD('DAY', -1, CURRENT_TIMESTAMP()), CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()),
+('rec_101_1', 101, 1, 'session_test', 'A', TRUE, DATEADD('DAY', -2, CURRENT_TIMESTAMP()), CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()),
+('rec_101_2', 101, 2, 'session_test', 'A', TRUE, DATEADD('DAY', -2, CURRENT_TIMESTAMP()), CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()),
+('rec_101_3', 101, 4, 'session_test', 'C', FALSE, DATEADD('DAY', -2, CURRENT_TIMESTAMP()), CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()),
+('rec_102_1', 102, 1, 'session_test', 'C', FALSE, DATEADD('DAY', -3, CURRENT_TIMESTAMP()), CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()),
+('rec_102_2', 102, 3, 'session_test', 'A', TRUE, DATEADD('DAY', -3, CURRENT_TIMESTAMP()), CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()),
+('rec_102_3', 102, 5, 'session_test', 'B', TRUE, DATEADD('DAY', -3, CURRENT_TIMESTAMP()), CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()),
+('rec_103_1', 103, 2, 'session_test', 'A', TRUE, DATEADD('DAY', -4, CURRENT_TIMESTAMP()), CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()),
+('rec_103_2', 103, 4, 'session_test', 'A', TRUE, DATEADD('DAY', -4, CURRENT_TIMESTAMP()), CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()),
+('rec_103_3', 103, 5, 'session_test', 'D', FALSE, DATEADD('DAY', -4, CURRENT_TIMESTAMP()), CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()),
+('rec_104_1', 104, 1, 'session_test', 'A', TRUE, DATEADD('DAY', -5, CURRENT_TIMESTAMP()), CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()),
+('rec_104_2', 104, 3, 'session_test', 'B', FALSE, DATEADD('DAY', -5, CURRENT_TIMESTAMP()), CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()),
+('rec_104_3', 104, 4, 'session_test', 'A', TRUE, DATEADD('DAY', -5, CURRENT_TIMESTAMP()), CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()),
+('rec_105_1', 105, 2, 'session_test', 'C', FALSE, DATEADD('DAY', -6, CURRENT_TIMESTAMP()), CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()),
+('rec_105_2', 105, 3, 'session_test', 'A', TRUE, DATEADD('DAY', -6, CURRENT_TIMESTAMP()), CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()),
+('rec_105_3', 105, 5, 'session_test', 'B', TRUE, DATEADD('DAY', -6, CURRENT_TIMESTAMP()), CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()),
+('rec_106_1', 106, 1, 'session_test', 'A', TRUE, DATEADD('DAY', -7, CURRENT_TIMESTAMP()), CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()),
+('rec_106_2', 106, 4, 'session_test', 'A', TRUE, DATEADD('DAY', -7, CURRENT_TIMESTAMP()), CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()),
+('rec_106_3', 106, 5, 'session_test', 'A', FALSE, DATEADD('DAY', -7, CURRENT_TIMESTAMP()), CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()),
+('rec_107_1', 107, 2, 'session_test', 'A', TRUE, DATEADD('DAY', -8, CURRENT_TIMESTAMP()), CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()),
+('rec_107_2', 107, 3, 'session_test', 'A', TRUE, DATEADD('DAY', -8, CURRENT_TIMESTAMP()), CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()),
+('rec_107_3', 107, 4, 'session_test', 'D', FALSE, DATEADD('DAY', -8, CURRENT_TIMESTAMP()), CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()),
+('rec_108_1', 108, 1, 'session_test', 'B', FALSE, DATEADD('DAY', -9, CURRENT_TIMESTAMP()), CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()),
+('rec_108_2', 108, 2, 'session_test', 'A', TRUE, DATEADD('DAY', -9, CURRENT_TIMESTAMP()), CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()),
+('rec_108_3', 108, 5, 'session_test', 'B', TRUE, DATEADD('DAY', -9, CURRENT_TIMESTAMP()), CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()),
+('rec_109_1', 109, 3, 'session_test', 'A', TRUE, DATEADD('DAY', -10, CURRENT_TIMESTAMP()), CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()),
+('rec_109_2', 109, 4, 'session_test', 'C', FALSE, DATEADD('DAY', -10, CURRENT_TIMESTAMP()), CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()),
+('rec_109_3', 109, 5, 'session_test', 'B', TRUE, DATEADD('DAY', -10, CURRENT_TIMESTAMP()), CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP());
 
 -- 5. AI对话历史测试数据 (50条) - 使用静态数据替代存储过程
 INSERT INTO conversation_history (user_id, session_id, question, answer, sequence_number, is_active, token_count, conversation_type, question_id, created_at, updated_at) VALUES
@@ -190,31 +161,23 @@ INSERT INTO conversation_history (user_id, session_id, question, answer, sequenc
 (107, 'chat_session_003', '能推荐一些参考资料吗？', '优秀的科普作品同样能够启发思考，拓展视野增长见识。', 2, TRUE, 44, 'REAL_TIME_QA', NULL, DATEADD('DAY', -6, CURRENT_TIMESTAMP()), CURRENT_TIMESTAMP());
 
 -- 6. 教师事件测试数据 (5条)
-INSERT INTO teacher_events (teacher_id, teacher_name, event_title, event_description, event_timestamp, is_global, created_at, updated_at) VALUES
-(110, '李老师', '期中考试', '高三物理期中考试安排', DATEADD('DAY', -30, CURRENT_TIMESTAMP()), false, CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()),
-(111, '陈老师', '实验课程', '力学实验课程通知', DATEADD('DAY', -25, CURRENT_TIMESTAMP()), false, CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()),
-(112, '刘老师', '知识点复习', '电磁学重点知识梳理', DATEADD('DAY', -20, CURRENT_TIMESTAMP()), false, CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()),
-(113, '杨老师', '期末准备', '期末复习计划制定', DATEADD('DAY', -15, CURRENT_TIMESTAMP()), false, CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()),
-(114, '科研人员', '研究成果分享', '最新物理研究成果交流', DATEADD('DAY', -10, CURRENT_TIMESTAMP()), false, CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP());
+INSERT INTO teacher_events (teacher_id, teacher_name, event_title, event_description, event_timestamp, status, created_at, updated_at) VALUES
+(110, '李老师', '期中考试', '高三物理期中考试安排', DATEADD('DAY', -30, CURRENT_TIMESTAMP()), 'ARCHIVED', CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()),
+(111, '陈老师', '实验课程', '力学实验课程通知', DATEADD('DAY', -25, CURRENT_TIMESTAMP()), 'ARCHIVED', CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()),
+(112, '刘老师', '知识点复习', '电磁学重点知识梳理', DATEADD('DAY', -20, CURRENT_TIMESTAMP()), 'ARCHIVED', CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()),
+(113, '杨老师', '期末准备', '期末复习计划制定', DATEADD('DAY', -15, CURRENT_TIMESTAMP()), 'ARCHIVED', CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP()),
+(114, '科研人员', '研究成果分享', '最新物理研究成果交流', DATEADD('DAY', -10, CURRENT_TIMESTAMP()), 'ARCHIVED', CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP());
 
 -- 显示测试数据统计信息
 SELECT 'H2测试数据初始化完成' as message;
 SELECT 
-    (SELECT COUNT(*) FROM videos) as video_count,
-    (SELECT COUNT(*) FROM questions) as question_count,
+(SELECT COUNT(*) FROM questions) as question_count,
     (SELECT COUNT(*) FROM users) as user_count,
     (SELECT COUNT(*) FROM answer_records) as answer_record_count,
     (SELECT COUNT(*) FROM conversation_history) as conversation_count,
     (SELECT COUNT(*) FROM teacher_events) as teacher_event_count;
 
 SELECT user_type, COUNT(*) as count FROM users GROUP BY user_type;
-
--- 显示各视频关联的题目分布
-SELECT v.title, v.knowledge_point, 
-       CASE WHEN v.question_id IS NULL THEN '无关联题目' ELSE '有关联题目' END as question_status
-FROM videos v 
-GROUP BY v.title, v.knowledge_point, v.question_id
-ORDER BY v.title;
 
 -- 显示答题正确率统计
 SELECT 

@@ -51,6 +51,8 @@ import static org.mockito.Mockito.*;
  * 遵循Given-When-Then测试模式，使用Mockito进行依赖模拟
  */
 class AnswerRecordServiceUnitTest extends BaseUnitTest {
+    @Mock private com.zhixuewuli.service.teacherEvent.TaskRosterService roster;
+
 
         @Mock
         private AnswerRecordRepository answerRecordRepository;
@@ -71,6 +73,8 @@ class AnswerRecordServiceUnitTest extends BaseUnitTest {
     private com.zhixuewuli.repository.TeacherEventRepository teacherEventRepository;
 
     @Mock private com.fasterxml.jackson.databind.ObjectMapper snapshotJson;
+    @Mock private com.zhixuewuli.service.question.AnswerAccessPolicy answerAccess;
+    @Mock private com.zhixuewuli.service.question.QuestionImageStore questionImages;
     @InjectMocks
         private AnswerRecordServiceImpl answerRecordService;
 
@@ -104,7 +108,6 @@ class AnswerRecordServiceUnitTest extends BaseUnitTest {
                 AnswerRecordSubmitRequest request = new AnswerRecordSubmitRequest();
                 request.setQuestionId(questionId);
                 request.setUserAnswer("A");
-                request.setErrorReason("概念理解不够深入");
                 request.setAnsweredAt(LocalDateTime.now());
 
                 when(questionRepository.findById(questionId)).thenReturn(Optional.of(mockQuestion));
@@ -331,37 +334,20 @@ class AnswerRecordServiceUnitTest extends BaseUnitTest {
         @Test
         void deleteAnswerRecord_shouldDelete_whenTeacherAndRecordExists() {
                 // Given
-                doNothing().when(userPermissionUtil).checkTeacherPermission(userId);
                 when(answerRecordRepository.findById(recordId)).thenReturn(Optional.of(mockAnswerRecord));
 
                 // When
                 answerRecordService.deleteAnswerRecord(recordId, userId);
 
                 // Then
-                verify(userPermissionUtil).checkTeacherPermission(userId);
                 verify(answerRecordRepository).findById(recordId);
                 verify(answerRecordRepository).deleteById(recordId);
         }
 
-        @Test
-        void deleteAnswerRecord_shouldThrowInsufficientPermissionException_whenNotTeacher() {
-                // Given
-                doThrow(new InsufficientPermissionException(userId, "需要教师权限"))
-                                .when(userPermissionUtil).checkTeacherPermission(userId);
-
-                // When & Then
-                assertThatThrownBy(() -> answerRecordService.deleteAnswerRecord(recordId, userId))
-                                .isInstanceOf(InsufficientPermissionException.class);
-
-                verify(userPermissionUtil).checkTeacherPermission(userId);
-                verify(answerRecordRepository, never()).findById(any());
-                verify(answerRecordRepository, never()).deleteById(any());
-        }
 
         @Test
         void deleteAnswerRecord_shouldThrowAnswerRecordNotFoundException_whenRecordNotExists() {
                 // Given
-                doNothing().when(userPermissionUtil).checkTeacherPermission(userId);
                 when(answerRecordRepository.findById(recordId)).thenReturn(Optional.empty());
 
                 // When & Then
@@ -383,14 +369,12 @@ class AnswerRecordServiceUnitTest extends BaseUnitTest {
                 request.setStartTime(startTime);
                 request.setEndTime(endTime);
 
-                doNothing().when(userPermissionUtil).checkTeacherPermission(userId);
                 when(answerRecordRepository.deleteByTimeRange(startTime, endTime)).thenReturn(5);
 
                 // When
                 answerRecordService.batchDeleteByTimeRange(request, userId);
 
                 // Then
-                verify(userPermissionUtil).checkTeacherPermission(userId);
                 verify(answerRecordRepository).deleteByTimeRange(startTime, endTime);
         }
 
@@ -403,7 +387,6 @@ class AnswerRecordServiceUnitTest extends BaseUnitTest {
                 request.setStartTime(startTime);
                 request.setEndTime(endTime);
 
-                doNothing().when(userPermissionUtil).checkTeacherPermission(userId);
 
                 // When & Then
                 assertThatThrownBy(() -> answerRecordService.batchDeleteByTimeRange(request, userId))
@@ -419,7 +402,6 @@ class AnswerRecordServiceUnitTest extends BaseUnitTest {
         void countTotalAnswers_shouldReturnCount_whenTeacher() {
                 // Given
                 Long expectedCount = 150L;
-                doNothing().when(userPermissionUtil).checkTeacherPermission(userId);
                 when(answerRecordRepository.count()).thenReturn(expectedCount);
 
                 // When
@@ -427,7 +409,6 @@ class AnswerRecordServiceUnitTest extends BaseUnitTest {
 
                 // Then
                 assertThat(result).isEqualTo(expectedCount);
-                verify(userPermissionUtil).checkTeacherPermission(userId);
                 verify(answerRecordRepository).count();
         }
 
@@ -440,7 +421,6 @@ class AnswerRecordServiceUnitTest extends BaseUnitTest {
                                 TestDataFactory.createAnswerRecord(1001L, questionId),
                                 TestDataFactory.createAnswerRecord(1002L, questionId + 1));
 
-                doNothing().when(userPermissionUtil).checkTeacherPermission(userId);
                 when(answerRecordRepository.findAll()).thenReturn(allRecords);
                 when(questionRepository.findById(any())).thenReturn(Optional.of(mockQuestion));
                 when(questionResponseConverter.convertToFullResponseDTO(any(), any()))
@@ -452,7 +432,6 @@ class AnswerRecordServiceUnitTest extends BaseUnitTest {
                 // Then
                 assertThat(result).isNotNull();
                 assertThat(result.getTotalCount()).isEqualTo(2L);
-                verify(userPermissionUtil).checkTeacherPermission(userId);
                 verify(answerRecordRepository).findAll();
         }
 
@@ -476,7 +455,7 @@ class AnswerRecordServiceUnitTest extends BaseUnitTest {
                 // Then
                 assertThat(result).isNotNull();
                 assertThat(result.getTotalCount()).isEqualTo(1L);
-                verify(answerRecordRepository, times(2)).findBySessionIdAndUserId(sessionId, userId);
+                verify(answerRecordRepository).findBySessionIdAndUserId(sessionId, userId);
         }
 
         @Test
@@ -525,12 +504,12 @@ class AnswerRecordServiceUnitTest extends BaseUnitTest {
                 // Given
                 Long studentId = 2001L;
                 String latestSessionId = "latest-session-456";
+                mockUser.setId(studentId);
                 List<AnswerRecord> latestRecords = List.of(
                                 TestDataFactory.createAnswerRecord(studentId, questionId));
 
-                doNothing().when(userPermissionUtil).checkTeacherPermission(userId);
                 when(userRepository.findById(studentId)).thenReturn(Optional.of(mockUser));
-                when(answerRecordRepository.findDistinctSessionIdsByUserId(studentId))
+                when(answerRecordRepository.findLatestSessionIdsByUserId(eq(studentId), any()))
                                 .thenReturn(List.of(latestSessionId));
                 when(answerRecordRepository.findBySessionIdAndUserId(latestSessionId, studentId))
                                 .thenReturn(latestRecords);
@@ -545,16 +524,14 @@ class AnswerRecordServiceUnitTest extends BaseUnitTest {
                 // Then
                 assertThat(result).isNotNull();
                 assertThat(result.getTotalCount()).isEqualTo(1L);
-                verify(userPermissionUtil).checkTeacherPermission(userId);
                 verify(userRepository).findById(studentId);
-                verify(answerRecordRepository).findDistinctSessionIdsByUserId(studentId);
+                verify(answerRecordRepository).findLatestSessionIdsByUserId(eq(studentId), any());
         }
 
         @Test
         void getStudentLatestSessionRecords_shouldThrowUserNotFoundException_whenStudentNotExists() {
                 // Given
                 Long studentId = 9999L;
-                doNothing().when(userPermissionUtil).checkTeacherPermission(userId);
                 when(userRepository.findById(studentId)).thenReturn(Optional.empty());
 
                 // When & Then
@@ -563,16 +540,16 @@ class AnswerRecordServiceUnitTest extends BaseUnitTest {
                                 .hasMessage("学生不存在");
 
                 verify(userRepository).findById(studentId);
-                verify(answerRecordRepository, never()).findDistinctSessionIdsByUserId(any());
+                verify(answerRecordRepository, never()).findLatestSessionIdsByUserId(any(), any());
         }
 
         @Test
         void getStudentLatestSessionRecords_shouldReturnEmpty_whenStudentHasNoSessions() {
                 // Given
                 Long studentId = 3001L;
-                doNothing().when(userPermissionUtil).checkTeacherPermission(userId);
+                mockUser.setId(studentId);
                 when(userRepository.findById(studentId)).thenReturn(Optional.of(mockUser));
-                when(answerRecordRepository.findDistinctSessionIdsByUserId(studentId)).thenReturn(List.of());
+                when(answerRecordRepository.findLatestSessionIdsByUserId(eq(studentId), any())).thenReturn(List.of());
 
                 // When
                 AnswerRecordBatchResponse result = answerRecordService.getStudentLatestSessionRecords(studentId, userId);
@@ -598,9 +575,8 @@ class AnswerRecordServiceUnitTest extends BaseUnitTest {
                 mockUser.setId(studentId);
                 mockUser.setRealName(studentName);
 
-                doNothing().when(userPermissionUtil).checkTeacherPermission(userId);
                 when(userRepository.findByRealName(studentName)).thenReturn(Optional.of(mockUser));
-                when(answerRecordRepository.findDistinctSessionIdsByUserId(studentId))
+                when(answerRecordRepository.findLatestSessionIdsByUserId(eq(studentId), any()))
                                 .thenReturn(List.of(latestSessionId));
                 when(answerRecordRepository.findBySessionIdAndUserId(latestSessionId, studentId))
                                 .thenReturn(latestRecords);
@@ -615,7 +591,6 @@ class AnswerRecordServiceUnitTest extends BaseUnitTest {
                 // Then
                 assertThat(result).isNotNull();
                 assertThat(result.getTotalCount()).isEqualTo(1L);
-                verify(userPermissionUtil).checkTeacherPermission(userId);
                 verify(userRepository).findByRealName(studentName);
         }
 
@@ -623,7 +598,6 @@ class AnswerRecordServiceUnitTest extends BaseUnitTest {
         void getStudentLatestSessionRecordsByName_shouldThrowUserNotFoundException_whenStudentNotExists() {
                 // Given
                 String studentName = "不存在的学生";
-                doNothing().when(userPermissionUtil).checkTeacherPermission(userId);
                 when(userRepository.findByRealName(studentName)).thenReturn(Optional.empty());
 
                 // When & Then
@@ -632,7 +606,7 @@ class AnswerRecordServiceUnitTest extends BaseUnitTest {
                                 .hasMessage("学生不存在");
 
                 verify(userRepository).findByRealName(studentName);
-                verify(answerRecordRepository, never()).findDistinctSessionIdsByUserId(any());
+                verify(answerRecordRepository, never()).findLatestSessionIdsByUserId(any(), any());
         }
 
         // ==================== getAnswerStats 测试 ====================
@@ -644,9 +618,8 @@ class AnswerRecordServiceUnitTest extends BaseUnitTest {
                 long totalCount = 50L;
                 double expectedRate = 90.0;
 
-                doNothing().when(userPermissionUtil).checkTeacherPermission(userId);
-                when(answerRecordRepository.countDistinctUserIds()).thenReturn(answeredCount);
-                when(userRepository.countByUserType(User.UserType.STUDENT)).thenReturn(totalCount);
+                when(answerRecordRepository.countDistinctActiveStudentIds()).thenReturn(answeredCount);
+                when(userRepository.countByUserTypeAndActiveTrue(User.UserType.STUDENT)).thenReturn(totalCount);
 
                 // When
                 AnswerStatsResponse result = answerRecordService.getAnswerStats(userId);
@@ -657,9 +630,8 @@ class AnswerRecordServiceUnitTest extends BaseUnitTest {
                 assertThat(result.getTotalStudentCount()).isEqualTo(totalCount);
                 assertThat(result.getCoverageRate()).isEqualTo(expectedRate);
 
-                verify(userPermissionUtil).checkTeacherPermission(userId);
-                verify(answerRecordRepository).countDistinctUserIds();
-                verify(userRepository).countByUserType(User.UserType.STUDENT);
+                verify(answerRecordRepository).countDistinctActiveStudentIds();
+                verify(userRepository).countByUserTypeAndActiveTrue(User.UserType.STUDENT);
         }
 
         @Test
@@ -668,9 +640,8 @@ class AnswerRecordServiceUnitTest extends BaseUnitTest {
                 long answeredCount = 0L;
                 long totalCount = 0L;
 
-                doNothing().when(userPermissionUtil).checkTeacherPermission(userId);
-                when(answerRecordRepository.countDistinctUserIds()).thenReturn(answeredCount);
-                when(userRepository.countByUserType(User.UserType.STUDENT)).thenReturn(totalCount);
+                when(answerRecordRepository.countDistinctActiveStudentIds()).thenReturn(answeredCount);
+                when(userRepository.countByUserTypeAndActiveTrue(User.UserType.STUDENT)).thenReturn(totalCount);
 
                 // When
                 AnswerStatsResponse result = answerRecordService.getAnswerStats(userId);
@@ -688,9 +659,8 @@ class AnswerRecordServiceUnitTest extends BaseUnitTest {
                 long answeredCount = 0L;
                 long totalCount = 30L;
 
-                doNothing().when(userPermissionUtil).checkTeacherPermission(userId);
-                when(answerRecordRepository.countDistinctUserIds()).thenReturn(answeredCount);
-                when(userRepository.countByUserType(User.UserType.STUDENT)).thenReturn(totalCount);
+                when(answerRecordRepository.countDistinctActiveStudentIds()).thenReturn(answeredCount);
+                when(userRepository.countByUserTypeAndActiveTrue(User.UserType.STUDENT)).thenReturn(totalCount);
 
                 // When
                 AnswerStatsResponse result = answerRecordService.getAnswerStats(userId);
@@ -702,18 +672,4 @@ class AnswerRecordServiceUnitTest extends BaseUnitTest {
                 assertThat(result.getCoverageRate()).isEqualTo(0.0);
         }
 
-        @Test
-        void getAnswerStats_shouldThrowInsufficientPermissionException_whenNotTeacher() {
-                // Given
-                doThrow(new InsufficientPermissionException(userId, "需要教师权限"))
-                                .when(userPermissionUtil).checkTeacherPermission(userId);
-
-                // When & Then
-                assertThatThrownBy(() -> answerRecordService.getAnswerStats(userId))
-                                .isInstanceOf(InsufficientPermissionException.class);
-
-                verify(userPermissionUtil).checkTeacherPermission(userId);
-                verify(answerRecordRepository, never()).countDistinctUserIds();
-                verify(userRepository, never()).countByUserType(any());
-        }
 }

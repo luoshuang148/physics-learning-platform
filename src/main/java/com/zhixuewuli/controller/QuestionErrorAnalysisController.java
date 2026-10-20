@@ -1,7 +1,9 @@
 package com.zhixuewuli.controller;
 
+import com.zhixuewuli.common.security.TeacherOnly;
+import com.zhixuewuli.common.security.AuthenticatedUser;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import com.zhixuewuli.common.result.Result;
-import com.zhixuewuli.common.util.UserPermissionUtil;
 import com.zhixuewuli.dto.request.AIAskRequest;
 import com.zhixuewuli.dto.response.QuestionErrorDetailsResponse;
 import com.zhixuewuli.dto.response.QuestionErrorSummaryResponse;
@@ -36,7 +38,7 @@ import java.util.List;
  * <ul>
  * <li>GET /api/question-error-analysis/statistics - 获取题目错误统计</li>
  * <li>GET /api/question-error-analysis/{questionId}/details -
- * 获取题目学生错误详情（含词云）</li>
+ * 获取题目学生错误详情</li>
  * <li>POST /api/question-error-analysis/stream - 教师题目分析流式生成（纯 AI 分析）</li>
  * </ul>
  * 
@@ -63,7 +65,6 @@ public class QuestionErrorAnalysisController {
 
         private final QuestionErrorAnalysisService questionErrorAnalysisService;
         private final AliyunAIReportService aliyunAIReportService;
-        private final UserPermissionUtil userPermissionUtil;
         private final QuestionRepository questionRepository;
 
         /**
@@ -108,8 +109,10 @@ public class QuestionErrorAnalysisController {
                 @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "403", description = "权限不足（非教师身份）")
             }
         )
+        @TeacherOnly
         public Result<List<QuestionErrorSummaryResponse>> getQuestionErrorStatistics(
-                        @io.swagger.v3.oas.annotations.Parameter(description = "教师 ID（从请求属性中自动提取）", required = true) @RequestAttribute("userId") Long teacherId) {
+                        @AuthenticationPrincipal AuthenticatedUser user) {
+                Long teacherId = user.id();
 
                 log.info("收到题目错误统计查询请求 - TeacherId: {}", teacherId);
 
@@ -123,7 +126,7 @@ public class QuestionErrorAnalysisController {
         @GetMapping("/{questionId}/details")
         @Operation(
             summary = "获取题目错误详情",
-            description = "返回指定题目的学生错误列表和词云数据（单次查询优化）",
+            description = "返回指定题目的学生错误列表（单次查询优化）",
             responses = {
                 @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "查询成功"),
                 @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "未认证"),
@@ -131,9 +134,11 @@ public class QuestionErrorAnalysisController {
                 @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "题目不存在")
             }
         )
+        @TeacherOnly
         public Result<QuestionErrorDetailsResponse> getQuestionErrorDetails(
                         @io.swagger.v3.oas.annotations.Parameter(description = "题目 ID", required = true) @PathVariable Long questionId,
-                        @io.swagger.v3.oas.annotations.Parameter(description = "教师 ID（从请求属性中自动提取）", required = true) @RequestAttribute("userId") Long teacherId) {
+                        @AuthenticationPrincipal AuthenticatedUser user) {
+                Long teacherId = user.id();
 
                 log.info("获取题目错误详情 - TeacherId: {}, QuestionId: {}", teacherId, questionId);
 
@@ -156,28 +161,25 @@ public class QuestionErrorAnalysisController {
                 @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "题目不存在")
             }
         )
+        @TeacherOnly
         public SseEmitter streamTeacherQuestionAnalysis(
                         @io.swagger.v3.oas.annotations.Parameter(description = "AI 问答请求参数（需包含题目 ID）", required = true) @Valid @RequestBody AIAskRequest request,
-                        HttpServletRequest httpRequest) {
+                        @AuthenticationPrincipal AuthenticatedUser user, HttpServletRequest httpRequest) {
                 // 1. 参数验证：由@Valid 注解自动完成，失败时 Spring 抛出 MethodArgumentNotValidException
                 // 全局异常处理器会捕获并返回 400 错误，不建立 SSE 连接
 
-                // 2. 从请求属性获取教师 ID 和会话 ID（由拦截器设置）
-                Long teacherId = (Long) httpRequest.getAttribute("userId");
+                // 2. 教师身份已由 @TeacherOnly 校验；会话 ID 由 SessionIdInterceptor 设置
+                Long teacherId = user.id();
                 String sessionId = (String) httpRequest.getAttribute("sessionId");
 
-                // 3. 控制器层权限验证前置（快速失败）
-                // 验证失败直接抛出异常，不创建 emitter，避免无效连接开销
-                userPermissionUtil.checkTeacherPermission(teacherId);
-
-                // ✅ 4. 新增：题目存在性验证（教师题目分析专属）
+                // 3. 题目存在性验证，失败时不创建 emitter
                 questionRepository.findById(request.getQuestionId())
                         .orElseThrow(() -> new com.zhixuewuli.common.exception.question.QuestionNotFoundException(request.getQuestionId()));
 
-                // 5. 创建 emitter（到这里说明所有验证通过）
+                // 4. 创建 emitter（到这里说明所有验证通过）
                 SseEmitter emitter = aliyunAIReportService.createConfiguredEmitter();
 
-                // 6. 调用服务（已移除初始化数据发送）
+                // 5. 调用服务（已移除初始化数据发送）
                 questionErrorAnalysisService.streamTeacherQuestionAnalysis(request, emitter, teacherId, sessionId);
 
                 return emitter;

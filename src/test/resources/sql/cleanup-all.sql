@@ -8,18 +8,17 @@ SET MODE MySQL;
 SET REFERENTIAL_INTEGRITY FALSE;
 
 -- 清理所有表的数据（按依赖关系倒序）
+DELETE FROM task_recipients;
 DELETE FROM teacher_event_questions;
 DELETE FROM student_reports;
 DELETE FROM teacher_events;
 DELETE FROM conversation_history;
 DELETE FROM answer_records;
 DELETE FROM questions;
-DELETE FROM videos;
 DELETE FROM users;
 
 -- 重置所有表的自增序列
 ALTER TABLE users ALTER COLUMN id RESTART WITH 1;
-ALTER TABLE videos ALTER COLUMN id RESTART WITH 1;
 ALTER TABLE questions ALTER COLUMN id RESTART WITH 1;
 ALTER TABLE conversation_history ALTER COLUMN id RESTART WITH 1;
 ALTER TABLE teacher_events ALTER COLUMN id RESTART WITH 1;

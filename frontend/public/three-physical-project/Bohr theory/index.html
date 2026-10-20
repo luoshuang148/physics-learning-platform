@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <title>波尔能级跃迁 - 3D模拟实验</title>
+    <link rel="stylesheet" href="../Shared/color.css">
+    <link rel="stylesheet" href="../Shared/theme.css">
+    <link rel="stylesheet" href="../Shared/style.css">
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+</head>
+
+<body>
+    <canvas id="c"></canvas>
+
+    <!-- 左半边 -->
+    <div id="left-sidebar">
+        <div id="ui-panel" class="panel">
+            <details open>
+                <summary style="color: var(--theme-primary); font-weight: bold;">⚡ 量子控制台</summary>
+                <div class="panel-content">
+                    <div class="control-group" style="border-top: none;">
+                        <button id="btn-n1">跃迁至 基态 (n=1)</button>
+                        <button id="btn-n2">跃迁至 激发态 (n=2)</button>
+                        <button id="btn-n3">跃迁至 激发态 (n=3)</button>
+                        <button id="btn-inf" class="btn-danger" style="margin-top: 10px;">🔥
+                            极限：电离
+                            (n=∞)</button>
+                        <button id="btn-reset" style="margin-top: 10px; display: none;">
+                            🔄 捕获新电子 (重置实验)
+                        </button>
+                    </div>
+
+                    <hr class="divider">
+
+                    <p class="section-title" style="color: var(--theme-secondary);">🔫 能量大炮 (测试量子化)：</p>
+
+                    <div class="projectile-toggle">
+                        <input type="radio" id="proj-photon" name="projectile" value="photon" checked>
+                        <label for="proj-photon" id="label-photon">〰️ 光子</label>
+
+                        <input type="radio" id="proj-electron" name="projectile" value="electron">
+                        <label for="proj-electron" id="label-electron">⚪ 电子</label>
+                    </div>
+
+                    <div class="input-group">
+                        <input type="number" id="energy-input" step="0.1" value="10.2">
+                        <span>eV</span>
+                    </div>
+                    <button id="btn-fire" class="btn-danger">发射光子/电子轰击</button>
+                </div>
+            </details>
+        </div>
+
+        <div id="log-panel" class="panel">
+            <details open>
+                <summary>📝 实验操作记录</summary>
+                <div class="panel-content log-content" id="log-container">
+                </div>
+            </details>
+        </div>
+    </div>
+
+    <div id="data-panel" class="panel">
+        <details open>
+            <summary>📊 实时物理数据</summary>
+            <div class="panel-content">
+                <p>主量子数 (n): <strong id="data-n">1</strong></p>
+                <p>系统能量 (E): <strong id="data-e">-13.60 eV</strong></p>
+                <p>光子波长 (λ): <strong id="data-lambda">-- nm</strong></p>
+            </div>
+        </details>
+    </div>
+
+    <!-- 正上方 -->
+    <div id="ai-panel" class="panel">
+        <details open>
+            <summary><span class="ai-icon">🤖</span>
+                <primary>AI 实验助教</primary>
+            </summary>
+            <p id="ai-text">你好！欢迎来到微观世界。目前电子处于基态（n=1），非常稳定。请点击左侧按钮或使用能量大炮尝试激发它。</p>
+        </details>
+    </div>
+
+    <!-- 右半边 -->
+    <div id="right-sidebar">
+        <div id="energy-diagram-panel" class="panel">
+            <details open>
+                <summary>📉 经典能级图</summary>
+                <div class="panel-content" style="text-align: center; padding-bottom: 5px;">
+                    <canvas id="energy-canvas" width="220" height="280"></canvas>
+                </div>
+            </details>
+        </div>
+    </div>
+
+
+
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+            "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+        }
+    }
+    </script>
+
+    <script type="module" src="main.js"></script>
+</body>
+
+</html>
