@@ -1,42 +1,164 @@
-# Physics Learning Platform
+<div align="center">
 
-面向单学校多班级的物理教学学习平台，包含学生答题、错题整理、教师任务管理、AI 流式辅导和学情报告。后端采用 Java 21 / Spring Boot 3.3.8 / Spring Data JPA / MySQL，前端采用 Vue 3 / TypeScript / Vite。
+# 智学物理 · Physics Learning Platform
 
-项目适合作为后端实习作品展示：重点是权限边界、会话隔离、流式请求资源管理、数据库查询和数据生命周期。它是单体教学项目，目前没有生产流量或分布式部署的性能证明。
+**面向中学物理教学的开源学习平台**
 
-## 已实现
+学生答题与错题本 · 教师任务与学情分析 · AI 流式辅导 · 多班级协作
 
-- 学生注册、JWT 登录、BCrypt 密码校验、登录限流；登录只接受唯一用户名，真实姓名不再作为登录凭证；退出或改密即时撤销已有令牌；公开注册仅允许学生，教师由运营初始化或通过受保护的管理 API 授权。
-- 教师管理题目并发布纯题目任务，填写任务名后从题库选择题目；结束任务会归档，保留答题、对话和报告。任务报告按任务 ID 取数，任务切换会取消旧流并忽略晚到响应。
-- 支持多班级与班级协作教师：学生归属一个主班，教师可加入多个班级；任务发布时绑定班级并只向该班学生发放。任务状态为草稿/已发布/已截止/已归档，并支持开始与截止时间；任务发布保存有序题目快照。
-- 作答绑定任务、题目与幂等请求 ID，重试不会重复记分；原始成绩与补练分开，错题本按最后一次尝试显示掌握状态。题库改动不影响新保存的历史内容，历史图片按内容哈希共享、不随题库修改。
-- 教师答题记录和学生的历史/错题列表使用数据库分页，列表投影不传输图片和完整解析，详情按记录权限加载；最近会话按真实作答时间与 `attemptOrder` 选取。
-- 任务进度按持久化应参与名单统计，发布后新加入学生只参加尚未截止的作业，停用账号保留历史成绩；答案开放规则集中判断，未开放及开放中任务的首次作答不能通过补练绕过；任务首次提交使用共享行锁，归档/替换保持排他锁。
-- 学生端保留独立的 3D 实验入口，可自由切换原子物理和宇宙航天实验，不绑定教师任务，也不包含过渡视频。
-- 使用 OkHttp 对接兼容 OpenAI 格式的模型接口，通过 Spring MVC `SseEmitter` 向浏览器推送内容。
-- 对话缓存按用户、任务和业务类型隔离，只恢复最近的有界窗口，通过数据库聚合保留累计 token 与序号；持久化失败明确反馈。
-- AI 输出统一净化 HTML 并保留数学公式；移除调试账户入口和二级令牌缓存。报告使用匿名标签、题目快照及服务端统计，记录模型、生成时间与输入摘要。
-- 题库管理及任务选题使用服务端分页、搜索和无图片正文的列表投影；编辑时再读详情，跨页选题保持顺序。
-- 作业复盘按用户、任务和作答版本恢复已保存报告；新增作答或补练使旧版本失效。AI 状态区分配置与最近实际调用，不为页面检查额外请求模型。
-- 教师总览使用数据库聚合；公开健康检查不含细节，运行指标仅教师可访问。
-- 批量学生报告使用 RabbitMQ 异步生成：创建批次与发件箱记录在同一事务提交；发布确认后标记投递，消费端手动确认，子任务认领使用条件更新加租约，数据库唯一约束与执行者校验共同保证幂等，旧执行者不能覆盖新状态；自动重试按延迟退避调度，重试耗尽进入死信队列并支持教师手动重试，无作答学生直接跳过不调用模型。 已发布未认领任务可恢复，投递耗尽可手动重试；教师可为同一作业显式生成新批次，查询按当前班级权限与作业范围过滤。
-- SSE 请求独立取消：断开或超时会取消上游 HTTP 调用；同一会话只允许一个活动请求，并限制全局、用户连接数及执行队列。
-- Maven Wrapper、JUnit、Testcontainers（Redis/RabbitMQ）、Playwright 与 GitHub Actions 覆盖后端、前端、批量报告消息链路、MySQL 全新/升级路径、Docker 启动、浏览器主流程及备份恢复。
+[![CI](https://github.com/luoshuang148/physics-learning-platform/actions/workflows/ci.yml/badge.svg)](https://github.com/luoshuang148/physics-learning-platform/actions/workflows/ci.yml)
+[![Java](https://img.shields.io/badge/Java-21-orange)](https://openjdk.org/)
+[![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.3.8-6db33f)](https://spring.io/projects/spring-boot)
+[![Vue 3](https://img.shields.io/badge/Vue-3-42b883)](https://vuejs.org/)
+[![MySQL](https://img.shields.io/badge/MySQL-8.0%2B-4479a1)](https://www.mysql.com/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-## 本地运行
+[快速开始](#-快速开始) · [功能](#-功能特性) · [架构](#-架构) · [文档](#-文档) · [贡献](#-贡献) · [English](#english)
 
-需要 JDK 21、MySQL 8.0+（CI 使用 8.4）、Node.js 22。Maven 由 Wrapper 下载，无需全局安装。
+</div>
+
+---
+
+## 界面预览
+
+| 登录 | 教师总览 |
+|:----:|:--------:|
+| ![登录](docs/images/login.png) | ![教师总览](docs/images/teacher-dashboard.png) |
+
+| 题库管理 | 作业详情 |
+|:--------:|:--------:|
+| ![题库管理](docs/images/teacher-questions.png) | ![作业详情](docs/images/teacher-assignment.png) |
+
+| 学生首页 | 错题本 |
+|:--------:|:------:|
+| ![学生首页](docs/images/student-home.png) | ![错题本](docs/images/student-wrong-book.png) |
+
+## 项目简介
+
+智学物理（`zxwl_vlab`）是一个可本地一键运行的物理教学平台，覆盖「出题 → 发布作业 → 在线作答 → 错题整理 → 学情分析 → AI 辅导」完整闭环，适合中学物理课堂、教育机构内网以及后端/全栈学习与二次开发。
+
+| 角色 | 能做什么 |
+|------|----------|
+| **学生** | 在线作答、作业进度、错题本与掌握状态、AI 实时问答、作业复盘报告、3D 物理实验 |
+| **教师** | 题库管理、按班级发布任务、完成率/正确率统计、学生学情分析、批量报告、账号与班级管理 |
+| **运维/开发者** | Flyway 迁移、Docker Compose、CI 全链路验证、可插拔 AI 模型接入 |
+
+> 设计重点在**权限边界、会话隔离、流式资源管理、数据生命周期**，而不是堆砌业务功能。当前为单体教学项目，已在 CI 中覆盖测试，但**没有生产流量与分布式性能证明**。
+
+## 功能特性
+
+### 学生端
+- 注册登录（JWT + BCrypt），登录限流，退出/改密即时吊销令牌
+- 作业列表与进度、首次作答与补练分离、幂等提交（`requestId` 重试不重复记分）
+- 错题本按最后一次尝试展示掌握状态；历史快照与题库解耦，改题不影响已做记录
+- AI 实时问答与错题分析（SSE 流式，可取消）
+- 作业复盘报告（按作答版本失效重算）
+- 独立 3D 实验入口（原子物理 / 宇宙航天）
+
+### 教师端
+- 题库 CRUD、服务端分页与搜索、任务选题与有序快照
+- 多班级：学生归属主班，教师可协作多班；任务只发放到指定班级
+- 任务生命周期：草稿 / 已发布 / 已截止 / 已归档，支持开始与截止时间
+- 任务总览与作业详情：参与率、完成率、每题正确率、未交名单
+- 学生学情分析、批量 AI 报告（RabbitMQ 异步 + 发件箱 + 租约 + 死信重试）
+- 学生账号管理（启用/停用/角色/班级）
+
+### 平台能力
+- Spring Security + JWT；教师接口 `@TeacherOnly`；Redis 认证快照与登录限流
+- SSE 全局/用户连接配额与租约回收；请求断开即取消上游模型调用
+- AI 输出 HTML 净化并保留数学公式；对话按用户/任务/类型隔离
+- Flyway 管理 schema；MySQL 8 空库迁移与 V7 升级路径均纳入 CI
+- 一键种子数据：题库、班级、学生、任务、作答记录
+
+## 技术栈
+
+| 层次 | 选型 |
+|------|------|
+| 后端 | Java 21 · Spring Boot 3.3 · Spring Security · Spring Data JPA · Flyway |
+| 前端 | Vue 3 · TypeScript · Vite · Pinia · Vue Router |
+| 数据 | MySQL 8 · Redis（限流 / SSE 租约 / 认证缓存） |
+| 消息 | RabbitMQ（批量报告异步生成） |
+| AI | 兼容 OpenAI 协议的模型接口（默认可对接智谱，可替换） |
+| 测试 | JUnit 5 · Testcontainers · Playwright · GitHub Actions |
+| 3D 实验 | Three.js（`frontend/public/three-physical-project`） |
+
+## 架构
+
+```mermaid
+flowchart TB
+  subgraph Client["浏览器"]
+    SPA["Vue 3 SPA<br/>学生端 / 教师端 / 3D 实验"]
+  end
+
+  subgraph Backend["Spring Boot 单体"]
+    API["REST API<br/>/api/v1"]
+    SEC["Security<br/>JWT + 角色鉴权"]
+    BIZ["业务服务<br/>作业 / 题库 / 学情 / 会话"]
+    SSE["SSE 网关<br/>AI 流式输出"]
+  end
+
+  subgraph Data["数据与中间件"]
+    DB[("MySQL 8<br/>Flyway")]
+    RD[("Redis<br/>限流 / 租约 / 快照")]
+    MQ[("RabbitMQ<br/>批量报告")]
+  end
+
+  subgraph AI["模型上游"]
+    LLM["OpenAI 兼容 API<br/>（智谱 / 自建）"]
+  end
+
+  SPA -->|HTTPS / JSON| API
+  SPA -->|SSE| SSE
+  API --> SEC --> BIZ
+  BIZ --> DB
+  BIZ --> RD
+  BIZ --> MQ
+  SSE -->|OkHttp| LLM
+  SSE --> RD
+```
+
+更细的模块边界见 [docs/项目启动指南.md](docs/项目启动指南.md) 与源码 `src/main/java/com/zhixuewuli/`。
+
+## 快速开始
+
+### 环境要求
+
+- **JDK 21** · **Node.js 22** · **MySQL 8.0+** · **Redis** ·（可选）**RabbitMQ** ·（可选）**Docker**
+
+### 1. 配置
 
 ```bash
+git clone https://github.com/luoshuang148/physics-learning-platform.git
+cd physics-learning-platform
+
 cp .env.dev.example .env
-# 修改 .env 中的数据库密码和 JWT 密钥
-mysql -u root -p -e "CREATE DATABASE IF NOT EXISTS zhixuewuli CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
+# 编辑 .env：至少修改 DB_PASSWORD 与 APP_JWT_SECRET（≥32 位随机串）
+```
+
+### 2. 数据库
+
+```bash
+mysql -u root -p -e "CREATE DATABASE IF NOT EXISTS zhixuewuli \
+  CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
+```
+
+应用启动时由 **Flyway** 自动建表/升级，无需手动执行 SQL。
+
+### 3. 启动后端
+
+```bash
+# 首次创建教师账号（至少 12 位密码）
+# 在 .env 中设置：
+#   BOOTSTRAP_TEACHER_ENABLED=true
+#   BOOTSTRAP_TEACHER_USERNAME=teacher
+#   BOOTSTRAP_TEACHER_PASSWORD=your_password_at_least_12_chars
+
 ./mvnw spring-boot:run
 ```
 
-应用启动时由 Flyway 自动迁移数据库：空库执行 `V8__baseline_current_schema.sql` 建立完整结构；已有 V7 库会 baseline 到 8，不重复执行建表。后续增量迁移（V9 多班级结构与 V10 批量报告三表）按版本自动执行。应用仍用 `ddl-auto=validate` 校验实体与表结构。旧于 V7 的数据库必须先按[生产部署指南](docs/生产部署指南.md)完成历史升级，不能直接让 Flyway baseline。
+启动后请将 `BOOTSTRAP_TEACHER_ENABLED` 改回 `false` 并删除明文密码。
 
-另一个终端启动前端：
+### 4. 启动前端
 
 ```bash
 cd frontend
@@ -44,67 +166,83 @@ npm ci
 npm run dev
 ```
 
-访问 [http://localhost:5173](http://localhost:5173)，后端 API 前缀为 `/api/v1`。开发环境默认关闭 AI，无需模型密钥即可运行普通功能；启用 AI 时在 `.env` 中设置 `AI_ENABLED=true` 和对应模型密钥（报告密钥留空时可复用智谱密钥，但服务地址和模型必须匹配），需要自行确认模型权限和费用。
+打开 <http://localhost:5173>。API 前缀为 `/api/v1`，开发环境默认关闭 AI，无需模型密钥即可体验核心功能。
 
-批量学生报告需要 RabbitMQ：使用仓库自带 Compose 时执行 `docker compose up -d rabbitmq`；不用 Docker 时需自行启动 RabbitMQ 并核对 `.env` 中的 `RABBITMQ_*`。若暂时不需要该功能，可设 `REPORT_BATCH_ENABLED=false` 关闭消费、发件箱调度与租约恢复；此时接口仍可创建批次，但不会被处理，重新开启后由发件箱调度继续投递。
-
-首次使用时在 `.env` 临时设置：
-
-```dotenv
-BOOTSTRAP_TEACHER_ENABLED=true
-BOOTSTRAP_TEACHER_USERNAME=first_teacher
-BOOTSTRAP_TEACHER_PASSWORD=your_own_password_at_least_12_characters
-```
-
-重启后可用该账号登录。随后关闭初始化并移除明文密码。已有同名教师不会被重置密码，同名学生会使初始化失败；新装数据库不提供默认密码。详见[项目启动指南](docs/项目启动指南.md)。
-
-## 验证
+### 5.（可选）消息队列与演示数据
 
 ```bash
+# 批量报告依赖 RabbitMQ
+docker compose up -d rabbitmq
+
+# 灌入题库 / 班级 / 学生 / 任务 / 作答演示数据
+python3 scripts/seed_test_data.py
+```
+
+种子数据包含 26 道物理题、2 个班级、13 名学生、4 个不同状态的作业与约 165 条作答记录，可直接用于界面演示。
+
+更多细节（Docker、生产部署、AI 接入、升级旧库）见 [docs/项目启动指南.md](docs/项目启动指南.md) 与 [docs/生产部署指南.md](docs/生产部署指南.md)。
+
+## 测试与 CI
+
+```bash
+# 后端（含 Testcontainers：Redis / RabbitMQ）
 ./mvnw -B test
+
+# 前端
 cd frontend && npm ci && npm test && npm run build
 ```
 
-默认后端套件使用隔离的 H2 数据与 Testcontainers（Redis、RabbitMQ），不访问真实模型；批量报告的端到端用例会启动真实 RabbitMQ 容器验证投递、重试与死信，因此运行测试需要本机 Docker 或兼容的容器运行时。MySQL 验证需要独立测试库：
+CI 覆盖：后端单测与集成、前端单测与构建、MySQL 8.4 空库迁移与 V7 升级、批量报告消息链路、Docker 启动与备份恢复。详见 [docs/交付验证.md](docs/交付验证.md)。
 
-```bash
-# 在独立 MySQL 实例创建空库后执行；Flyway 自动建表，测试会写入数据
-MYSQL_TEST_URL='jdbc:mysql://127.0.0.1:3306/zhixuewuli?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai' \
-MYSQL_TEST_USER=root MYSQL_TEST_PASSWORD=your_test_password \
-./mvnw -B test -Dgroups=mysql -DexcludedGroups=external-api
-```
+## 文档
 
-CI 对 MySQL 8.4 分别执行 Flyway 空库迁移和旧版 V1→V7 升级后的 baseline，包含 MIGRATED/MISSING 旧题及历史记录保留检查。`src/test/resources/mysql/schema-v1.sql` 是可销毁的旧版测试夹具，**包含删库语句，只能用于独立测试实例**。
+| 文档 | 内容 |
+|------|------|
+| [项目启动指南](docs/项目启动指南.md) | 本地开发环境完整步骤 |
+| [生产部署指南](docs/生产部署指南.md) | 镜像、备份、HTTPS、监控 |
+| [学生使用指南](docs/学生使用指南.md) | 学生端操作说明 |
+| [教师使用指南](docs/教师使用指南.md) | 教师端操作说明 |
+| [交付验证](docs/交付验证.md) | 测试与验收方式 |
+| [性能验证](docs/性能验证.md) | 查询优化与复现 |
+| [后端项目简历与面试](docs/后端项目简历与面试.md) | 技术亮点与问答 |
+| [开源组件清单](docs/开源组件清单.txt) | 第三方组件与许可证 |
+| [AI 评测](docs/ai-evaluation/README.md) | 模型输出评测样例 |
 
-## 后端改进证据
+## 现状与边界
 
-冷持久化上下文下，25 条答题记录分别关联 25 道题的回归用例，旧列表查询执行 SQL 从 **27 条降到 2 条**（包含教师身份查询）。当前教师页面进一步使用有界分页和轻量投影。该结果来自 H2 SQL 计数，不能直接换算成生产吞吐量。
+为了不误导使用者，这里明确说明**当前没有做到**的事：
 
-- [性能验证及复现方法](docs/性能验证.md)
-- [简历表述与面试准备](docs/后端项目简历与面试.md)
-- [本轮产品与后端改进记录](docs/superpowers/product-hardening-ledger.md)
-- [浏览器、备份与实测复现](docs/交付验证.md)
-- [AI 评测样例与人工评分方法](docs/ai-evaluation/README.md)
-- [首轮实现记录](docs/superpowers/implementation-ledger.md)
+- 单体架构，无生产流量与分布式性能数据；跨实例会话互斥与取消路由尚未实现
+- AI 上游为阻塞 I/O，未做全链路非阻式与自动续传；题目缓存仍在本地
+- 固定 AI 评测样例仍需人工评分；本地合成数据不代表生产容量
+- 仓库含既有实验/视频资源，再分发前请阅读 [LICENSE](LICENSE) 与[开源组件清单](docs/开源组件清单.txt)
 
-## 结构与边界
+## 贡献
 
-```text
-src/main/java/com/zhixuewuli/
-  controller/       HTTP API
-  service/          业务规则、权限与会话管理
-  repository/       JPA 查询
-  common/           安全配置与 JWT 过滤器、流式客户端、异常处理
-src/main/resources/db/migration/  Flyway 迁移脚本（当前从 V8 基线开始）
-src/test/           单元、H2 集成及 MySQL 专项测试
-frontend/           Vue 页面及实验演示资源
-docs/               启动、部署、验证和面试说明
-```
+欢迎 Issue 与 Pull Request。
 
-认证与授权统一由 Spring Security 完成：`JwtAuthenticationFilter` 解析令牌并通过 Redis 中 5 分钟 TTL 的用户快照校验令牌版本、账号状态及角色，未命中时回库，URL 规则默认要求登录，教师接口用 `@TeacherOnly`（`@PreAuthorize`）声明；Service 层只保留“能否访问某个学生数据”这类资源归属判断。AI 上游读取运行在有界工作线程中，属于阻塞 I/O；没有实现全链路非阻塞、自动续传、LRU 或 JWT 刷新机制。登录限流与 SSE 全局/用户连接限制由 Redis 跨实例协调：登录按 IP+用户名 5 次/60 秒、IP 200 次/60 秒，Lua 原子执行检查、INCR 与首次 EXPIRE，成功登录只清除账号计数。每个 SSE 连接持有 60 秒 TTL 租约，每 20 秒续期；Redis 时间和有序集合期限用于原子准入及过期回收，实例崩溃不会永久占用名额，完成/超时/错误立即幂等释放。Redis 不可用时拒绝新增连接，续期失败则关闭流。会话内仅一个活跃生成请求的所有权与取消仍为进程内状态，跨实例同一会话的互斥及取消路由尚未实现；题目缓存也仍在本地。
+1. Fork 本仓库并创建分支：`git checkout -b feature/amazing`
+2. 提交前请保证测试通过：`./mvnw -B test` 与 `cd frontend && npm test`
+3. 遵循既有代码风格，PR 中说明动机与验证方式
 
-登出、修改密码、教师修改角色/启停账号及删除账号均注册 `TransactionSynchronization.afterCommit` 清除认证快照；提交前清除会让并发请求从数据库旧值重新填充缓存，回滚也不应影响有效缓存。Redis 修订标记与 Lua 条件填充进一步阻止已开始的旧查询在提交后的失效操作之后回填。提交前仅写入保护标记，保留快照；若标记写入失败则事务回滚，若提交后失效失败则每 5 秒重试，保护标记使其他实例绕过旧快照并回库。保护标记不自动过期，避免慢事务或进程崩溃后重新信任旧值；若实例在重试前崩溃，受影响用户继续回库，需在确认事务结束后清除该用户快照与遗留保护标记以恢复缓存。事务内查询直接回库以读取自身修改，并且不会将未提交数据写入缓存。修订标记保留至用户后续失效，不随快照到期删除，避免慢查询绕过失效栅栏。Redis 是认证与连接准入的必需依赖，部署使用 `noeviction`，通过 `REDIS_HOST`、`REDIS_PORT`、`REDIS_PASSWORD` 配置；Compose 提供 Redis 服务，集成测试使用 Testcontainers Redis，运行测试需要 Docker。
+详见 [CONTRIBUTING.md](CONTRIBUTING.md) 与 [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)。安全相关问题请见 [SECURITY.md](SECURITY.md)。
 
-历史上下文只读取最近 N 条，累计值另做聚合；报告采用文字投影，输入上限 5000 次作答、单字段 4096 字符及 128 KiB UTF-8；超限拒绝生成。教师默认只分析当前任务；成功报告按次保留，最新查询具有确定顺序。本地合成数据的 HTTP 实测不能代表生产容量；跨实例会话互斥、取消路由和外部模型可用性需单独验证。历史无快照的记录只可回退当前题库，报告会标记这一局限；固定 AI 评测样例尚待教师评分。
+## 许可证
 
-仓库包含既有物理实验、视频和第三方资源，使用与再分发前请核对 [LICENSE](LICENSE) 及[开源组件清单](docs/开源组件清单.txt)。说明个人工作时，应区分原有教学功能和本次后端改进。
+[MIT License](LICENSE) © 智学物理项目
+
+---
+
+## English
+
+**ZhiXue Physics** is an open-source learning platform for secondary-school physics: question bank, class-scoped assignments, answer records & wrong-question book, streaming AI tutoring, and teacher analytics.
+
+**Highlights**
+
+- Java 21 + Spring Boot 3 + Vue 3 + MySQL/Redis/RabbitMQ
+- JWT auth, per-class task delivery, idempotent submissions, snapshot isolation
+- SSE streaming AI with cancellation and connection quotas
+- Flyway migrations, Testcontainers, Playwright and GitHub Actions CI
+- One-command demo data seed (`scripts/seed_test_data.py`)
+
+**Quick start**: see [Quick Start](#-快速开始) above. Docs are primarily in Chinese; API and code comments follow standard English conventions. Licensed under [MIT](LICENSE).
