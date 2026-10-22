@@ -159,3 +159,13 @@ A: 编辑 `fast-test.bat`，修改以下变量：
 - ✓ 优化用户体验（更清晰的提示信息）
 - ✓ 增强 AI 测试脚本功能
 - ✓ 添加完整的文档说明
+
+## README 真实截图
+
+```sh
+npm --prefix frontend ci
+(cd frontend && npx playwright install chromium)
+BASE_URL=http://47.110.38.57 node scripts/capture_readme_shots.mjs
+```
+
+从仓库根目录或 frontend 目录运行均可。BASE_URL 默认为 http://localhost:5173。教师 teacher、学生 stu01；仅演示账号默认使用 Teacher@2026 / Student@2026，可通过 TEACHER_PASSWORD / STUDENT_PASSWORD 覆盖。脚本只读页面，不灌入演示数据。输出 docs/images 的登录页与 5 张鉴权页面；教师作业 id 来自总览真实链接。登录、路由、内容或 API 验证失败会非零退出，不覆盖原图。请逐张核对画面后提交。
