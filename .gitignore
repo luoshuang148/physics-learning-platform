@@ -216,3 +216,7 @@ src/main/resources/static/
 
 # Local-only development notes (not published)
 dev-notes/
+
+# Local demo secrets
+.env.demo
+.readme-shots-*/

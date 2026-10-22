@@ -1,0 +1,33 @@
+# Compose >= 2.24.4. Use only with docker-compose.yml and .env.demo.
+services:
+  redis:
+    ports: !override []
+  mysql:
+    container_name: !reset null
+    ports: !override []
+    volumes:
+      - mysql-data:/var/lib/mysql
+  rabbitmq:
+    container_name: !reset null
+    ports: !override []
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+  app:
+    container_name: !reset null
+    image: zhixuewuli-demo:local
+    ports: !override
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - app-data:/data
+    environment:
+      AI_ENABLED: "false"
+      REPORT_BATCH_ENABLED: "true"
+      SPRING_PROFILES_ACTIVE: prod
+      BOOTSTRAP_TEACHER_ENABLED: "true"
+      BOOTSTRAP_TEACHER_USERNAME: teacher
+      BOOTSTRAP_TEACHER_PASSWORD: Teacher@2026
+      APP_CORS_ALLOWED_ORIGIN: http://localhost:8080
+volumes:
+  mysql-data:
+  rabbitmq-data:
+  app-data:

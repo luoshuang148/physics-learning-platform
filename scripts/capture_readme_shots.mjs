@@ -1,77 +1,80 @@
 /**
- * 截取 README 演示图。用法：
- *   cd frontend && node ../scripts/capture_readme_shots.mjs
+ * Capture one login page and five authenticated demo pages for the README.
+ * From the repository root: BASE_URL=http://47.110.38.57 node scripts/capture_readme_shots.mjs
+ * Install dependencies first: npm --prefix frontend ci && npm --prefix frontend exec playwright install chromium
  */
-import { chromium } from 'playwright';
-import fs from 'node:fs';
+import { createRequire } from 'node:module';
+import fs from 'node:fs/promises';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const OUT = path.resolve(process.cwd(), '..', 'docs', 'images');
-const BASE = 'http://localhost:5173';
-fs.mkdirSync(OUT, { recursive: true });
-
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const require = createRequire(path.join(ROOT, 'frontend', 'package.json'));
+const { chromium, expect } = require('@playwright/test');
+const BASE = (process.env.BASE_URL || 'http://localhost:5173').replace(/\/$/, '');
+const OUT = path.join(ROOT, 'docs', 'images');
+const staging = await fs.mkdtemp(path.join(ROOT, '.readme-shots-'));
 const shots = [
-  {
-    name: 'login',
-    url: `${BASE}/auth/login`,
-    async prepare() {},
-  },
-  {
-    name: 'student-home',
-    url: `${BASE}/student/home`,
-    login: { username: 'student1', password: 'Student@2026' },
-  },
-  {
-    name: 'student-wrong-book',
-    url: `${BASE}/student/wrong-book`,
-    login: { username: 'student1', password: 'Student@2026' },
-  },
-  {
-    name: 'teacher-dashboard',
-    url: `${BASE}/teacher/dashboard`,
-    login: { username: 'teacher', password: 'Teacher@2026' },
-  },
-  {
-    name: 'teacher-questions',
-    url: `${BASE}/teacher/questions`,
-    login: { username: 'teacher', password: 'Teacher@2026' },
-  },
-  {
-    name: 'teacher-assignment',
-    url: `${BASE}/teacher/assignments/1`,
-    login: { username: 'teacher', password: 'Teacher@2026' },
-  },
+  { name: 'login', route: '/auth/login', marker: 'form' },
+  { name: 'student-home', route: '/student/home', role: 'student', marker: '.student-summary' },
+  { name: 'student-wrong-book', route: '/student/wrong-book', role: 'student', marker: '.wb-page' },
+  { name: 'teacher-dashboard', route: '/teacher/dashboard', role: 'teacher', marker: '.overview-strip' },
+  { name: 'teacher-questions', route: '/teacher/questions', role: 'teacher', marker: '.qm-layout' },
+  { name: 'teacher-assignment', role: 'teacher', marker: '.detail-page' },
 ];
-
-async function login(page, { username, password }) {
-  await page.goto(`${BASE}/auth/login`, { waitUntil: 'networkidle' });
-  const user = page.locator('input').first();
-  await user.fill(username);
-  const pass = page.locator('input[type="password"]').first();
-  await pass.fill(password);
-  await page.getByRole('button', { name: /登录|login/i }).first().click();
-  await page.waitForLoadState('networkidle');
-  await page.waitForTimeout(800);
-}
-
 const browser = await chromium.launch({ headless: true });
-for (const shot of shots) {
-  const ctx = await browser.newContext({
-    viewport: { width: 1440, height: 900 },
-    deviceScaleFactor: 2,
-    locale: 'zh-CN',
-  });
-  const page = await ctx.newPage();
-  try {
-    if (shot.login) await login(page, shot.login);
-    await page.goto(shot.url, { waitUntil: 'networkidle' });
-    await page.waitForTimeout(1200);
-    const file = path.join(OUT, `${shot.name}.png`);
-    await page.screenshot({ path: file, fullPage: false });
-    console.log('saved', file);
-  } catch (e) {
-    console.error('fail', shot.name, e.message);
+try {
+  for (const shot of shots) {
+    const context = await browser.newContext({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1, locale: 'zh-CN' });
+    try {
+      const page = await context.newPage();
+      const apiErrors = [];
+      page.on('requestfailed', request => {
+        if (request.url().includes('/api/v1/')) apiErrors.push(request.failure()?.errorText || 'request failed');
+      });
+      page.on('response', response => {
+        if (response.url().includes('/api/v1/') && response.status() >= 400) apiErrors.push(response.status());
+      });
+      await page.goto(`${BASE}/auth/login`, { waitUntil: 'networkidle' });
+      const loginURL = new URL(page.url());
+      if (loginURL.origin !== new URL(BASE).origin || !loginURL.pathname.endsWith('/auth/login')) throw new Error('Unexpected login URL');
+      const appBase = loginURL.origin + loginURL.pathname.slice(0, -'/auth/login'.length);
+      if (shot.role) {
+        await page.locator('input[autocomplete="username"]').fill(shot.role === 'teacher' ? 'teacher' : 'stu01');
+        await page.locator('input[type="password"]').fill(shot.role === 'teacher' ? (process.env.TEACHER_PASSWORD || 'Teacher@2026') : (process.env.STUDENT_PASSWORD || 'Student@2026'));
+        await page.getByRole('button', { name: '登录', exact: true }).click();
+        const destination = shot.role === 'teacher' ? '/teacher/dashboard' : '/student/home';
+        await page.waitForURL(url => url.origin === loginURL.origin && url.pathname === new URL(appBase + destination).pathname, { timeout: 15000 });
+        await expect(page.locator('input[type="password"]')).toHaveCount(0);
+      }
+      let route = shot.route;
+      if (shot.name === 'teacher-assignment') {
+        const link = page.locator('a[href*="/teacher/assignments/"]').first();
+        await expect(link).toBeVisible();
+        const detail = new URL(await link.getAttribute('href'), appBase + '/');
+        const prefix = new URL(appBase).pathname.replace(/\/$/, '');
+        route = detail.pathname.slice(prefix.length);
+        if (detail.origin !== loginURL.origin || !/^\/teacher\/assignments\/\d+$/.test(route)) throw new Error('No valid assignment detail link');
+      }
+      await page.goto(`${appBase}${route}`, { waitUntil: 'networkidle' });
+      await expect(page).toHaveURL(`${appBase}${route}`);
+      if (shot.role) await expect(page.locator('input[type="password"]')).toHaveCount(0);
+      await expect(page.locator(shot.marker).first()).toBeVisible();
+      await expect(page.getByText(/正在加载…|加载错题记录…|加载中…/, { exact: true })).toHaveCount(0);
+      await page.evaluate(() => document.fonts.ready);
+      await expect(page.locator('[role="alert"], .toast.visible.type-error')).toHaveCount(0);
+      if (apiErrors.length) throw new Error(`API failed: ${apiErrors.join(', ')}`);
+      await page.screenshot({ path: path.join(staging, `${shot.name}.png`), animations: 'disabled' });
+      console.log(`captured ${shot.name}: ${page.url()}`);
+    } finally {
+      await context.close();
+    }
   }
-  await ctx.close();
+  // A failed capture leaves the existing README images untouched.
+  await fs.mkdir(OUT, { recursive: true });
+  for (const shot of shots) await fs.copyFile(path.join(staging, `${shot.name}.png`), path.join(OUT, `${shot.name}.png`));
+  console.log(`Saved all ${shots.length} screenshots to ${OUT}`);
+} finally {
+  await browser.close();
+  await fs.rm(staging, { recursive: true, force: true });
 }
-await browser.close();

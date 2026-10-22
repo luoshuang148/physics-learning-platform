@@ -13,14 +13,16 @@
 [![MySQL](https://img.shields.io/badge/MySQL-8.0%2B-4479a1)](https://www.mysql.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-**在线演示：** [http://47.110.38.57](http://47.110.38.57) · 备用 [http://47-110-38-57.sslip.io](http://47-110-38-57.sslip.io)
+面向中学物理教师、学生与二次开发者，串起建班、作业、在线作答、错题与学情。<br>
+Java 21 · Spring Boot 3 · Vue 3 · MySQL / Redis / RabbitMQ。<br>
+[在线体验](http://47.110.38.57)：教师 `teacher / Teacher@2026`，学生 `stu01 / Student@2026`。<br>
+演示数据可重置，请勿输入真实个人信息；本地部署见下方快速开始。
 
-| 角色 | 账号 | 密码 |
-|------|------|------|
-| 教师 | `teacher` | `Teacher@2026` |
-| 学生 | `stu01` ~ `stu12` | `Student@2026` |
+| 教师掌握作业进度 | 学生查看任务与学习进度 | 教师维护题库 |
+|:---:|:---:|:---:|
+| ![教师总览：任务列表、作业参与人数与正确率](docs/images/teacher-dashboard.png) | ![学生首页：当前作业、答题进度与错题概览](docs/images/student-home.png) | ![教师题库：筛选、编辑与维护物理试题](docs/images/teacher-questions.png) |
 
-> 演示服为阿里云试用规格，仅用于功能试用；数据可被重置，请勿写入真实个人信息。
+本地体验（Docker Compose 2.24.4+）：`./scripts/demo-up.sh`
 
 [快速开始](#-快速开始) · [功能](#-功能特性) · [架构](#-架构) · [文档](#-文档) · [贡献](#-贡献) · [English](#english)
 
@@ -32,15 +34,15 @@
 
 | 登录 | 教师总览 |
 |:----:|:--------:|
-| ![登录](docs/images/login.png) | ![教师总览](docs/images/teacher-dashboard.png) |
+| ![教学管理平台用户名与密码登录表单](docs/images/login.png) | ![教师总览：任务列表与完成统计](docs/images/teacher-dashboard.png) |
 
 | 题库管理 | 作业详情 |
 |:--------:|:--------:|
-| ![题库管理](docs/images/teacher-questions.png) | ![作业详情](docs/images/teacher-assignment.png) |
+| ![教师题库：物理试题筛选和维护](docs/images/teacher-questions.png) | ![教师作业详情：参与和答题统计](docs/images/teacher-assignment.png) |
 
 | 学生首页 | 错题本 |
 |:--------:|:------:|
-| ![学生首页](docs/images/student-home.png) | ![错题本](docs/images/student-wrong-book.png) |
+| ![学生首页：当前任务与学习进度](docs/images/student-home.png) | ![学生错题本：历史错题和掌握情况](docs/images/student-wrong-book.png) |
 
 ## 项目简介
 
@@ -127,6 +129,26 @@ flowchart TB
 ```
 
 更细的模块边界见 [docs/项目启动指南.md](docs/项目启动指南.md) 与源码 `src/main/java/com/zhixuewuli/`。
+
+## 本地体验（Docker）
+
+需要运行中的本机 Docker、Compose **2.24.4+**、OpenSSL、curl；安装 Python 3 才会自动准备学生和作业数据。首次构建耗时取决于网络与机器，不保证 5 分钟。
+
+```sh
+./scripts/demo-up.sh
+```
+
+访问 [localhost:8080](http://localhost:8080)。教师 `teacher / Teacher@2026`；只有脚本完成种子验证后，学生 `stu01 / Student@2026` 才可用于完整演示。没有 Python 时仅启动服务，不宣称已有学生数据。
+
+仅用于本地演示，不要暴露公网；AI 默认关闭，AI 问答和批量 AI 报告不代表可用。使用独立 Compose 项目 `zhixuewuli-demo` 与具名卷，不修改生产 compose 的默认行为。脚本拒绝远程 Docker，且不会更改当前 context。密钥自动存入忽略的 `.env.demo`，不提交、不分享。
+
+停止并保留数据：
+
+```sh
+docker compose -p zhixuewuli-demo --env-file .env.demo -f docker-compose.yml -f docker-compose.demo.yml down
+```
+
+成功初始化记录保存在专用 app 数据卷；仅在上次完整成功且四份任务题数/状态校验通过时，重复运行才会保留已有任务而不重新灌数。没有成功记录的残留数据会报错并保留；半途失败或手动删除数据后，先查看日志，备份需要保留的数据，再决定是否重建专用演示卷。不要对其他部署执行清卷命令。
 
 ## 快速开始
 

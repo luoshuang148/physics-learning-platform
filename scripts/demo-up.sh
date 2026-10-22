@@ -1,0 +1,119 @@
+#!/usr/bin/env bash
+set -euo pipefail
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$ROOT"
+for tool in docker openssl curl; do
+  command -v "$tool" >/dev/null || { echo "缺少 $tool，请先安装。" >&2; exit 1; }
+done
+# Do not change the user's Docker context or silently deploy to a remote engine.
+endpoint="${DOCKER_HOST:-$(docker context inspect --format '{{.Endpoints.docker.Host}}')}"
+case "$endpoint" in unix://*) ;; *) echo '演示脚本只允许本机 Unix socket Docker；请显式选择本机 context。' >&2; exit 1;; esac
+version="$(docker compose version --short)"
+version="${version#v}"
+IFS=. read -r major minor patch <<< "$version"
+if (( major < 2 || (major == 2 && minor < 24) || (major == 2 && minor == 24 && ${patch:-0} < 4) )); then
+  echo '需要 Docker Compose 2.24.4+（ports !override）。' >&2; exit 1
+fi
+if [[ ! -f .env.demo ]]; then
+  umask 077
+  (set -o noclobber
+   cat > .env.demo <<ENV
+DB_USER=demo
+DB_PASSWORD=$(openssl rand -hex 24)
+APP_JWT_SECRET=$(openssl rand -hex 32)
+RABBITMQ_USER=demo
+RABBITMQ_PASSWORD=$(openssl rand -hex 24)
+APP_CORS_ALLOWED_ORIGIN=http://localhost:8080
+PUBLIC_PORT=8080
+ALIYUN_AI_API_KEY=
+ZHIPU_AI_API_KEY=
+ENV
+  )
+fi
+# Shell exports otherwise override --env-file interpolation, including production credentials.
+unset DB_USER DB_PASSWORD DB_HOST DB_PORT DB_NAME APP_JWT_SECRET RABBITMQ_USER RABBITMQ_PASSWORD
+unset ALIYUN_AI_API_KEY ZHIPU_AI_API_KEY APP_CORS_ALLOWED_ORIGIN PUBLIC_PORT APP_IMAGE
+unset VITE_APP_BASE VITE_API_BASE_URL JAVA_OPTS SPRING_PROFILES_ACTIVE AI_ENABLED REPORT_BATCH_ENABLED
+unset BOOTSTRAP_TEACHER_ENABLED BOOTSTRAP_TEACHER_USERNAME BOOTSTRAP_TEACHER_PASSWORD
+compose=(docker compose -p zhixuewuli-demo --env-file .env.demo -f docker-compose.yml -f docker-compose.demo.yml)
+docker info >/dev/null 2>&1 || { echo '本机 Docker daemon 未运行，请启动后重试。' >&2; exit 1; }
+"${compose[@]}" config --quiet
+"${compose[@]}" up -d --build
+ready=false
+for ((i=0; i<60; i++)); do
+  health="$(curl --connect-timeout 1 --max-time 2 -fsS http://127.0.0.1:8080/api/v1/actuator/health 2>/dev/null | tr -d '[:space:]' || true)"
+  if [[ "$health" == *'"status":"UP"'* ]]; then ready=true; break; fi
+  sleep 1
+done
+if [[ "$ready" != true ]]; then
+  "${compose[@]}" logs --tail=100 app >&2
+  echo '应用未在启动等待期内健康。' >&2; exit 1
+fi
+if command -v python3 >/dev/null; then
+  # Invalidate the checkpoint until this run verifies it again. A failed first
+  # seed cannot become a successful warm start merely because some tasks exist.
+  seed_verified="$("${compose[@]}" exec -T app sh -c 'if [ -f /data/.demo-seed-complete ]; then rm /data/.demo-seed-complete; printf 1; else printf 0; fi')"
+  DEMO_SEED_VERIFIED="$seed_verified" python3 - <<'PY'
+import os
+import sys
+sys.path.insert(0, 'scripts')
+import seed_test_data as seed
+teacher, _ = seed.login(*seed.TEACHER)
+def tasks_of_teacher():
+    status, body = seed.req('GET', '/teacher/events/all', teacher)
+    tasks = seed.data_of(body)
+    if status != 200 or not isinstance(tasks, list):
+        raise SystemExit('无法检查现有任务，不执行种子写入。')
+    return tasks
+tasks = tasks_of_teacher()
+if not tasks:
+    # The legacy seeder logs some write errors and still returns zero.
+    # Observe its actual write responses; optional student1 login may legitimately fail.
+    original_req = seed.req
+    write_errors = []
+    def checked_req(method, path, *args, **kwargs):
+        status, body = original_req(method, path, *args, **kwargs)
+        code = body.get('code', status)
+        payload = kwargs.get('body') or (args[1] if len(args) > 1 else {})
+        # The legacy seeder samples optional practice even when the corresponding
+        # first answer was deliberately skipped. This one policy rejection is expected.
+        optional_practice = (method == 'POST' and path == '/answer-records/student/submit'
+                             and isinstance(payload, dict) and payload.get('intent') == 'PRACTICE'
+                             and status == 409 and '请先完成首次作答后再补练' in body.get('message', ''))
+        if method in ('POST', 'PUT', 'PATCH', 'DELETE') and path != '/auth/login' and not optional_practice:
+            if not 200 <= status < 300 or not isinstance(code, int) or not 200 <= code < 300:
+                write_errors.append(f'{method} {path}: HTTP {status}, code {code}')
+        return status, body
+    seed.req = checked_req
+    try:
+        result = seed.main()
+    finally:
+        seed.req = original_req
+    if result != 0 or write_errors:
+        raise SystemExit('种子初始化不完整：' + '; '.join(write_errors))
+    tasks = tasks_of_teacher()
+else:
+    if os.environ.get('DEMO_SEED_VERIFIED') != '1':
+        raise SystemExit('检测到未完成初始化的数据，保留现状并停止。请检查先前种子错误或重建专用演示环境。')
+    print('已有成功初始化记录，保留当前数据，不重复灌入。')
+expected = {'运动学基础练习': (8, 'CLOSED'), '牛顿运动定律': (10, 'PUBLISHED'),
+            '电学入门测验': (6, 'PUBLISHED'), '综合复习卷': (12, 'CLOSED')}
+by_title = {task.get('eventTitle'): task for task in tasks}
+for title, (count, status) in expected.items():
+    task = by_title.get(title, {})
+    if task.get('questionCount') != count or task.get('status') != status:
+        raise SystemExit('演示任务缺失或已改变：' + title + '；保留现有数据，请检查日志或重建专用演示环境。')
+student, _ = seed.login('stu01', 'Student@2026')
+status, body = seed.req('GET', '/teacher/events/student-tasks', student)
+if status != 200 or not seed.data_of(body):
+    raise SystemExit('学生任务验证失败；请检查种子日志，不要把当前环境标记为完整演示。')
+print('教师/学生登录及学生任务验证通过。')
+PY
+  "${compose[@]}" exec -T app touch /data/.demo-seed-complete
+  echo '学生：stu01 / Student@2026'
+else
+  echo '未检测到 python3：跳过种子数据；学生账号与演示作业尚未准备。安装 Python 3 后重跑。'
+fi
+echo '访问：http://localhost:8080（部署路由可能跳转至 /api/v1/）'
+echo '教师：teacher / Teacher@2026；AI 默认关闭。只用于本机演示。'
+echo '停止：docker compose -p zhixuewuli-demo --env-file .env.demo -f docker-compose.yml -f docker-compose.demo.yml down'
