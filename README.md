@@ -1,8 +1,6 @@
 <div align="center">
 
-# 知学物理 · 开源中学物理教学平台
-
-Teaching Management Platform
+# 教学管理平台 · Teaching Management Platform
 
 **面向中学课堂的开源教学管理系统**
 
@@ -36,7 +34,7 @@ Java 21 · Spring Boot 3 · Vue 3 · MySQL / Redis / RabbitMQ。<br>
 
 | 登录 | 教师总览 |
 |:----:|:--------:|
-| ![知学物理用户名与密码登录表单](docs/images/login.png) | ![教师总览：任务列表与完成统计](docs/images/teacher-dashboard.png) |
+| ![教学管理平台用户名与密码登录表单](docs/images/login.png) | ![教师总览：任务列表与完成统计](docs/images/teacher-dashboard.png) |
 
 | 题库管理 | 作业详情 |
 |:--------:|:--------:|

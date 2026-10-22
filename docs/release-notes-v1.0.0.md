@@ -1,4 +1,4 @@
-# 知学物理 v1.0.0 — 发布准备（尚未发布）
+# 教学管理平台 v1.0.0 — 发布准备（尚未发布）
 
 面向中学课堂和二次开发的开源物理教学平台。支持班级/账号、题库与作业、在线作答、错题本、学情分析、可选 AI 辅导/批量报告与 3D 实验。
 
@@ -11,9 +11,9 @@ Java 21 + Spring Boot 3 + Vue 3 + MySQL / Redis / RabbitMQ。演示入口：http
 确认最终 commit 和全套 CI/演示验收后，才建议执行（以下命令未执行）：
 
 ```sh
-git tag -a v1.0.0 -m '知学物理 v1.0.0' VERIFIED_COMMIT
+git tag -a v1.0.0 -m '教学管理平台 v1.0.0' VERIFIED_COMMIT
 git push origin v1.0.0
-gh release create v1.0.0 --repo luoshuang148/physics-learning-platform --verify-tag --title '知学物理 v1.0.0' --notes-file docs/release-notes-v1.0.0.md --draft
+gh release create v1.0.0 --repo luoshuang148/physics-learning-platform --verify-tag --title '教学管理平台 v1.0.0' --notes-file docs/release-notes-v1.0.0.md --draft
 ```
 
 先核实 tag 不存在，替换 VERIFIED_COMMIT；公开发布需要单独确认。

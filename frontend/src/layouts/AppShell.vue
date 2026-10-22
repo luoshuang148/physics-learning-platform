@@ -2,9 +2,9 @@
   <div class="shell app-shell" :class="{ 'app-shell-wide': route.path === '/student/experiments' }">
     <header class="app-topbar">
       <div class="app-topbar-inner">
-        <RouterLink class="app-brand" :to="homePath" aria-label="知学物理首页">
+        <RouterLink class="app-brand" :to="homePath" aria-label="教学管理平台首页">
           <span class="app-brand-mark"><AppIcon name="spark" /></span>
-          <span><strong>知学物理</strong><small>TEACHING PLATFORM</small></span>
+          <span><strong>教学管理</strong><small>TEACHING PLATFORM</small></span>
         </RouterLink>
         <AppNavigation placement="top" :role="role" />
         <label v-if="role === 'TEACHER'" class="class-switcher">
