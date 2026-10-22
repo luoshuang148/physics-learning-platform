@@ -50,7 +50,11 @@ if [[ "$ready" != true ]]; then
   echo '应用未在启动等待期内健康。' >&2; exit 1
 fi
 if command -v python3 >/dev/null; then
-  python3 - <<'PY'
+  # Invalidate the checkpoint until this run verifies it again. A failed first
+  # seed cannot become a successful warm start merely because some tasks exist.
+  seed_verified="$("${compose[@]}" exec -T app sh -c 'if [ -f /data/.demo-seed-complete ]; then rm /data/.demo-seed-complete; printf 1; else printf 0; fi')"
+  DEMO_SEED_VERIFIED="$seed_verified" python3 - <<'PY'
+import os
 import sys
 sys.path.insert(0, 'scripts')
 import seed_test_data as seed
@@ -69,8 +73,16 @@ if not tasks:
     write_errors = []
     def checked_req(method, path, *args, **kwargs):
         status, body = original_req(method, path, *args, **kwargs)
-        if method in ('POST', 'PUT', 'PATCH', 'DELETE') and path != '/auth/login' and not 200 <= status < 300:
-            write_errors.append(f'{method} {path}: {status}')
+        code = body.get('code', status)
+        payload = kwargs.get('body') or (args[1] if len(args) > 1 else {})
+        # The legacy seeder samples optional practice even when the corresponding
+        # first answer was deliberately skipped. This one policy rejection is expected.
+        optional_practice = (method == 'POST' and path == '/answer-records/student/submit'
+                             and isinstance(payload, dict) and payload.get('intent') == 'PRACTICE'
+                             and status == 409 and '请先完成首次作答后再补练' in body.get('message', ''))
+        if method in ('POST', 'PUT', 'PATCH', 'DELETE') and path != '/auth/login' and not optional_practice:
+            if not 200 <= status < 300 or not isinstance(code, int) or not 200 <= code < 300:
+                write_errors.append(f'{method} {path}: HTTP {status}, code {code}')
         return status, body
     seed.req = checked_req
     try:
@@ -81,7 +93,9 @@ if not tasks:
         raise SystemExit('种子初始化不完整：' + '; '.join(write_errors))
     tasks = tasks_of_teacher()
 else:
-    print('已有任务，保留当前数据，不重复灌入。')
+    if os.environ.get('DEMO_SEED_VERIFIED') != '1':
+        raise SystemExit('检测到未完成初始化的数据，保留现状并停止。请检查先前种子错误或重建专用演示环境。')
+    print('已有成功初始化记录，保留当前数据，不重复灌入。')
 expected = {'运动学基础练习': (8, 'CLOSED'), '牛顿运动定律': (10, 'PUBLISHED'),
             '电学入门测验': (6, 'PUBLISHED'), '综合复习卷': (12, 'CLOSED')}
 by_title = {task.get('eventTitle'): task for task in tasks}
@@ -95,6 +109,7 @@ if status != 200 or not seed.data_of(body):
     raise SystemExit('学生任务验证失败；请检查种子日志，不要把当前环境标记为完整演示。')
 print('教师/学生登录及学生任务验证通过。')
 PY
+  "${compose[@]}" exec -T app touch /data/.demo-seed-complete
   echo '学生：stu01 / Student@2026'
 else
   echo '未检测到 python3：跳过种子数据；学生账号与演示作业尚未准备。安装 Python 3 后重跑。'
