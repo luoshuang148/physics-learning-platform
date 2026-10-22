@@ -55,14 +55,40 @@ import sys
 sys.path.insert(0, 'scripts')
 import seed_test_data as seed
 teacher, _ = seed.login(*seed.TEACHER)
-status, body = seed.req('GET', '/teacher/events', teacher)
-if status != 200:
-    raise SystemExit('无法检查现有任务，不执行种子写入。')
-if not seed.data_of(body):
-    if seed.main() != 0:
-        raise SystemExit('种子初始化失败。')
+def tasks_of_teacher():
+    status, body = seed.req('GET', '/teacher/events/all', teacher)
+    tasks = seed.data_of(body)
+    if status != 200 or not isinstance(tasks, list):
+        raise SystemExit('无法检查现有任务，不执行种子写入。')
+    return tasks
+tasks = tasks_of_teacher()
+if not tasks:
+    # The legacy seeder logs some write errors and still returns zero.
+    # Observe its actual write responses; optional student1 login may legitimately fail.
+    original_req = seed.req
+    write_errors = []
+    def checked_req(method, path, *args, **kwargs):
+        status, body = original_req(method, path, *args, **kwargs)
+        if method in ('POST', 'PUT', 'PATCH', 'DELETE') and path != '/auth/login' and not 200 <= status < 300:
+            write_errors.append(f'{method} {path}: {status}')
+        return status, body
+    seed.req = checked_req
+    try:
+        result = seed.main()
+    finally:
+        seed.req = original_req
+    if result != 0 or write_errors:
+        raise SystemExit('种子初始化不完整：' + '; '.join(write_errors))
+    tasks = tasks_of_teacher()
 else:
     print('已有任务，保留当前数据，不重复灌入。')
+expected = {'运动学基础练习': (8, 'CLOSED'), '牛顿运动定律': (10, 'PUBLISHED'),
+            '电学入门测验': (6, 'PUBLISHED'), '综合复习卷': (12, 'CLOSED')}
+by_title = {task.get('eventTitle'): task for task in tasks}
+for title, (count, status) in expected.items():
+    task = by_title.get(title, {})
+    if task.get('questionCount') != count or task.get('status') != status:
+        raise SystemExit('演示任务缺失或已改变：' + title + '；保留现有数据，请检查日志或重建专用演示环境。')
 student, _ = seed.login('stu01', 'Student@2026')
 status, body = seed.req('GET', '/teacher/events/student-tasks', student)
 if status != 200 or not seed.data_of(body):

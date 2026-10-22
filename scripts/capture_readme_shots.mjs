@@ -29,6 +29,9 @@ try {
     try {
       const page = await context.newPage();
       const apiErrors = [];
+      page.on('requestfailed', request => {
+        if (request.url().includes('/api/v1/')) apiErrors.push(request.failure()?.errorText || 'request failed');
+      });
       page.on('response', response => {
         if (response.url().includes('/api/v1/') && response.status() >= 400) apiErrors.push(response.status());
       });
@@ -59,6 +62,7 @@ try {
       await expect(page.locator(shot.marker).first()).toBeVisible();
       await expect(page.getByText(/正在加载…|加载错题记录…|加载中…/, { exact: true })).toHaveCount(0);
       await page.evaluate(() => document.fonts.ready);
+      await expect(page.locator('[role="alert"], .toast.visible.type-error')).toHaveCount(0);
       if (apiErrors.length) throw new Error(`API failed: ${apiErrors.join(', ')}`);
       await page.screenshot({ path: path.join(staging, `${shot.name}.png`), animations: 'disabled' });
       console.log(`captured ${shot.name}: ${page.url()}`);
