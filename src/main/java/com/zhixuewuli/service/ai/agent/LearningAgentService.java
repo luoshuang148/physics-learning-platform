@@ -25,12 +25,20 @@ public class LearningAgentService {
     public ValidatedPlanPreview preview(LearningToolContext context, String question, int days,
                                         java.util.function.BooleanSupplier cancelled,
                                         java.util.function.Consumer<Runnable> cancellationRegistration) {
+        return preview(context, question, days, cancelled, cancellationRegistration, ignored -> {});
+    }
+
+    public ValidatedPlanPreview preview(LearningToolContext context, String question, int days,
+                                        java.util.function.BooleanSupplier cancelled,
+                                        java.util.function.Consumer<Runnable> cancellationRegistration,
+                                        java.util.function.Consumer<LearningAssistantStep> onStep) {
         if (!agentProperties.isToolCallingEnabled()) throw new IllegalStateException("动态 Agent 尚未启用");
         if (days < 1 || days > 7 || question == null || question.isBlank() || question.length() > 800)
             throw new IllegalArgumentException("请求参数无效");
         long deadline = System.currentTimeMillis() + limits.getTotalDeadlineSeconds() * 1000;
+        var step = new java.util.concurrent.atomic.AtomicInteger();
         boolean knowledgeOnly = isKnowledgeOnly(question);
-        PersonalLearningSummary personal = knowledgeOnly ? null : readSummary(context);
+        PersonalLearningSummary personal = knowledgeOnly ? null : readSummary(context, onStep, step);
         String revision = personal == null ? "no-personal-data" : personal.sourceAnswerRevision();
         List<ChatTurn> turns = new ArrayList<>();
         turns.add(new ChatTurn(ChatTurn.Role.SYSTEM, systemPrompt(context.eventId(), revision, days), null, null, List.of()));
@@ -67,7 +75,9 @@ public class LearningAgentService {
                         List<PracticeCandidate> found = json.readerForListOf(PracticeCandidate.class).readValue(resultJson);
                         candidates.clear(); candidates.addAll(found);
                     }
+                    onStep.accept(new LearningAssistantStep(step.incrementAndGet(), call.name(), "SUCCEEDED", stepSummary(call.name())));
                 } catch (Exception error) {
+                    onStep.accept(new LearningAssistantStep(step.incrementAndGet(), call.name(), "FAILED", "此步骤暂未完成"));
                     resultJson = serialize(Map.of("error", "tool_failed", "message", "工具调用失败；请尝试其他证据或给出部分建议。"));
                 }
                 turns.add(new ChatTurn(ChatTurn.Role.TOOL, resultJson, call.callId(), call.name(), List.of()));
@@ -84,13 +94,27 @@ public class LearningAgentService {
                 "信息不足可返回空items。";
     }
 
-    private PersonalLearningSummary readSummary(LearningToolContext context) {
+    private PersonalLearningSummary readSummary(LearningToolContext context,
+                                                java.util.function.Consumer<LearningAssistantStep> onStep,
+                                                java.util.concurrent.atomic.AtomicInteger step) {
         try {
             String args = json.writeValueAsString(Map.of("eventId", context.eventId()));
             ToolResult result = tools.execute(context, new ToolCall("agent-summary", "get_learning_summary", args),
                     System.currentTimeMillis() + limits.getToolTimeoutSeconds() * 1000);
-            return json.readValue(result.json(), PersonalLearningSummary.class);
+            PersonalLearningSummary summary = json.readValue(result.json(), PersonalLearningSummary.class);
+            onStep.accept(new LearningAssistantStep(step.incrementAndGet(), "get_learning_summary", "SUCCEEDED", "已读取本人本次作业统计"));
+            return summary;
         } catch (Exception error) { throw new IllegalStateException("无法读取本人学习统计", error); }
+    }
+
+    private String stepSummary(String toolName) {
+        return switch (toolName) {
+            case "get_learning_summary" -> "已读取本人本次作业统计";
+            case "get_wrong_questions" -> "已读取本人错题和历史快照";
+            case "search_knowledge" -> "已检索当前作业可访问的资料";
+            case "recommend_practice" -> "已筛选可练习题目";
+            default -> "步骤完成";
+        };
     }
 
     private boolean isKnowledgeOnly(String value) {

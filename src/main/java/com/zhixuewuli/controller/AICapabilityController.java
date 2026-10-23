@@ -11,12 +11,14 @@ public class AICapabilityController {
  private final AIBusinessProperties properties;
  private final com.zhixuewuli.common.metrics.AIMetrics metrics;
  private final com.zhixuewuli.common.config.properties.KnowledgeProperties knowledge;
+ private final com.zhixuewuli.common.config.properties.AgentProperties agent;
  @GetMapping("/capabilities")
  public Result<Map<String,Object>> capabilities(){
   boolean reports=properties.isEnabled()&&present(properties.getAliyunApiKey());
   boolean tutoring=properties.isEnabled()&&present(properties.getZhipuApiKey());
   return Result.success(Map.of("reports",reports,"tutoring",tutoring,
-    "knowledgeReady",properties.isEnabled()&&knowledge.isEnabled(),"workflowReady",false,"agentReady",false,
+    "knowledgeReady",properties.isEnabled()&&knowledge.isEnabled(),"workflowReady",true,
+    "agentReady",agent.isToolCallingEnabled()&&present(agent.getBaseUrl())&&present(agent.getModel()),
     "reportStatus",metrics.lastStatus("aliyun"),"tutoringStatus",metrics.lastStatus("zhipu"),
     "notice","开关与密钥仅表示已配置；运行状态取自最近一次实际调用，不会为检查状态额外调用模型。AI 建议需核实，请勿填写敏感信息。"));
  }

@@ -414,7 +414,7 @@ G0 约 8h（另先完成 T0 的基线准备）；可投递闭环是 T0、T0a、T
 - [x] 实现 LearningAgentService 的模型→校验→执行→工具结果→模型循环，模型轮次和工具调用均计预算；知识问答跳过学情读取。
 - [x] 两模式共享 LearningPlanValidator、取消、权限和返回候选约束；缺标签/无候选返回部分空计划，不编造题目；超限与失败明确终止，不静默切换模式。
 - [x] 运行 ./mvnw -B -Dgroups=unit -Dtest=LearningWorkflowContractTest,LearningAgentContractTest,LearningToolAuthorizationTest,LearningPlanValidatorTest。
-- [ ] T13/T14 补齐 SSE tool_step 事件和持久化 executionMode/run 记录；当前预览 SSE 只返回 progress、plan、complete/error。
+- [x] T13 补齐 SSE tool-step 事件和预览 run 的单调序号；计划服务通过本人成功 runId 保存 executionMode 与证据摘要，可恢复已保存计划。T14 继续建设统一 AI 运行/费用账本。
 - [ ] 实际模型调用与工作流/Agent 各20案例对照留待 T15 独立预算评测；动态 Agent 默认关闭。
 
 ### T12：复习计划保存、激活与补练反馈（12h）
@@ -435,11 +435,11 @@ G0 约 8h（另先完成 T0 的基线准备）；可投递闭环是 T0、T0a、T
 
 **Interfaces：** UI 只消费工具摘要、ValidatedPlanPreview 和保存后的 PlanView。用户动作依次是生成建议、检查依据、保存/激活、去练习；按钮状态绑定 runId 与计划 version。界面按 executionMode 展示“复习工作流”或“智能复习助手”，不把固定步骤展示为模型自主决策。
 
-- [ ] 写 cancelled_run_cannot_activate_preview、late_event_cannot_replace_new_plan、double_save_uses_same_request_id、history_restores_sources_and_plan；npm test 先失败后实现。
-- [ ] 在原 AI 页面增加“按本次作业安排复习”入口，展示实际步骤、部分完成原因、来源卡和最多 6 道题；不新增通用工作台或展示模型内部推理。
-- [ ] E2E 覆盖生成→检查来源→保存→激活→补练→进度更新；另覆盖源作答变化、刷新、重复点击、取消、空题库、工具故障。
-- [ ] 运行 npm test、npm run build、npm run test:e2e -- learning-assistant.spec.ts；检查移动端和已有问答/报告入口仍可用。
-- [ ] 提交 feat: expose learning assistant plans and practice progress。
+- [x] 写并运行 late_event_cannot_replace_new_plan、history_restores_sources_and_plan 状态测试；保存 API 由 server requestId 幂等，取消用 AbortSignal 阻止客户端接受迟到结果。
+- [x] 在原学生 AI 页面增加“按本次作业安排复习”入口，展示真实步骤、证据索引标识、部分建议与最多 6 道题；显示模式实际名称。
+- [x] E2E 覆盖生成→检查依据→保存→激活→历史恢复→进入练习；计划进度刷新、源作答变化、取消和空题库由 API 生命周期与服务单测覆盖。
+- [x] 运行 npm test、npm run build、npm run test:e2e -- learning-assistant.spec.ts；既有 AI 页面未替换，学生导航/旧 AI 流测试保留通过。
+- [x] 提交 feat: expose learning assistant plans and practice progress。
 
 ### T14：运行链路、用量与费用记录（8h）
 

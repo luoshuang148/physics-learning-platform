@@ -30,8 +30,10 @@ class LearningPlanLifecycleTest {
                 .thenReturn(21L);
         when(jdbc.queryForMap(contains("FROM learning_plans WHERE id=?"), eq(21L), eq(3L))).thenReturn(Map.of(
                 "id", 21L, "event_id", 8L, "status", "DRAFT", "version", 1L, "days", 2,
-                "source_answer_revision", "r1", "activated_at", ""));
+                "source_answer_revision", "r1", "activated_at", "", "source_run_id", "22222222-2222-4222-8222-222222222222"));
         when(jdbc.query(contains("FROM learning_plan_items"), any(RowMapper.class), eq(21L))).thenReturn(List.of());
+        when(jdbc.queryForObject("SELECT plan_json FROM learning_plan_previews WHERE run_id=? AND user_id=?", String.class,
+                "22222222-2222-4222-8222-222222222222", 3L)).thenReturn("{\"executionMode\":\"WORKFLOW\",\"evidenceSummary\":[]}");
         var result = plans.saveDraft(3L, "22222222-2222-4222-8222-222222222222", "11111111-1111-4111-8111-111111111111");
         assertEquals(21L, result.id());
         assertEquals("DRAFT", result.status());
@@ -59,9 +61,11 @@ class LearningPlanLifecycleTest {
     @Test void progressCountsOnlyPostActivationPracticeWithoutWritingOriginalScores() {
         when(jdbc.queryForMap(contains("FROM learning_plans WHERE id=?"), eq(21L), eq(3L))).thenReturn(Map.of(
                 "id", 21L, "event_id", 8L, "status", "ACTIVE", "version", 2L, "days", 2,
-                "source_answer_revision", "r1", "activated_at", java.sql.Timestamp.valueOf("2026-10-23 10:00:00")));
+                "source_answer_revision", "r1", "activated_at", java.sql.Timestamp.valueOf("2026-10-23 10:00:00"), "source_run_id", "22222222-2222-4222-8222-222222222222"));
         when(jdbc.query(contains("FROM learning_plan_items"), any(RowMapper.class), eq(21L)))
                 .thenReturn(List.of(new com.zhixuewuli.dto.agent.LearningPlanItemPreview(1, "mechanics.newton_2", 31L, List.of("S1"))));
+        when(jdbc.queryForObject("SELECT plan_json FROM learning_plan_previews WHERE run_id=? AND user_id=?", String.class,
+                "22222222-2222-4222-8222-222222222222", 3L)).thenReturn("{\"executionMode\":\"AGENT\",\"evidenceSummary\":[\"S1\"]}");
         when(jdbc.queryForMap(contains("SELECT COUNT(*) AS attempts"), any(Object[].class)))
                 .thenReturn(Map.of("attempts", 2L, "correct_count", 1L));
         var view = plans.get(3L, 21L);
@@ -74,8 +78,10 @@ class LearningPlanLifecycleTest {
     @Test void repeatedActivationReturnsTheAlreadyActivePlan() {
         when(jdbc.queryForMap(contains("FROM learning_plans WHERE id=?"), eq(21L), eq(3L))).thenReturn(Map.of(
                 "id", 21L, "event_id", 8L, "status", "ACTIVE", "version", 2L, "days", 2,
-                "source_answer_revision", "r1", "activated_at", java.sql.Timestamp.valueOf("2026-10-23 10:00:00")));
+                "source_answer_revision", "r1", "activated_at", java.sql.Timestamp.valueOf("2026-10-23 10:00:00"), "source_run_id", "22222222-2222-4222-8222-222222222222"));
         when(jdbc.query(contains("FROM learning_plan_items"), any(RowMapper.class), eq(21L))).thenReturn(List.of());
+        when(jdbc.queryForObject("SELECT plan_json FROM learning_plan_previews WHERE run_id=? AND user_id=?", String.class,
+                "22222222-2222-4222-8222-222222222222", 3L)).thenReturn("{\"executionMode\":\"WORKFLOW\",\"evidenceSummary\":[]}");
         var result = plans.activate(3L, 21L, 1);
         assertEquals("ACTIVE", result.status()); assertEquals(2L, result.version());
         verifyNoInteractions(data, tasks);

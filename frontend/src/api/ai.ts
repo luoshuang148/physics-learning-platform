@@ -168,6 +168,10 @@ export const streamRealtimeQA = (body: AIAskPayload, options: Omit<StreamOptions
 export const streamWrongQuestionAnalysis = (body: AIAskPayload, options: Omit<StreamOptions, 'body' | 'method'>) =>
   streamAI('/ai/student/wrong-question-analysis', { ...options, body, method: 'POST', sessionType: options.sessionType ?? 'student_wrong_analysis' });
 
+export interface LearningPlanPreviewPayload { eventId: number; days: number; question: string; requestId: string; }
+export const streamLearningPlanPreview = (body: LearningPlanPreviewPayload, options: Omit<StreamOptions, 'body' | 'method'>) =>
+  streamAI('/ai/student/learning-plan/preview', { ...options, body, method: 'POST', sessionType: options.sessionType ?? 'student_learning_assistant' });
+
 export const streamStudentReport = (options: Omit<StreamOptions, 'body'> & { eventId?: number }) =>
   streamAI(`/ai/student/report${options.eventId == null ? '' : `?eventId=${options.eventId}`}`, { ...options, method: 'GET' });
 

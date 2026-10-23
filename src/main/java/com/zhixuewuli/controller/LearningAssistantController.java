@@ -52,6 +52,7 @@ public class LearningAssistantController {
                               @AuthenticationPrincipal AuthenticatedUser user) {
         if (user == null || user.id() == null) throw new IllegalStateException("需要学生身份认证");
         String runId = UUID.randomUUID().toString();
+        java.util.concurrent.atomic.AtomicInteger sequence = new java.util.concurrent.atomic.AtomicInteger();
         SseEmitter emitter = new SseEmitter((properties.getTotalDeadlineSeconds() + 5) * 1000);
         AtomicBoolean cancelled = new AtomicBoolean(false);
         CopyOnWriteArrayList<Runnable> cancellationActions = new CopyOnWriteArrayList<>();
@@ -69,17 +70,19 @@ public class LearningAssistantController {
                 LearningToolContext context = new LearningToolContext(user.id(), request.eventId());
                 long deadline = System.currentTimeMillis() + properties.getTotalDeadlineSeconds() * 1000;
                 ValidatedPlanPreview plan = properties.getMode() == LearningAssistantProperties.Mode.AGENT
-                        ? agent.preview(context, request.question(), request.days(), cancelled::get, cancellationActions::add)
-                        : workflow.preview(context, request.question(), request.days(), deadline, cancelled::get);
+                        ? agent.preview(context, request.question(), request.days(), cancelled::get, cancellationActions::add,
+                        step -> sendStep(emitter, runId, step, sequence.incrementAndGet()))
+                        : workflow.preview(context, request.question(), request.days(), deadline, cancelled::get,
+                        step -> sendStep(emitter, runId, step, sequence.incrementAndGet()));
                 if (cancelled.get()) return;
                 plans.storeSuccessfulPreview(user.id(), runId, plan);
-                emitter.send(SseEmitter.event().name("plan").data(Map.of("runId", runId, "seq", 1, "planPreview", plan, "evidenceSummary", plan.evidenceSummary())));
-                emitter.send(SseEmitter.event().name("complete").data(Map.of("runId", runId, "seq", 2, "status", "success", "executionMode", plan.executionMode())));
+                emitter.send(SseEmitter.event().name("plan").data(Map.of("runId", runId, "seq", sequence.incrementAndGet(), "planPreview", plan, "evidenceSummary", plan.evidenceSummary())));
+                emitter.send(SseEmitter.event().name("complete").data(Map.of("runId", runId, "seq", sequence.incrementAndGet(), "status", "success", "executionMode", plan.executionMode())));
                 emitter.complete();
             } catch (Exception error) {
                 if (cancelled.get()) return;
                 try {
-                    emitter.send(SseEmitter.event().name("error").data(Map.of("runId", runId, "seq", 1, "code", "LEARNING_PLAN_FAILED", "message", safeMessage(error))));
+                    emitter.send(SseEmitter.event().name("error").data(Map.of("runId", runId, "seq", sequence.incrementAndGet(), "code", "LEARNING_PLAN_FAILED", "message", safeMessage(error))));
                 } catch (Exception ignored) { }
                 emitter.complete();
             }
@@ -91,5 +94,12 @@ public class LearningAssistantController {
         String message = error.getMessage();
         if (message == null || message.isBlank()) return "暂时无法生成复习计划";
         return message.substring(0, Math.min(160, message.length()));
+    }
+
+    private void sendStep(SseEmitter emitter, String runId, com.zhixuewuli.dto.agent.LearningAssistantStep step, int sequence) {
+        try {
+            emitter.send(SseEmitter.event().name("tool-step").data(Map.of("runId", runId, "seq", sequence,
+                    "toolName", step.toolName(), "status", step.status(), "summary", step.summary())));
+        } catch (Exception ignored) { }
     }
 }

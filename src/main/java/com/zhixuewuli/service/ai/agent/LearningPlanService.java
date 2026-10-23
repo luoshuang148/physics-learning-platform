@@ -122,13 +122,15 @@ public class LearningPlanService {
     @Transactional(readOnly = true)
     public LearningPlanView get(Long viewerId, Long planId) {
         Map<String, Object> row = jdbc.queryForMap("""
-                SELECT id,event_id,status,version,days,source_answer_revision,activated_at
+                SELECT id,event_id,status,version,days,source_answer_revision,activated_at,source_run_id
                 FROM learning_plans WHERE id=? AND user_id=?
                 """, planId, viewerId);
         List<LearningPlanItemPreview> items = jdbc.query("""
                 SELECT day_no,question_id,knowledge_point_code,reason_source_ids FROM learning_plan_items WHERE plan_id=? ORDER BY day_no,id
                 """, (rs, n) -> new LearningPlanItemPreview(rs.getInt("day_no"), rs.getString("knowledge_point_code"),
                 rs.getLong("question_id"), parseStrings(rs.getString("reason_source_ids"))), planId);
+        ValidatedPlanPreview preview = decodePreview(jdbc.queryForObject("SELECT plan_json FROM learning_plan_previews WHERE run_id=? AND user_id=?",
+                String.class, row.get("source_run_id"), viewerId));
         int attempts = 0, correct = 0;
         if ("ACTIVE".equals(row.get("status")) && !items.isEmpty()) {
             var ids = items.stream().map(LearningPlanItemPreview::questionId).toList();
@@ -142,7 +144,14 @@ public class LearningPlanService {
         String status = "CANCELLED".equals(row.get("status")) ? "CANCELLED" : attempts == 0 ? "NOT_STARTED" : correct == attempts ? "ON_TRACK" : "IN_PROGRESS";
         return new LearningPlanView(((Number) row.get("id")).longValue(), ((Number) row.get("event_id")).longValue(),
                 String.valueOf(row.get("status")), ((Number) row.get("version")).longValue(), ((Number) row.get("days")).intValue(),
-                items, String.valueOf(row.get("source_answer_revision")), attempts, correct, status);
+                items, String.valueOf(row.get("source_answer_revision")), attempts, correct, status,
+                preview.executionMode(), preview.evidenceSummary());
+    }
+
+    @Transactional(readOnly = true)
+    public List<LearningPlanView> list(Long viewerId) {
+        return jdbc.queryForList("SELECT id FROM learning_plans WHERE user_id=? ORDER BY updated_at DESC,id DESC LIMIT 30", Long.class, viewerId)
+                .stream().map(id -> get(viewerId, id)).toList();
     }
 
     @Transactional

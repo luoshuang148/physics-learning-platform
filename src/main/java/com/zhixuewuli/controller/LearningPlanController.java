@@ -30,6 +30,11 @@ public class LearningPlanController {
         return Result.success(service.get(user.id(), id));
     }
 
+    @GetMapping
+    public Result<java.util.List<LearningPlanView>> list(@AuthenticationPrincipal AuthenticatedUser user) {
+        return Result.success(service.list(user.id()));
+    }
+
     @PostMapping("/{id}/activate")
     public Result<LearningPlanView> activate(@PathVariable Long id, @Valid @RequestBody LearningPlanVersionRequest request,
                                               @AuthenticationPrincipal AuthenticatedUser user) {
