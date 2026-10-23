@@ -67,6 +67,7 @@ public class QuestionServiceImpl implements QuestionService {
     private final com.zhixuewuli.repository.TeacherEventQuestionRepository taskQuestionRepository;
     private final com.zhixuewuli.repository.AnswerRecordRepository answerRepository;
     private final com.zhixuewuli.repository.KnowledgePointRepository knowledgePoints;
+    private final com.zhixuewuli.service.platformsearch.QuestionSourceIndexService indexService;
 
     @Override
     public Question createQuestion(QuestionCreateRequest request) {
@@ -90,10 +91,17 @@ public class QuestionServiceImpl implements QuestionService {
         question.setDifficulty(request.getDifficulty());
         question.setImageBase64(request.getImageBase64());
         question.setKnowledgePointCodes(validKnowledgePointCodes(request.getKnowledgePointCodes()));
+        boolean aiEnabled = Boolean.TRUE.equals(request.getAiPracticeEnabled());
+        validateAiPracticeEnabled(request.getContent(), request.getExplanation(), request.getOptions(), aiEnabled);
+        question.setAiPracticeEnabled(aiEnabled);
+        question.setAiContentRevision(1L);
 
         // 4. 保存到数据库
         Question savedQuestion = questionRepository.save(question);
         log.info("题目创建成功，ID: {}", savedQuestion.getId());
+
+        // 5. 同事务入队索引（未启用 AI 的题标 OBSOLETE，由 worker 处理）
+        indexService.enqueueCurrent(savedQuestion.getId(), savedQuestion.getAiContentRevision());
 
         return savedQuestion;
     }
@@ -113,6 +121,8 @@ public class QuestionServiceImpl implements QuestionService {
         // 2. 执行删除
         if(taskQuestionRepository.existsByQuestionId(id) || answerRepository.existsByQuestionId(id))
             throw new com.zhixuewuli.common.exception.BusinessException("题目已有任务或作答关联，请保留历史题目");
+        // 同事务排队删除墓碑；向量异步清理
+        indexService.enqueueDelete(id, question.getAiContentRevision());
         questionRepository.delete(question);
         log.info("题目删除成功，ID: {}", id);
     }
@@ -129,6 +139,12 @@ public class QuestionServiceImpl implements QuestionService {
                     return new QuestionNotFoundException(request.getId());
                 });
 
+        boolean aiEnabled = Boolean.TRUE.equals(request.getAiPracticeEnabled());
+        validateAiPracticeEnabled(request.getContent(), request.getExplanation(), request.getOptions(), aiEnabled);
+
+        boolean previousAiEnabled = existingQuestion.isAiPracticeEnabled();
+        String fingerprintBefore = contentFingerprint(existingQuestion);
+
         // 3. 全量覆盖更新（包括可能的空值）
         existingQuestion.setContent(request.getContent());
         existingQuestion.setOptions(request.getOptions());
@@ -137,12 +153,52 @@ public class QuestionServiceImpl implements QuestionService {
         existingQuestion.setDifficulty(request.getDifficulty());
         existingQuestion.setImageBase64(request.getImageBase64());
         existingQuestion.setKnowledgePointCodes(validKnowledgePointCodes(request.getKnowledgePointCodes()));
+        existingQuestion.setAiPracticeEnabled(aiEnabled);
 
-        // 4. 保存更新
+        String fingerprintAfter = contentFingerprint(existingQuestion);
+        boolean revisionRelevantChanged = !fingerprintBefore.equals(fingerprintAfter)
+                || previousAiEnabled != aiEnabled;
+
+        // 4. 内容修订号：题干/选项/答案/解析/难度/标签/图片/AI 开关变化时递增
+        if (revisionRelevantChanged) {
+            existingQuestion.setAiContentRevision(existingQuestion.getAiContentRevision() + 1);
+        }
+
+        // 5. 保存更新
         Question updatedQuestion = questionRepository.save(existingQuestion);
         log.info("题目更新成功，ID: {}", updatedQuestion.getId());
 
+        // 6. 同事务入队新修订索引
+        if (revisionRelevantChanged) {
+            indexService.enqueueCurrent(updatedQuestion.getId(), updatedQuestion.getAiContentRevision());
+        }
+
         return updatedQuestion;
+    }
+
+    /** 修订相关字段指纹；纯时间戳变化不参与。 */
+    private String contentFingerprint(Question q) {
+        return java.util.Objects.hash(
+                q.getContent(), q.getOptions(), q.getCorrectOption(), q.getExplanation(),
+                q.getDifficulty(), q.getImageBase64(), q.getKnowledgePointCodes(), q.isAiPracticeEnabled()
+        ) + "|" + String.valueOf(q.getExplanation());
+    }
+
+    /**
+     * 仅可用文字内容且解析完整的题才能启用 AI 补练。
+     * 纯图片或解析缺失的题明确提示需要补录文字。
+     */
+    private void validateAiPracticeEnabled(String content, String explanation, String options, boolean aiEnabled) {
+        if (!aiEnabled) return;
+        boolean hasText = (content != null && !content.isBlank()) || (options != null && !options.isBlank());
+        if (!hasText) {
+            throw new com.zhixuewuli.common.exception.BusinessException(
+                    "纯图片题不能启用 AI 补练，请先补录文字题干或选项");
+        }
+        if (explanation == null || explanation.isBlank()) {
+            throw new com.zhixuewuli.common.exception.BusinessException(
+                    "解析缺失时不能启用 AI 补练，请补录完整解析");
+        }
     }
 
     private List<String> validKnowledgePointCodes(List<String> codes) {

@@ -231,6 +231,8 @@ public class QuestionController {
                 .difficulty(question.getDifficulty())
                 .knowledgePointCodes(question.getKnowledgePointCodes())
                 .imageBase64(question.getImageBase64())
+                .aiPracticeEnabled(question.isAiPracticeEnabled())
+                .aiContentRevision(question.getAiContentRevision())
                 .createdAt(question.getCreatedAt())
                 .updatedAt(question.getUpdatedAt())
                 .build();

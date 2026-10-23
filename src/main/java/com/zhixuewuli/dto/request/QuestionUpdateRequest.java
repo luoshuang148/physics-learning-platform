@@ -148,4 +148,8 @@ public class QuestionUpdateRequest {
      */
     @Schema(description = "题目图片Base64编码数据", example = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/5+hHgAHggJ/PchI7wAAAABJRU5ErkJggg==")
     private String imageBase64;
+
+    /** 是否允许用于 AI 补练（默认 false；须文字与解析完整才能开启）。 */
+    @Schema(description = "是否允许用于 AI 补练", example = "false")
+    private Boolean aiPracticeEnabled = Boolean.FALSE;
 }

@@ -163,4 +163,12 @@ public class QuestionResponse {
      */
     @Schema(description = "更新时间", example = "2026-01-15T15:45:00")
     private LocalDateTime updatedAt;
+
+    /** 是否允许用于 AI 补练。 */
+    @Schema(description = "是否允许用于 AI 补练", example = "false")
+    private Boolean aiPracticeEnabled;
+
+    /** 内容修订号。 */
+    @Schema(description = "内容修订号", example = "1")
+    private Long aiContentRevision;
 }

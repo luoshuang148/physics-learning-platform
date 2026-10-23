@@ -118,6 +118,20 @@ public class Question extends BaseTimeEntity {
     private String imageBase64;
 
     /**
+     * 是否允许用于 AI 补练检索（默认 false）。
+     * 仅当可用文字内容且解析完整时，教师审核后开启。
+     */
+    @Column(name = "ai_practice_enabled", nullable = false)
+    private boolean aiPracticeEnabled = false;
+
+    /**
+     * 内容修订号。题干、选项、正确答案、解析、难度、标签、AI 启用状态或图片变化时递增；
+     * 纯时间戳变化不递增。
+     */
+    @Column(name = "ai_content_revision", nullable = false)
+    private long aiContentRevision = 1L;
+
+    /**
      * 在持久化前自动计算 contentHash
      */
     @PrePersist
