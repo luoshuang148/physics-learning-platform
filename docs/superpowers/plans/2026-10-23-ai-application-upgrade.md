@@ -401,7 +401,6 @@ G0 约 8h（另先完成 T0 的基线准备）；可投递闭环是 T0、T0a、T
 - [x] 请求带总截止时间，按 T0a 验证过的 SDK 取消机制传递取消；模型 ID、端点和能力独立配置，toolCallingEnabled 默认关闭，agentReady 仍为 false，不影响 tutoring/reports。
 - [ ] 用明确启用的独立外部冒烟测试验证一个目标模型；写日期和结果，不把付费冒烟加入普通 CI。
 - [x] 重跑旧 AIWireContractTest 与新测试。
-- [ ] 用明确启用的独立外部冒烟测试验证一个目标模型；写日期和结果，不把付费冒烟加入普通 CI。
 - [x] 提交 feat: add typed tool-calling model adapter。
 
 ### T11：先建立工作流，再实现有界 Agent（16h）
@@ -410,11 +409,13 @@ G0 约 8h（另先完成 T0 的基线准备）；可投递闭环是 T0、T0a、T
 
 **Interfaces：** preview(viewerId, sessionId, eventId, days, requestId, emitter)；registry.execute(viewerContext, toolCall, deadline) -> ToolResult；validator.validate(planJson, returnedCandidates, sourceRevision) -> ValidatedPlanPreview。viewerContext 只能由后端认证和任务访问结果构造。ai.learning-assistant.mode=WORKFLOW/AGENT 是后端配置，初始 WORKFLOW；run 与预览事件记录真实 executionMode，客户端不能通过模型参数切换权限或预算。
 
-- [ ] 写 tool_cannot_override_viewer、summary_is_personal_not_whole_class、workflow_uses_shared_tools、knowledge_only_request_skips_student_stats、empty_wrong_list_changes_next_step、invalid_question_id_is_rejected、agent_stops_at_budget；分别覆盖权限、真实模式和动态选择，限制仍是 6 轮/8 次工具/60 秒。
-- [ ] 先注册第 6 节四个只读工具并实现 LearningWorkflowService：固定顺序收集事实，再由代码生成合法候选计划，可选一次模型润色但不能改变事实/题目 ID。先通过 LearningWorkflowContractTest，核对统计、选题和权限；不标为 Agent。
-- [ ] 工作流通过后实现 LearningAgentService 的模型→校验→执行→工具结果→模型循环，所有调用计预算；根据第 6 节场景改变下一步。所有终态只写一次，记录 tool_step 与 executionMode；无动态选择的实现仍只能按工作流交付。
-- [ ] 两模式共享 LearningPlanValidator、取消、权限和返回候选约束。测试 cancel_stops_next_tool、duplicate_call_does_not_loop、partial_result_is_not_full_success；缺标签/无候选/失败明确展示，不静默在两模式间切换并宣称成功。
-- [ ] 运行 ./mvnw -B test -Dtest=LearningWorkflowContractTest,LearningAgentContractTest,LearningToolAuthorizationTest -Dgroups=unit，提交 feat: compare fixed learning workflow with bounded tool-calling agent。
+- [x] 写权限覆盖、个人统计隔离、工作流共用工具、知识问答跳过学情、空错题不虚构练题、无效题目 ID 拒绝、Agent 达到预算停止；另覆盖取消和重复调用停止，限制仍是 6 轮/8 次工具/60 秒。
+- [x] 注册第 6 节四个只读工具并实现 LearningWorkflowService：固定顺序收集事实，再由代码生成合法候选计划。通过 LearningWorkflowContractTest，核对统计、选题和权限；不标为 Agent。
+- [x] 实现 LearningAgentService 的模型→校验→执行→工具结果→模型循环，模型轮次和工具调用均计预算；知识问答跳过学情读取。
+- [x] 两模式共享 LearningPlanValidator、取消、权限和返回候选约束；缺标签/无候选返回部分空计划，不编造题目；超限与失败明确终止，不静默切换模式。
+- [x] 运行 ./mvnw -B -Dgroups=unit -Dtest=LearningWorkflowContractTest,LearningAgentContractTest,LearningToolAuthorizationTest,LearningPlanValidatorTest。
+- [ ] T13/T14 补齐 SSE tool_step 事件和持久化 executionMode/run 记录；当前预览 SSE 只返回 progress、plan、complete/error。
+- [ ] 实际模型调用与工作流/Agent 各20案例对照留待 T15 独立预算评测；动态 Agent 默认关闭。
 
 ### T12：复习计划保存、激活与补练反馈（12h）
 

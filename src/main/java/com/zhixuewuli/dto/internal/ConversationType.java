@@ -44,7 +44,10 @@ public enum ConversationType {
     /**
      * 教师题目分析
      */
-    TEACHER_QUESTION_ANALYSIS("教师题目分析");
+    TEACHER_QUESTION_ANALYSIS("教师题目分析"),
+
+    /** 独立隔离的学习计划 Agent 对话。 */
+    LEARNING_ASSISTANT("学习计划助手");
 
     private final String description;
 
