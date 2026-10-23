@@ -7,6 +7,7 @@ import com.zhixuewuli.dto.agent.ValidatedPlanPreview;
 import com.zhixuewuli.dto.request.LearningPlanPreviewRequest;
 import com.zhixuewuli.service.ai.agent.LearningAgentService;
 import com.zhixuewuli.service.ai.agent.LearningWorkflowService;
+import com.zhixuewuli.service.ai.agent.LearningPlanService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -30,15 +31,18 @@ public class LearningAssistantController {
     private final LearningWorkflowService workflow;
     private final LearningAgentService agent;
     private final LearningAssistantProperties properties;
+    private final LearningPlanService plans;
     private final Executor executor;
 
     @Autowired
     public LearningAssistantController(LearningWorkflowService workflow, LearningAgentService agent,
                                        LearningAssistantProperties properties,
+                                       LearningPlanService plans,
                                        @Qualifier("aiTaskExecutor") Executor executor) {
         this.workflow = workflow;
         this.agent = agent;
         this.properties = properties;
+        this.plans = plans;
         this.executor = executor;
     }
 
@@ -68,6 +72,7 @@ public class LearningAssistantController {
                         ? agent.preview(context, request.question(), request.days(), cancelled::get, cancellationActions::add)
                         : workflow.preview(context, request.question(), request.days(), deadline, cancelled::get);
                 if (cancelled.get()) return;
+                plans.storeSuccessfulPreview(user.id(), runId, plan);
                 emitter.send(SseEmitter.event().name("plan").data(Map.of("runId", runId, "seq", 1, "planPreview", plan, "evidenceSummary", plan.evidenceSummary())));
                 emitter.send(SseEmitter.event().name("complete").data(Map.of("runId", runId, "seq", 2, "status", "success", "executionMode", plan.executionMode())));
                 emitter.complete();

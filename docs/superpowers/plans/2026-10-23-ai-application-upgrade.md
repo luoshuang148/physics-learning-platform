@@ -423,11 +423,11 @@ G0 约 8h（另先完成 T0 的基线准备）；可投递闭环是 T0、T0a、T
 
 **Interfaces：** saveDraft(viewerId, runId, requestId) -> LearningPlanView；activate(viewerId, planId, expectedVersion)；progress(viewerId, planId) -> PlanProgress。sourceAnswerRevision 使用本用户/任务的有序作答版本/摘要，不用全班汇总版本。
 
-- [ ] 写 duplicate_save_returns_same_plan、parallel_activation_is_idempotent、changed_answer_revision_requires_refresh、practice_does_not_change_original_score、other_user_cannot_read_plan。
-- [ ] 失败后实现服务端读取成功 run 产物保存 DRAFT；事务内唯一键和版本校验；激活前重新校验题目可练性、知识版本与源作答版本。
-- [ ] 计划 item 保留选题快照、知识点与来源，学生以现有补练链路作答；进度关联本人计划创建/激活后的合法尝试，统计口径写清楚。
-- [ ] “补练后变化”只展示次数、正确情况与掌握状态变化，不归因为 AI 带来提分；用户可取消计划，旧作业成绩仍由既有逻辑决定。
-- [ ] 跑生命周期单测和 @Tag("mysql") 并发测试后提交 feat: persist revision-aware learning plans and practice feedback。
+- [x] 覆盖重复保存幂等、激活重复请求幂等、源作答变化要求重生成、补练统计不写原始分数、其他学生不能读取计划。
+- [x] 服务端仅凭本人成功预览 runId 读取计划产物保存 DRAFT；事务内幂等键、题目可练性和源作答版本校验；激活用 expectedVersion 条件更新。
+- [x] 计划项目保存题目内容快照、知识点和证据 ID；激活后的进度只统计本人、同一任务、计划题目、activated_at 之后的 practice=1 答题记录。
+- [x] 支持取消计划；进度只描述补练次数、正确数和当前状态，不归因于 AI 导致成绩提升。
+- [x] 生命周期单测及独立 MySQL V15 迁移/并发激活测试通过；提交 feat: persist revision-aware learning plans and practice feedback。
 
 ### T13：助手交互、计划卡与历史恢复（12h）
 
