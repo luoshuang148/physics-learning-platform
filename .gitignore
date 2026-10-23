@@ -223,3 +223,6 @@ dev-notes/
 
 # Private local AI evaluation inputs and outputs
 .local/
+
+# Uploaded knowledge files (not source fixtures)
+data/knowledge/

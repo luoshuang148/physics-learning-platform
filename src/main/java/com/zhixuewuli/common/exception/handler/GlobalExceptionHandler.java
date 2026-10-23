@@ -115,6 +115,7 @@ public class GlobalExceptionHandler {
             case InvalidCredentialsException ex -> business(UNAUTHORIZED, ex, null);
             case InvalidTokenException ex -> business(UNAUTHORIZED, ex, null);
             case AccountDisabledException ex -> business(FORBIDDEN, ex, null);
+            case com.zhixuewuli.common.exception.KnowledgeNotFoundException ex -> business(NOT_FOUND, ex, null);
             case UserNotFoundException ex -> business(NOT_FOUND, ex, null);
             case UserNameDuplicateException ex -> business(CONFLICT, ex, null);
             case RealNameDuplicateException ex -> business(CONFLICT, ex, null);

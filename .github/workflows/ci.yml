@@ -48,6 +48,10 @@ jobs:
       - run: npm run build
   mysql:
     runs-on: ubuntu-latest
+    env:
+      MYSQL_TEST_URL: jdbc:mysql://127.0.0.1:3306/zhixuewuli?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai
+      MYSQL_TEST_USER: root
+      MYSQL_TEST_PASSWORD: test-root-password
     services:
       redis:
         image: redis:7.4-alpine

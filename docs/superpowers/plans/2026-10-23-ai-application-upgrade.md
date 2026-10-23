@@ -299,11 +299,11 @@ G0 约 8h（另先完成 T0 的基线准备）；可投递闭环是 T0、T0a、T
 
 **Interfaces：** upload(viewerId, classId, title, MultipartFile) -> DocumentStatus；withdraw(viewerId, documentId) -> void；requireReadable(viewerId, chunkId) -> KnowledgeChunkView。读取班级关系使用只读查询，不能通过 resolveForStudent 的自动补默认班级行为给学生隐式授权。
 
-- [ ] 新增 KnowledgeAuthorizationTest，覆盖非教师上传、外班教师管理、外班学生读 chunk、文档撤回、10 MiB 超限和文件伪装；断言未授权时无原文/标题泄露。
-- [ ] 运行 ./mvnw -B test -Dtest=KnowledgeAuthorizationTest -Dgroups=unit，先看到新增行为失败，再实现文件白名单、魔数/文本检查、随机存储名与班级授权。
-- [ ] 原始文件写到专用挂载目录，由 KnowledgeDocumentStore 管理，上传不会使用客户端文件名拼接路径；数据库保存逻辑 key/hash。文档业务删除先撤回，再清文件与索引。
-- [ ] 新增 KnowledgeSchemaMySqlTest，按 @Tag("mysql") 执行，验证空库/升级库迁移与中文 FULLTEXT ngram 查询；H2 单元测试只验证不依赖 ngram 的业务逻辑。
-- [ ] 运行该单测及 ./mvnw -B test -Dtest=KnowledgeSchemaMySqlTest -Dgroups=mysql，检查既有迁移测试兼容后提交 feat: add class-scoped knowledge documents。
+- [x] 新增 KnowledgeAuthorizationTest，覆盖非教师上传、外班教师管理、外班学生读 chunk、文档撤回、10 MiB 超限和文件伪装；断言未授权时无原文/标题泄露。
+- [x] 运行 ./mvnw -B test -Dtest=KnowledgeAuthorizationTest -Dgroups=unit，先看到新增行为失败，再实现文件白名单、魔数/文本检查、随机存储名与班级授权。
+- [x] 原始文件写到专用挂载目录，由 KnowledgeDocumentStore 管理，上传不会使用客户端文件名拼接路径；数据库保存逻辑 key/hash。文档业务删除先撤回，再清文件与索引。
+- [x] 新增 KnowledgeSchemaMySqlTest，按 @Tag("mysql") 执行，验证空库/升级库迁移与中文 FULLTEXT ngram 查询；H2 单元测试只验证不依赖 ngram 的业务逻辑。
+- [x] 运行该单测及 ./mvnw -B test -Dtest=KnowledgeSchemaMySqlTest -Dgroups=mysql，检查既有迁移测试兼容后提交 feat: add class-scoped knowledge documents。
 
 ### T3：资料提取、页码与切分（8h）
 
