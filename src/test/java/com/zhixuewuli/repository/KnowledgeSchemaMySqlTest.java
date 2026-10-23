@@ -38,6 +38,25 @@ class KnowledgeSchemaMySqlTest {
             }
         }
     }
+
+    @Test void questionKnowledgeTagsAreVersionedAndPreseededOnRealMySql() throws Exception {
+        try (var connection = DriverManager.getConnection(url, user, password)) {
+            try (var result = connection.createStatement().executeQuery(
+                    "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name IN ('knowledge_points','question_knowledge_points')")) {
+                assertTrue(result.next());
+                assertEquals(2, result.getInt(1));
+            }
+            try (var result = connection.createStatement().executeQuery("SELECT COUNT(*) FROM knowledge_points")) {
+                assertTrue(result.next());
+                assertEquals(12, result.getInt(1));
+            }
+            try (var result = connection.createStatement().executeQuery(
+                    "SELECT COUNT(*) FROM knowledge_points WHERE topic='力学' AND code LIKE 'mechanics.%'")) {
+                assertTrue(result.next());
+                assertEquals(12, result.getInt(1));
+            }
+        }
+    }
     private long insert(Connection connection,String sql,Object... values)throws Exception {
         try(var statement=connection.prepareStatement(sql,Statement.RETURN_GENERATED_KEYS)) {
             for(int i=0;i<values.length;i++)statement.setObject(i+1,values[i]);statement.executeUpdate();

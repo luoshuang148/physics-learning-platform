@@ -125,6 +125,9 @@ public class QuestionResponse {
     @Schema(description = "题目难度等级（1-5）", example = "3")
     private Integer difficulty;
 
+    @lombok.Builder.Default
+    private java.util.List<String> knowledgePointCodes = java.util.List.of();
+
     /**
      * 讲解视频映射
      * 

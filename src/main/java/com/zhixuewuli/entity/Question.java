@@ -5,6 +5,10 @@ import org.apache.commons.codec.digest.DigestUtils;
 import jakarta.persistence.*;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * 题目实体类
@@ -84,6 +88,25 @@ public class Question extends BaseTimeEntity {
 
     /** 题目难度等级，取值范围1-5 */
     private Integer difficulty = 1;
+
+    /** Human-maintained tags. Serialized into task/answer snapshots as stable codes. */
+    @JsonIgnore
+    @OneToMany(mappedBy = "question", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
+    private List<QuestionKnowledgePoint> knowledgePoints = new ArrayList<>();
+
+    @JsonProperty("knowledgePointCodes")
+    public List<String> getKnowledgePointCodes() {
+        return knowledgePoints == null ? List.of() : knowledgePoints.stream()
+                .map(QuestionKnowledgePoint::getKnowledgePointCode).distinct().sorted().toList();
+    }
+
+    @JsonProperty("knowledgePointCodes")
+    public void setKnowledgePointCodes(List<String> codes) {
+        if (knowledgePoints == null) knowledgePoints = new ArrayList<>();
+        knowledgePoints.clear();
+        if (codes != null) codes.stream().filter(code -> code != null && !code.isBlank()).distinct().sorted()
+                .forEach(code -> knowledgePoints.add(new QuestionKnowledgePoint(this, code)));
+    }
 
     /**
      * 题目图片Base64编码数据（仅支持PNG格式）

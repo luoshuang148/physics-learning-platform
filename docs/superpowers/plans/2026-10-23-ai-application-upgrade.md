@@ -383,11 +383,12 @@ G0 约 8h（另先完成 T0 的基线准备）；可投递闭环是 T0、T0a、T
 
 **Interfaces：** recommend(viewerId, eventId, pointCodes, limit) -> List<PracticeCandidate>，候选含真实 questionId、知识点与可见字段；不含未授权答案。人工维护 code，不自动断言学生真正的认知错误。
 
-- [ ] 写 old_snapshot_without_tags_stays_unknown、editing_tags_does_not_rewrite_old_task、recommendation_respects_answer_access；创建未首次作答的在进行作业，断言不能通过推荐拿到答案/不允许的补练。
-- [ ] 失败后补知识点标注与快照；为两主题 40–60 道题人工标注 10–15 个知识点，保留缺标签状态，不强填。
-- [ ] 推荐按匹配点、难度、练习可访问性筛选，去重且最多 6 题；由 AnswerAccessPolicy 和任务可见性决定字段，候选不足返回实际数量。
-- [ ] 运行 ./mvnw -B test -Dtest=QuestionKnowledgeSnapshotTest,PracticeRecommendationTest -Dgroups=unit，以及受影响题库/作答回归；frontend 运行 npm test 与 npm run build。
-- [ ] 提交 feat: add versioned knowledge tags and safe practice recommendations。
+- [x] 写 old_snapshot_without_tags_stays_unknown、editing_tags_does_not_rewrite_old_task、recommendation_respects_answer_access；创建未首次作答的在进行作业，断言不能通过推荐拿到答案/不允许的补练。
+- [x] 补知识点目录、题目标签与任务/作答快照；目录预置12个人工维护代码，既有题目保持未标注。
+- [ ] 为两主题40–60道真实题目人工标注10–15个知识点，保留缺标签状态，不强填；等待教师逐题确认，不能由模型或开发者代替教学判断。
+- [x] 推荐按匹配点、难度、练习可访问性筛选，去重且最多6题；由AnswerAccessPolicy和任务可见性决定字段，候选不足返回实际数量。
+- [x] 运行 ./mvnw -B test -Dtest=QuestionKnowledgeSnapshotTest,PracticeRecommendationTest -Dgroups=unit，以及题库/作答权限回归；frontend 运行 npm test 与 npm run build。
+- [x] 提交 feat: add versioned knowledge tags and safe practice recommendations。
 
 ### T10：增加显式工具调用协议（8h）
 

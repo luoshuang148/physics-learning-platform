@@ -67,6 +67,7 @@ public class QuestionController {
     private final OptionMappingUtil optionMappingUtil;
     private final com.zhixuewuli.service.question.AnswerAccessPolicy answerAccess;
     private final com.zhixuewuli.service.question.QuestionCatalogService catalog;
+    private final com.zhixuewuli.service.knowledge.PracticeRecommendationService recommendations;
 
     @GetMapping("/teacher/page")
     @TeacherOnly
@@ -74,6 +75,20 @@ public class QuestionController {
             @RequestParam(defaultValue="1") int page, @RequestParam(defaultValue="20") int size,
             @RequestParam(defaultValue="") String search, @RequestParam(required=false) Integer difficulty) {
         return Result.success(catalog.page(page,size,search,difficulty));
+    }
+
+    @GetMapping("/knowledge-points")
+    public Result<List<com.zhixuewuli.dto.response.KnowledgePointResponse>> knowledgePoints() {
+        return Result.success(recommendations.knowledgePoints());
+    }
+
+    @GetMapping("/practice/recommendations")
+    public Result<List<com.zhixuewuli.dto.response.PracticeCandidate>> practiceRecommendations(
+            @AuthenticationPrincipal AuthenticatedUser user,
+            @RequestParam(required = false) Long eventId,
+            @RequestParam List<String> pointCodes,
+            @RequestParam(defaultValue = "6") int limit) {
+        return Result.success(recommendations.recommend(user.id(), eventId, pointCodes, limit));
     }
 
     @PostMapping("/teacher/create")
@@ -214,6 +229,7 @@ public class QuestionController {
                 .correctOption(question.getCorrectOption())
                 .explanation(question.getExplanation())
                 .difficulty(question.getDifficulty())
+                .knowledgePointCodes(question.getKnowledgePointCodes())
                 .imageBase64(question.getImageBase64())
                 .createdAt(question.getCreatedAt())
                 .updatedAt(question.getUpdatedAt())

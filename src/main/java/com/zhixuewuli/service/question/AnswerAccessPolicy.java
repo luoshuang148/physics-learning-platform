@@ -90,6 +90,7 @@ public class AnswerAccessPolicy {
                 .content(source.getContent())
                 .options(source.getOptions())
                 .difficulty(source.getDifficulty())
+                .knowledgePointCodes(source.getKnowledgePointCodes())
                 .imageBase64(source.getImageBase64())
                 .createdAt(source.getCreatedAt())
                 .updatedAt(source.getUpdatedAt())

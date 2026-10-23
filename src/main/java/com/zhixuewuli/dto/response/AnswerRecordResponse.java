@@ -170,4 +170,5 @@ public class AnswerRecordResponse {
      */
     @Schema(description = "会话ID", example = "sess_20260101_123456")
     private String sessionId;
+    private java.util.List<String> knowledgePointCodes;
 }

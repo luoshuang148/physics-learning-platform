@@ -121,6 +121,18 @@
           </div>
 
           <div class="form-section">
+            <div class="form-label">知识点（人工维护，可留空）</div>
+            <div v-for="(points, topic) in groupedKnowledgePoints" :key="topic" class="knowledge-topic">
+              <strong>{{ topic }}</strong>
+              <label v-for="point in points" :key="point.code" class="knowledge-point-option">
+                <input v-model="form.knowledgePointCodes" type="checkbox" :value="point.code" />
+                <span>{{ point.name }}</span>
+              </label>
+            </div>
+            <span class="muted">没有人工确认的标签时保持未标注，系统不会推断学生的认知错误。</span>
+          </div>
+
+          <div class="form-section">
             <div class="form-label">题目解析</div>
             <textarea v-model="form.explanation" rows="3" class="form-textarea" placeholder="解析内容（支持 LaTeX）"></textarea>
             <div v-if="form.explanation" class="latex-preview">
@@ -155,15 +167,15 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, ref } from 'vue';
+import { computed, reactive, ref } from 'vue';
 import AppShell from '@/layouts/AppShell.vue';
 import AppToast from '@/components/AppToast.vue';
 import LatexText from '@/components/LatexText.vue';
 import { useToast } from '@/composables/useToast';
 import { useAuthStore } from '@/stores/auth';
 import { useQuestionCatalog } from '@/composables/useQuestionCatalog';
-import { createQuestionApi, deleteQuestionApi, getQuestionByIdApi, updateQuestionApi } from '@/api/question';
-import type { QuestionResponse, QuestionCatalogRow } from '@/types/question';
+import { createQuestionApi, deleteQuestionApi, getQuestionByIdApi, getKnowledgePointsApi, updateQuestionApi } from '@/api/question';
+import type { QuestionResponse, QuestionCatalogRow, KnowledgePoint } from '@/types/question';
 
 const auth = useAuthStore();
 const { visible, type, message, show } = useToast();
@@ -178,6 +190,11 @@ const imageReading = ref(false);
 const isDragOver = ref(false);
 const showForm = ref(false);
 const editing = ref<QuestionResponse | null>(null);
+const knowledgePointOptions = ref<KnowledgePoint[]>([]);
+const groupedKnowledgePoints = computed(() => knowledgePointOptions.value.reduce<Record<string, KnowledgePoint[]>>((groups, point) => {
+  (groups[point.topic] ??= []).push(point);
+  return groups;
+}, {}));
 const deleteTargetId = ref<number | null>(null);
 
 const form = reactive({
@@ -186,7 +203,10 @@ const form = reactive({
   explanation: '',
   difficulty: 3 as number | null,
   imageBase64: '',
+  knowledgePointCodes: [] as string[],
 });
+
+void getKnowledgePointsApi().then(points => { knowledgePointOptions.value = points; }).catch(() => show('知识点目录加载失败', 'error'));
 
 const optionInputs = reactive<Record<OptionKey, string>>({ A: '', B: '', C: '', D: '' });
 
@@ -203,6 +223,7 @@ const resetForm = () => {
   form.explanation = '';
   form.difficulty = 3;
   form.imageBase64 = '';
+  form.knowledgePointCodes = [];
   optionInputs.A = '';
   optionInputs.B = '';
   optionInputs.C = '';
@@ -227,6 +248,7 @@ const openEdit = async (row: QuestionCatalogRow) => {
   form.explanation = q.explanation ?? '';
   form.difficulty = q.difficulty;
   form.imageBase64 = q.imageBase64 ?? '';
+  form.knowledgePointCodes = q.knowledgePointCodes ?? [];
   optionInputs.A = q.options?.A ?? '';
   optionInputs.B = q.options?.B ?? '';
   optionInputs.C = q.options?.C ?? '';
@@ -313,6 +335,7 @@ const submit = async () => {
       explanation: form.explanation || undefined,
       difficulty: form.difficulty,
       imageBase64: form.imageBase64 || undefined,
+      knowledgePointCodes: form.knowledgePointCodes,
     };
     if (editing.value) {
       await updateQuestionApi({ ...payload, id: editing.value.id });
@@ -350,6 +373,9 @@ const doDelete = async () => {
 
 <style scoped>
 .catalog-pager { display:flex; flex-wrap:wrap; align-items:center; justify-content:center; gap:12px; padding:18px; color:#64748b; font-size:12px; }
+.knowledge-topic { display:flex; flex-wrap:wrap; align-items:center; gap:8px 14px; margin:8px 0; color:#cbd5e1; font-size:12px; }
+.knowledge-topic strong { width:100%; color:#94a3b8; }
+.knowledge-point-option { display:inline-flex; align-items:center; gap:5px; cursor:pointer; }
 .qm-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr);

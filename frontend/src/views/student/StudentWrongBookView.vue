@@ -77,6 +77,20 @@
                 <LatexText :content="detailOf(item)!.questionAnalysis!" />
               </div>
             </section>
+
+            <section v-if="detailOf(item)?.knowledgePointCodes?.length" class="wb-detail-block">
+              <h3 class="wb-section-title">按知识点推荐练习</h3>
+              <button class="wb-practice-btn" :disabled="recommendLoading[item.recordId]" @click="loadRecommendations(item)">
+                {{ recommendLoading[item.recordId] ? '正在查找…' : '查找相同知识点练习' }}
+              </button>
+              <p v-if="recommendations[item.recordId]?.length === 0" class="muted">当前没有可安全推荐的题目。</p>
+              <p v-if="recommendErrors[item.recordId]" class="muted">{{ recommendErrors[item.recordId] }}</p>
+              <button v-for="candidate in (recommendations[item.recordId] ?? [])" :key="candidate.questionId"
+                class="wb-recommendation" @click="practice({ eventId: item.eventId, questionId: candidate.questionId })">
+                <LatexText :content="candidate.content.slice(0, 120)" />
+                <span>难度 {{ candidate.difficulty ?? '未标注' }} · 开始练习</span>
+              </button>
+            </section>
           </div>
         </div>
       </div>
@@ -97,6 +111,7 @@ import AppShell from '@/layouts/AppShell.vue';
 import LatexText from '@/components/LatexText.vue';
 import { useAuthStore } from '@/stores/auth';
 import { getAnswerRecordDetailApi, getPracticeReviewPageApi } from '@/api/answer-record';
+import { getPracticeRecommendationsApi, type PracticeCandidate } from '@/api/question';
 import type { AnswerRecordResponse, AnswerRecordSummary } from '@/types/answer-record';
 
 const practiceRouter = useRouter();
@@ -110,6 +125,9 @@ const loadingMore = ref(false);
 const records = ref<AnswerRecordSummary[]>([]);
 const details = ref<Record<string, AnswerRecordResponse>>({});
 const detailLoading = ref<Record<string, boolean>>({});
+const recommendations = ref<Record<string, PracticeCandidate[]>>({});
+const recommendLoading = ref<Record<string, boolean>>({});
+const recommendErrors = ref<Record<string, string>>({});
 const page = ref(1);
 const pages = ref(0);
 const total = ref(0);
@@ -117,6 +135,15 @@ const pageSize = 20;
 const searchText = ref('');
 const expandedId = ref<string | null>(null);
 const detailOf = (item: AnswerRecordSummary) => details.value[item.recordId];
+const loadRecommendations = async (item: AnswerRecordSummary) => {
+  const codes = detailOf(item)?.knowledgePointCodes ?? [];
+  if (!codes.length || recommendLoading.value[item.recordId]) return;
+  recommendLoading.value[item.recordId] = true;
+  delete recommendErrors.value[item.recordId];
+  try { recommendations.value[item.recordId] = await getPracticeRecommendationsApi(codes, item.eventId); }
+  catch { recommendErrors.value[item.recordId] = '推荐加载失败，请稍后重试。'; }
+  finally { recommendLoading.value[item.recordId] = false; }
+};
 let searchTimer: ReturnType<typeof setTimeout> | undefined;
 const toggleExpand = async (item: AnswerRecordSummary) => {
   if (expandedId.value === item.recordId) {
@@ -174,6 +201,9 @@ onBeforeUnmount(() => {
   display: grid;
   gap: 18px;
 }
+
+.wb-recommendation { display:block; width:100%; margin-top:8px; padding:12px; text-align:left; border:1px solid rgba(151,172,249,.2); border-radius:10px; background:rgba(30,41,59,.4); color:#e2e8f0; cursor:pointer; }
+.wb-recommendation span { display:block; margin-top:6px; color:#94a3b8; font-size:12px; }
 
 .wb-hero,
 .wb-card,
