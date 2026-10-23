@@ -241,6 +241,11 @@ public class QuestionIndexWorker {
     }
 
     public String indexVersion(long questionId, long revision) {
+        return staticIndexVersion(questionId, revision, properties);
+    }
+
+    /** 确定性 indexVersion：与 worker 生成规则一致，检索侧复用。 */
+    public static String staticIndexVersion(long questionId, long revision, KnowledgeProperties properties) {
         String material = String.join("|", "q", Long.toString(questionId), Long.toString(revision),
                 properties.getEmbeddingModel(), Integer.toString(properties.getEmbeddingDimensions()));
         return "qidx_" + DigestUtils.sha256Hex(material.getBytes(StandardCharsets.UTF_8)).substring(0, 24);
