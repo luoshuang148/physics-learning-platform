@@ -14,6 +14,13 @@ G0：详见 g0-results.md。它使用已知10个开发问题，不使用 corpus-
 - 每次执行登记代码SHA/工作树状态、语料/资料/索引/Embedding版本、Prompt版本、模型、参数、时间、请求数和用量来源。
 - 价格缺失不记为免费，未知usage不记零；保留失败、取消、重试和未评分项。
 
+## T8 平台评测工具准备（2026-10-23）
+
+- 已新增隔离平台 runner、人工 review scorer 与保留全分母的 compare 工具；model call 默认关闭，并强制 loopback、请求预算、费用估算与价格版本。
+- runner 支持 baseline / vector / hybrid 业务模式及 development / holdout 分割；`--tuning` 明确拒绝 holdout。缺少隔离业务作答记录的案例会标为 unmapped，不调用模型。
+- 无网络准备结果：development 三种模式各 60 条，均为 prepared / 0 reviewed。输出仅存于忽略的 `.local/`，不代表生成效果。
+- 仍未做任何真实平台模型调用或教师评分。执行前需给语料案例建立隔离 `questionId`/`recordId` 映射、启用知识服务和索引；留出集待开发配置冻结后单独运行。
+
 ## 初步内容复核清单
 
 优先复核6份短讲义的适用条件与公式，其次核对计算题单位、摩擦反例、缺图/缺条件处理。没有人工评分前，所有accuracy/引用支持率位置显示pending；可以单独报告确定性的接口测试、检索来源命中与格式校验结果。

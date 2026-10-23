@@ -207,7 +207,7 @@ public class ZhiPuAIAssistantServiceImpl implements ZhiPuAIAssistantService {
                         finalRequest.setImageBase64(snapshot == null ? null : snapshot.getImageBase64());
 
                         // 构建多模态消息（支持图片）
-                        if (request.getKnowledgeMode() == KnowledgeMode.AUTO) {
+                        if (request.getKnowledgeMode() != KnowledgeMode.OFF) {
                             if (source.getQuestionSnapshot() == null && source.getContentSnapshot() == null) {
                                 streamUtils.sendError(emitter, ResultCode.AI_SERVICE_UNAVAILABLE,
                                         "该作答记录没有可验证的题目快照，暂不能使用讲义辅导");
@@ -215,7 +215,7 @@ public class ZhiPuAIAssistantServiceImpl implements ZhiPuAIAssistantService {
                             }
                             var ragQuestion=request.getQuestion();
                             var retrieval=knowledgeRetriever.retrieve(userId,source.getEventId(),ragQuestion,
-                                    RetrievalMode.HYBRID,()->streamUtils.isCancelled(emitter)||sessionContext.isCancelled());
+                                    request.getKnowledgeMode().retrievalMode(),()->streamUtils.isCancelled(emitter)||sessionContext.isCancelled());
                             if(retrieval.status()!=RetrievalStatus.MATCHED) {
                                 String message=retrieval.status()==RetrievalStatus.INSUFFICIENT
                                         ?"班级讲义中没有足够依据，请切回普通 AI 问答继续。"
