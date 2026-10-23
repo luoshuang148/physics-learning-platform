@@ -112,6 +112,10 @@ public class QuestionCreateRequest {
     @Schema(description = "题目难度等级（1-5）", example = "3")
     private Integer difficulty;
 
+    @Schema(description = "教师维护的知识点代码")
+    @jakarta.validation.constraints.Size(max = 15, message = "每题最多选择15个知识点")
+    private java.util.List<@jakarta.validation.constraints.Pattern(regexp = "^[a-z0-9.-]{1,100}$") String> knowledgePointCodes = java.util.List.of();
+
     /**
      * 题目图片Base64编码数据（仅支持PNG格式）
      * 

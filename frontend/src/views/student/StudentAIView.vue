@@ -15,10 +15,11 @@
             :disabled="state.loading"
             @click="switchMode('wrong')"
           >题目分析</button>
+          <button class="mode-tab" :class="{ active: activePanel === 'plan' }" :disabled="state.loading" @click="openPlanPanel">复习计划</button>
         </div>
       </section>
 
-      <section class="ai-layout">
+      <section v-if="activePanel === 'chat'" class="ai-layout">
         <div class="ask-panel">
           <div class="panel-head">
             <h3>发起提问</h3>
@@ -86,16 +87,50 @@
           </div>
         </div>
       </section>
+
+      <section v-else class="learning-plan-panel">
+        <header class="panel-head"><div><h2>按本次作业安排复习</h2><p>先检查建议和依据，再保存并激活。题目不足时会显示部分建议。</p></div><button class="ghost-btn" @click="activePanel = 'chat'">返回问答</button></header>
+        <label class="field-label" for="learning-event">选择作业</label>
+        <select id="learning-event" v-model.number="learningEventId" :disabled="learningPlanBusy || loadingTasks">
+          <option :value="null" disabled>{{ loadingTasks ? '正在加载作业…' : '请选择一份作业' }}</option>
+          <option v-for="task in studentTasks" :key="task.id" :value="task.id">{{ task.eventTitle }}（{{ task.questionCount ?? task.questionIds.length }} 题）</option>
+        </select>
+        <label class="field-label" for="learning-question">你想重点复习什么？</label>
+        <textarea id="learning-question" v-model="learningQuestion" rows="3" maxlength="800" placeholder="例如：帮我针对这次作业的错题安排三天复习" />
+        <label class="field-label" for="learning-days">复习天数</label>
+        <select id="learning-days" v-model.number="learningDays"><option v-for="day in 7" :key="day" :value="day">{{ day }} 天</option></select>
+        <div class="panel-actions">
+          <button v-if="learningPlanBusy" class="stop-btn" @click="stopLearningPlan">停止生成</button>
+          <button class="submit-btn" :disabled="learningPlanBusy || !learningEventId || !learningQuestion.trim() || !studentTasks.length" @click="generateLearningPlan">生成建议</button>
+        </div>
+        <p v-if="learningPlanError" class="learning-error">{{ learningPlanError }}</p>
+        <section v-if="savedLearningPlans.length" class="plan-history" aria-label="已保存的复习计划">
+          <h3>已保存的计划</h3>
+          <button v-for="plan in savedLearningPlans" :key="plan.id" class="plan-history-item" @click="openSavedPlan(plan)">
+            作业 {{ plan.eventId }} · {{ plan.status }} · {{ plan.executionMode === 'AGENT' ? '智能复习助手' : '复习工作流' }}
+          </button>
+        </section>
+        <AgentExecutionSteps :steps="learningPlan.steps" />
+        <LearningPlanCard :preview="learningPlan.preview" :saved-plan="learningPlan.savedPlan" :run-id="learningPlan.runId ?? ''" :busy="learningPlanBusy" @save="savePlan" @activate="activatePlan" @refresh="refreshPlan" @cancel="cancelPlan" @practice="goPractice" />
+      </section>
     </div>
   </AppShell>
 </template>
 
 <script setup lang="ts">
-import { computed, onUnmounted, ref } from 'vue';
+import { computed, onMounted, onUnmounted, ref } from 'vue';
 import AppShell from '@/layouts/AppShell.vue';
 import StreamOutput from '@/components/StreamOutput.vue';
 import { useAuthStore } from '@/stores/auth';
-import { clearSessionApi, streamRealtimeQA, streamWrongQuestionAnalysis } from '@/api/ai';
+import { clearSessionApi, streamRealtimeQA, streamWrongQuestionAnalysis, streamLearningPlanPreview } from '@/api/ai';
+import { getStudentTasksApi } from '@/api/teacher-event';
+import { activateLearningPlanApi, cancelLearningPlanApi, getLearningPlanApi, getLearningPlansApi, saveLearningPlanApi } from '@/api/learning-plan';
+import AgentExecutionSteps from '@/components/AgentExecutionSteps.vue';
+import LearningPlanCard from '@/components/LearningPlanCard.vue';
+import { acceptLearningPlanEvent, emptyLearningPlanState, startLearningPlanRun } from '@/composables/learningPlanState';
+import type { LearningAssistantStep, LearningPlanPreview } from '@/types/learning-plan';
+import type { LearningPlanView } from '@/types/learning-plan';
+import { useRouter } from 'vue-router';
 import { useAIStreamState } from '@/composables/useAIStreamState';
 
 interface ChatMessage {
@@ -116,16 +151,150 @@ const SESSION_TYPE_MAP: Record<AIMode, string> = {
 };
 
 const auth = useAuthStore();
+const router = useRouter();
 const { state, reset } = useAIStreamState();
 
 
 const question = ref('');
 const questionId = ref<number | undefined>(undefined);
 const activeMode = ref<AIMode>('realtime');
+const activePanel = ref<'chat' | 'plan'>('chat');
 const histories = ref<Record<AIMode, ChatMessage[]>>({ realtime: [], wrong: [] });
 const activeAbortController = ref<AbortController | null>(null);
+const learningPlanAbort = ref<AbortController | null>(null);
+const learningPlan = ref(emptyLearningPlanState());
+const learningPlanBusy = ref(false);
+const learningPlanError = ref('');
+const learningQuestion = ref('');
+const learningDays = ref(3);
+const learningEventId = ref<number | null>(null);
+const learningSaveRequestId = ref('');
+const studentTasks = ref<Awaited<ReturnType<typeof getStudentTasksApi>>>([]);
+const loadingTasks = ref(false);
+const savedLearningPlans = ref<LearningPlanView[]>([]);
 
 const currentMessages = computed(() => histories.value[activeMode.value]);
+
+onMounted(async () => {
+  loadingTasks.value = true;
+  try {
+    studentTasks.value = await getStudentTasksApi();
+    if (studentTasks.value.length === 1) learningEventId.value = studentTasks.value[0]!.id;
+  } catch {
+    learningPlanError.value = '暂时无法加载可用作业，请稍后重试。';
+  } finally { loadingTasks.value = false; }
+  try { savedLearningPlans.value = await getLearningPlansApi(); } catch { /* unavailable history remains empty */ }
+});
+
+const openPlanPanel = () => { if (!state.value.loading && !learningPlanBusy.value) activePanel.value = 'plan'; };
+
+const generateLearningPlan = async () => {
+  if (!learningEventId.value || !learningQuestion.value.trim() || learningPlanBusy.value) return;
+  const requestId = crypto.randomUUID();
+  learningSaveRequestId.value = requestId;
+  learningPlan.value = emptyLearningPlanState();
+  learningPlanError.value = '';
+  learningPlanBusy.value = true;
+  const controller = new AbortController();
+  learningPlanAbort.value = controller;
+  try {
+    await streamLearningPlanPreview({ eventId: learningEventId.value, days: learningDays.value, question: learningQuestion.value.trim(), requestId }, {
+      signal: controller.signal,
+      onProgress: (payload) => {
+        const event = payload as typeof payload & { runId?: string; requestId?: string };
+        if (learningSaveRequestId.value !== requestId || !event.runId || event.requestId !== requestId) return;
+        learningPlan.value = startLearningPlanRun(event.runId);
+      },
+      onToolStep: (payload) => {
+        const event = payload as unknown as LearningAssistantStep;
+        learningPlan.value = acceptLearningPlanEvent(learningPlan.value, event, current => ({
+          ...current, steps: [...current.steps, event],
+        }));
+      },
+      onPlan: (payload) => {
+        const event = payload as Record<string, unknown> & { runId: string; seq: number; planPreview: LearningPlanPreview };
+        learningPlan.value = acceptLearningPlanEvent(learningPlan.value, event, current => ({ ...current, preview: event.planPreview }));
+      },
+      onComplete: () => { if (learningSaveRequestId.value === requestId) learningPlanBusy.value = false; },
+      onError: (payload) => {
+        if (learningSaveRequestId.value !== requestId) return;
+        learningPlanError.value = payload.message || '暂时无法生成复习计划。';
+        learningPlanBusy.value = false;
+      },
+    });
+  } catch (error: unknown) {
+    if (learningSaveRequestId.value === requestId) {
+      if (!isAbortError(error)) learningPlanError.value = error instanceof Error ? error.message : '暂时无法生成复习计划。';
+      learningPlanBusy.value = false;
+    }
+  } finally {
+    if (learningPlanAbort.value === controller) learningPlanAbort.value = null;
+  }
+};
+
+const stopLearningPlan = () => learningPlanAbort.value?.abort();
+
+const openSavedPlan = (plan: LearningPlanView) => {
+  const preview: LearningPlanPreview = { days: plan.days, sourceEventId: plan.eventId,
+    sourceAnswerRevision: plan.sourceAnswerRevision, executionMode: plan.executionMode,
+    items: plan.items, evidenceSummary: plan.evidenceSummary, partial: false };
+  learningPlan.value = { ...startLearningPlanRun(`saved-${plan.id}`), preview, savedPlan: plan };
+  learningPlanError.value = '';
+};
+
+const savePlan = async () => {
+  if (!learningPlan.value.runId || !learningSaveRequestId.value || learningPlanBusy.value) return;
+  learningPlanBusy.value = true;
+  try {
+    const savedPlan = await saveLearningPlanApi(learningPlan.value.runId, learningSaveRequestId.value);
+    learningPlan.value = { ...learningPlan.value, savedPlan };
+    savedLearningPlans.value = [savedPlan, ...savedLearningPlans.value.filter(item => item.id !== savedPlan.id)];
+  } catch (error: unknown) {
+    learningPlanError.value = error instanceof Error ? error.message : '无法保存草稿。';
+  } finally { learningPlanBusy.value = false; }
+};
+
+const activatePlan = async () => {
+  const plan = learningPlan.value.savedPlan;
+  if (!plan) return;
+  learningPlanBusy.value = true;
+  try {
+    const savedPlan = await activateLearningPlanApi(plan.id, plan.version);
+    learningPlan.value = { ...learningPlan.value, savedPlan };
+    savedLearningPlans.value = savedLearningPlans.value.map(item => item.id === savedPlan.id ? savedPlan : item);
+  } catch (error: unknown) {
+    learningPlanError.value = error instanceof Error ? error.message : '无法激活计划。';
+  } finally { learningPlanBusy.value = false; }
+};
+
+const refreshPlan = async () => {
+  const plan = learningPlan.value.savedPlan;
+  if (!plan) return;
+  learningPlanBusy.value = true;
+  try {
+    const savedPlan = await getLearningPlanApi(plan.id);
+    learningPlan.value = { ...learningPlan.value, savedPlan };
+    savedLearningPlans.value = savedLearningPlans.value.map(item => item.id === savedPlan.id ? savedPlan : item);
+  }
+  catch (error: unknown) { learningPlanError.value = error instanceof Error ? error.message : '无法刷新进度。'; }
+  finally { learningPlanBusy.value = false; }
+};
+
+const cancelPlan = async () => {
+  const plan = learningPlan.value.savedPlan;
+  if (!plan) return;
+  learningPlanBusy.value = true;
+  try {
+    const savedPlan = await cancelLearningPlanApi(plan.id, plan.version);
+    learningPlan.value = { ...learningPlan.value, savedPlan };
+    savedLearningPlans.value = savedLearningPlans.value.map(item => item.id === savedPlan.id ? savedPlan : item);
+  } catch (error: unknown) { learningPlanError.value = error instanceof Error ? error.message : '无法取消计划。'; }
+  finally { learningPlanBusy.value = false; }
+};
+
+const goPractice = (questionId: number, eventId: number) => {
+  router.push({ path: '/student/practice', query: { eventId, questionId } });
+};
 
 const normalizeAIError = (raw: string | undefined) => {
   const message = raw ?? '';
@@ -151,6 +320,7 @@ const isAbortError = (error: unknown) => {
 
 const switchMode = (mode: AIMode) => {
   if (state.value.loading) return;
+  activePanel.value = 'chat';
   activeMode.value = mode;
   reset();
 };
@@ -261,6 +431,7 @@ const stopCurrentAnalysis = () => {
 
 onUnmounted(() => {
   activeAbortController.value?.abort();
+  learningPlanAbort.value?.abort();
 });
 
 const clearCurrentMode = async () => {
@@ -280,6 +451,14 @@ const clearCurrentMode = async () => {
   display: grid;
   gap: 18px;
 }
+
+.learning-plan-panel { display:grid; gap:12px; padding:22px; border:1px solid rgba(151,172,249,.14); border-radius:22px; background:#f3f6fa; color:#1c2938; }
+.learning-plan-panel textarea,.learning-plan-panel select { width:100%; padding:12px; border:1px solid #ccd5e0; border-radius:10px; background:white; color:#1c2938; }
+.learning-plan-panel .panel-head p { margin:4px 0 0; color:#59697a; }
+.learning-error { padding:12px; border-radius:10px; background:#fff0f0; color:#a22121; }
+.plan-history { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+.plan-history h3 { width:100%; margin:4px 0; }
+.plan-history-item { border:1px solid #d4dce7; border-radius:999px; background:white; color:#364152; padding:8px 12px; cursor:pointer; }
 
 .ai-hero,
 .ask-panel,

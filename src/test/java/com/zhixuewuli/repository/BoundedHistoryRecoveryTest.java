@@ -18,7 +18,7 @@ class BoundedHistoryRecoveryTest extends BaseIntegrationTest {
   for(int n=1;n<=40;n++){var row=new ConversationHistory();row.setUserId(u.getId());row.setSessionId("history-window");row.setConversationType(ConversationType.REAL_TIME_QA);row.setQuestion("q"+n);row.setAnswer("a"+n);row.setSequenceNumber(n);row.setTokenCount(10);row.setIsActive(true);histories.save(row);}
   jpaEntityManager.flush();jpaEntityManager.clear();properties.setMaxHistoryCount(3);
   var stats=jpaEntityManager.getEntityManagerFactory().unwrap(SessionFactory.class).getStatistics();stats.clear();
-  var manager=new SessionManager(histories,answers,properties,events);var context=manager.getOrCreateSession("history-window",u.getId(),ConversationType.REAL_TIME_QA,null,()->"physics");
+  var manager=new SessionManager(histories,answers,properties,events,org.mockito.Mockito.mock(com.zhixuewuli.service.knowledge.AiRunRecorder.class),org.mockito.Mockito.mock(com.zhixuewuli.service.knowledge.AiRunHistoryService.class));var context=manager.getOrCreateSession("history-window",u.getId(),ConversationType.REAL_TIME_QA,null,()->"physics");
   assertThat(context.getInteractionRecords()).hasSize(3);assertThat(context.getUsedTokens()).isEqualTo(400);assertThat(context.generateNextSequence()).isEqualTo(41);
   assertThat(stats.getEntityLoadCount()).isLessThanOrEqualTo(3);
  }

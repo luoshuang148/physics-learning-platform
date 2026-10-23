@@ -27,16 +27,21 @@ class AnswerAccessPolicyTest extends BaseControllerIntegrationTest {
     @Autowired QuestionRepository questions;
     @Autowired ObjectMapper json;
     @Autowired com.zhixuewuli.repository.TeacherEventRepository events;
+    @Autowired com.zhixuewuli.repository.KnowledgePointRepository knowledgePoints;
     private Question question;
     private long taskId;
     private User second;
 
     @BeforeEach
     void setUp() {
+        var point = new com.zhixuewuli.entity.KnowledgePoint();
+        point.setCode("mechanics.newton-laws"); point.setName("牛顿运动定律"); point.setTopic("力学");
+        knowledgePoints.saveAndFlush(point);
         question = new Question();
         question.setContent("access-policy-question");
         question.setOptions("{\"A\":\"a\",\"B\":\"b\",\"C\":\"c\",\"D\":\"d\"}");
         question.setCorrectOption("D"); question.setExplanation("受保护解析"); question.setDifficulty(2);
+        question.setKnowledgePointCodes(List.of("mechanics.newton-laws"));
         question = questions.saveAndFlush(question);
         TeacherEventCreateRequest request = new TeacherEventCreateRequest();
         request.setEventTitle("Access policy"); request.setQuestionIds(List.of(question.getId()));
@@ -76,6 +81,30 @@ class AnswerAccessPolicyTest extends BaseControllerIntegrationTest {
         events.saveAndFlush(task);
         practiceBypassBlocked("PRACTICE");
         hiddenBank();
+    }
+
+    @Test
+    void recommendationsHideUnansweredAssignmentAndReturnOnlySafePracticePreview() throws Exception {
+        Question available = new Question();
+        available.setContent("safe-recommendation-preview");
+        available.setOptions("{\"A\":\"secret option\",\"B\":\"b\",\"C\":\"c\",\"D\":\"d\"}");
+        available.setCorrectOption("A");
+        available.setExplanation("secret explanation");
+        available.setDifficulty(3);
+        available.setKnowledgePointCodes(List.of("mechanics.newton-laws"));
+        available = questions.saveAndFlush(available);
+
+        mockMvc.perform(get("/questions/practice/recommendations")
+                        .param("pointCodes", "mechanics.newton-laws")
+                        .param("eventId", String.valueOf(taskId))
+                        .header("Authorization", createAuthHeader(1001L, "student_user")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0].questionId").value(available.getId()))
+                .andExpect(jsonPath("$.data[0].content").value("safe-recommendation-preview"))
+                .andExpect(jsonPath("$.data[0].correctOption").doesNotExist())
+                .andExpect(jsonPath("$.data[0].options").doesNotExist())
+                .andExpect(jsonPath("$.data[0].explanation").doesNotExist());
     }
 
     @Test

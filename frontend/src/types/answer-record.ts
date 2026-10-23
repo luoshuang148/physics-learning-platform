@@ -26,6 +26,7 @@ export interface AnswerRecordResponse {
   difficulty: string | null;
   imageBase64: string | null;
   sessionId: string;
+  knowledgePointCodes?: string[];
 }
 
 export interface AnswerRecordSummary {

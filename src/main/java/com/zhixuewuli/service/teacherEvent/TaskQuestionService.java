@@ -57,6 +57,7 @@ public class TaskQuestionService {
   Question q=decode(row);
   return QuestionResponse.builder().id(row.getQuestionId()).content(q.getContent()).options("MISSING".equals(row.getSnapshotOrigin()) ? java.util.Map.of() : options.jsonToOptions(q.getOptions()))
    .correctOption(q.getCorrectOption()).explanation(q.getExplanation()).difficulty(q.getDifficulty()).imageBase64(q.getImageBase64())
+   .knowledgePointCodes(q.getKnowledgePointCodes())
    .snapshotOrigin(row.getSnapshotOrigin()).build();
  }).toList();}
 }

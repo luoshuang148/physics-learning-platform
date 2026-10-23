@@ -52,7 +52,9 @@ class StreamIsolationRegressionTest extends BaseUnitTest {
                     mock(AnswerRecordRepository.class), mock(ConversationHistoryRepository.class),
                     new OptionMappingUtil(new ObjectMapper()), new ObjectMapper(), mock(ZhipuAIClient.class),
                     new AIBusinessProperties(), properties,
-                    task -> { throw new RejectedExecutionException("full"); }, streams, mock(SessionManager.class));
+                    task -> { throw new RejectedExecutionException("full"); }, streams, mock(SessionManager.class),
+                    mock(com.zhixuewuli.service.knowledge.KnowledgeRetriever.class),mock(com.zhixuewuli.service.knowledge.RagPromptBuilder.class),
+                    mock(com.zhixuewuli.service.knowledge.CitationValidator.class),mock(com.zhixuewuli.service.knowledge.AiRunHistoryService.class));
             var emitter = service.createConfiguredEmitter();
             var request = new AIAskRequest();
             request.setQuestion("gravity");

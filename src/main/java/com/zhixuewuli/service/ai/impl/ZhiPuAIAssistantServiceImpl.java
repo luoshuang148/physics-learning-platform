@@ -19,6 +19,16 @@ import com.zhixuewuli.common.util.AIStreamExecutor.StreamOperation;
 import com.zhixuewuli.dto.internal.ConversationType;
 import com.zhixuewuli.dto.internal.SessionContextInternalDTO;
 import com.zhixuewuli.dto.request.AIAskRequest;
+import com.zhixuewuli.dto.knowledge.RetrievalResult;
+import com.zhixuewuli.service.knowledge.KnowledgeMode;
+import com.zhixuewuli.service.knowledge.RagPrompt;
+import com.zhixuewuli.service.knowledge.RetrievalMode;
+import com.zhixuewuli.service.knowledge.RetrievalStatus;
+import com.zhixuewuli.service.knowledge.KnowledgeRetriever;
+import com.zhixuewuli.service.knowledge.RagPromptBuilder;
+import com.zhixuewuli.service.knowledge.CitationValidator;
+import com.zhixuewuli.service.knowledge.AiRunHistoryService;
+import com.zhixuewuli.service.knowledge.RagInteractionData;
 import com.zhixuewuli.entity.AnswerRecord;
 import com.zhixuewuli.entity.ConversationHistory;
 import com.zhixuewuli.entity.Question;
@@ -62,6 +72,10 @@ public class ZhiPuAIAssistantServiceImpl implements ZhiPuAIAssistantService {
 
     // 注入会话管理器
     private final SessionManager sessionManager;
+    private final KnowledgeRetriever knowledgeRetriever;
+    private final RagPromptBuilder ragPromptBuilder;
+    private final CitationValidator citationValidator;
+    private final AiRunHistoryService aiRunHistoryService;
 
     // 从配置中读取的背景信息和模型配置
     private String ContextBackground() {
@@ -193,10 +207,33 @@ public class ZhiPuAIAssistantServiceImpl implements ZhiPuAIAssistantService {
                         finalRequest.setImageBase64(snapshot == null ? null : snapshot.getImageBase64());
 
                         // 构建多模态消息（支持图片）
-                        List<Map<String, Object>> messages = buildAnalysisMessages(finalRequest, sessionContext);
-
-                        streamAIMultimodalResponse(messages, emitter, sessionContext, finalRequest.getQuestion(),
-                                WrongQuestionAnalysisModel());
+                        if (request.getKnowledgeMode() != KnowledgeMode.OFF) {
+                            if (source.getQuestionSnapshot() == null && source.getContentSnapshot() == null) {
+                                streamUtils.sendError(emitter, ResultCode.AI_SERVICE_UNAVAILABLE,
+                                        "该作答记录没有可验证的题目快照，暂不能使用讲义辅导");
+                                return;
+                            }
+                            var ragQuestion=request.getQuestion();
+                            var retrieval=knowledgeRetriever.retrieve(userId,source.getEventId(),ragQuestion,
+                                    request.getKnowledgeMode().retrievalMode(),()->streamUtils.isCancelled(emitter)||sessionContext.isCancelled());
+                            if(retrieval.status()!=RetrievalStatus.MATCHED) {
+                                String message=retrieval.status()==RetrievalStatus.INSUFFICIENT
+                                        ?"班级讲义中没有足够依据，请切回普通 AI 问答继续。"
+                                        :"讲义检索暂不可用，请切回普通 AI 问答或稍后重试。";
+                                try { emitter.send(SseEmitter.event().name("knowledge-status").data(Map.of("status",retrieval.status().name(),"message",message))); }
+                                catch(IOException ignored) { }
+                                streamUtils.sendError(emitter,ResultCode.AI_SERVICE_UNAVAILABLE,message);
+                                return;
+                            }
+                            var ragPrompt=ragPromptBuilder.build(buildWrongQuestionContext(source,snapshot),ragQuestion,retrieval.passages(),priorConversation(sessionContext));
+                            try { emitter.send(SseEmitter.event().name("sources").data(objectMapper.writeValueAsString(retrieval.passages()))); }
+                            catch(IOException sendError) { streamUtils.sendError(emitter,ResultCode.NETWORK_COMMUNICATION_ERROR,"来源发送失败"); return; }
+                            streamAIMultimodalResponse(buildRagAnalysisMessages(ragPrompt,finalRequest.getImageBase64()),emitter,
+                                    sessionContext,ragQuestion,WrongQuestionAnalysisModel(),ragPrompt,retrieval,request.getQuestion());
+                        } else {
+                            List<Map<String, Object>> messages = buildAnalysisMessages(finalRequest, sessionContext);
+                            streamAIMultimodalResponse(messages, emitter, sessionContext, finalRequest.getQuestion(),WrongQuestionAnalysisModel());
+                        }
                     });
         });
     }
@@ -207,7 +244,20 @@ public class ZhiPuAIAssistantServiceImpl implements ZhiPuAIAssistantService {
         if (!sessionManager.canAccessSession(sessionId, userId) && sessionManager.hasAnySessionRecord(sessionId)) {
             throw new InsufficientPermissionException("无权访问该会话");
         }
-        return conversationHistoryRepository.findByUserIdAndSessionIdAndIsActiveOrderByCreatedAtAsc(userId, sessionId, true);
+        return conversationHistoryRepository.findByUserIdAndSessionIdAndIsActiveOrderByCreatedAtAsc(userId, sessionId, true)
+                .stream().map(history->aiRunHistoryService.attachSources(history,userId)).toList();
+    }
+
+    @Override
+    public List<ConversationHistory> getSessionHistory(String sessionId, Long userId, String recordId) {
+        if (recordId == null || recordId.isBlank()) return getSessionHistory(sessionId,userId);
+        AnswerRecord record=answerRecordRepository.findById(recordId)
+                .orElseThrow(() -> new AnswerRecordNotFoundException("作答记录不存在"));
+        if (!userId.equals(record.getUserId())) throw new InsufficientPermissionException("无权读取该会话");
+        String scopedSession=java.util.UUID.nameUUIDFromBytes((sessionId+":"+record.getId())
+                .getBytes(java.nio.charset.StandardCharsets.UTF_8)).toString();
+        return conversationHistoryRepository.findByUserIdAndSessionIdAndIsActiveOrderByCreatedAtAsc(userId,scopedSession,true)
+                .stream().map(history->aiRunHistoryService.attachSources(history,userId)).toList();
     }
 
     @Override
@@ -402,6 +452,22 @@ public class ZhiPuAIAssistantServiceImpl implements ZhiPuAIAssistantService {
         return List.of(Map.of("role", "user", "content", contentList));
     }
 
+    private List<Map<String,Object>> buildRagAnalysisMessages(RagPrompt prompt,String imageBase64) {
+        List<Map<String,Object>> content=new ArrayList<>();content.add(Map.of("type","text","text",prompt.userMessage()));
+        if(imageBase64!=null&&!imageBase64.isBlank()) {
+            String image=imageBase64.startsWith("data:image/")?imageBase64:"data:image/png;base64,"+imageBase64;
+            content.add(Map.of("type","image_url","image_url",Map.of("url",image)));
+        }
+        return List.of(Map.of("role","system","content",prompt.systemMessage()),Map.of("role","user","content",content));
+    }
+
+    private List<ConversationHistory> priorConversation(SessionContextInternalDTO context) {
+        aiRunHistoryService.refreshContext(context,context.getUserId());
+        context.getLock().readLock().lock();
+        try {var records=context.getInteractionRecords();return records==null?List.of():List.copyOf(records.values());}
+        finally {context.getLock().readLock().unlock();}
+    }
+
     /**
      * @deprecated 该方法已废弃，不再被调用。请使用 streamAIMultimodalResponse() 调用智谱AI多模态接口，
      *             支持文本和图片的混合消息格式。
@@ -506,7 +572,14 @@ public class ZhiPuAIAssistantServiceImpl implements ZhiPuAIAssistantService {
      */
     private void streamAIMultimodalResponse(List<Map<String, Object>> messages, SseEmitter emitter,
             SessionContextInternalDTO sessionContext, String userQuestion, String model) {
+        streamAIMultimodalResponse(messages,emitter,sessionContext,userQuestion,model,null,null,null);
+    }
+
+    private void streamAIMultimodalResponse(List<Map<String, Object>> messages, SseEmitter emitter,
+            SessionContextInternalDTO sessionContext, String userQuestion, String model,
+            RagPrompt ragPrompt,RetrievalResult retrieval,String originalInput) {
         try {
+            long modelStarted=System.nanoTime();
             StringBuilder fullResponse = new StringBuilder();
             StringBuilder fullReasoning = new StringBuilder();
 
@@ -564,7 +637,15 @@ public class ZhiPuAIAssistantServiceImpl implements ZhiPuAIAssistantService {
                         }
 
                         if (fullResponse.length() > 0) {
-                            sessionManager.addInteraction(sessionContext, userQuestion, fullResponse.toString(), actualTokens);
+                            String answer=fullResponse.toString();
+                            if(ragPrompt!=null) {
+                                var validated=citationValidator.validate(answer,retrieval.passages());answer=validated.text();
+                                var ragData=new RagInteractionData(retrieval.actualMode(),cancelled?"CANCELLED":"ANSWERED",model,
+                                        ragPrompt.systemMessage(),ragPrompt.userMessage(),originalInput,promptTokens,completionTokens,actualTokens,
+                                        retrieval.elapsedMillis(),(System.nanoTime()-modelStarted)/1_000_000,retrieval.passages());
+                                sessionManager.addRagInteraction(sessionContext,userQuestion,answer,actualTokens,ragData);
+                                emitter.send(SseEmitter.event().name("citation-validation").data(objectMapper.writeValueAsString(validated.validSourceIds())));
+                            } else sessionManager.addInteraction(sessionContext, userQuestion, answer, actualTokens);
                             sessionManager.updateTokenUsage(sessionContext, actualTokens);
                         }
 

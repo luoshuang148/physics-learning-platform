@@ -220,3 +220,9 @@ dev-notes/
 # Local demo secrets
 .env.demo
 .readme-shots-*/
+
+# Private local AI evaluation inputs and outputs
+.local/
+
+# Uploaded knowledge files (not source fixtures)
+data/knowledge/

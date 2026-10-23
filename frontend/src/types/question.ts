@@ -5,6 +5,7 @@ export interface QuestionPayload {
   explanation?: string;
   difficulty?: number | null;
   imageBase64?: string;
+  knowledgePointCodes?: string[];
 }
 
 export interface QuestionUpdatePayload extends QuestionPayload {
@@ -22,6 +23,13 @@ export interface QuestionResponse {
   imageBase64: string | null;
   createdAt: string;
   updatedAt: string;
+  knowledgePointCodes?: string[];
+}
+
+export interface KnowledgePoint {
+  code: string;
+  name: string;
+  topic: string;
 }
 
 export interface QuestionCatalogRow {

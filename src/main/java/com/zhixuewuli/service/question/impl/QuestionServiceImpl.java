@@ -66,6 +66,7 @@ public class QuestionServiceImpl implements QuestionService {
     private final QuestionRepository questionRepository;
     private final com.zhixuewuli.repository.TeacherEventQuestionRepository taskQuestionRepository;
     private final com.zhixuewuli.repository.AnswerRecordRepository answerRepository;
+    private final com.zhixuewuli.repository.KnowledgePointRepository knowledgePoints;
 
     @Override
     public Question createQuestion(QuestionCreateRequest request) {
@@ -88,6 +89,7 @@ public class QuestionServiceImpl implements QuestionService {
         question.setExplanation(request.getExplanation());
         question.setDifficulty(request.getDifficulty());
         question.setImageBase64(request.getImageBase64());
+        question.setKnowledgePointCodes(validKnowledgePointCodes(request.getKnowledgePointCodes()));
 
         // 4. 保存到数据库
         Question savedQuestion = questionRepository.save(question);
@@ -134,12 +136,21 @@ public class QuestionServiceImpl implements QuestionService {
         existingQuestion.setExplanation(request.getExplanation());
         existingQuestion.setDifficulty(request.getDifficulty());
         existingQuestion.setImageBase64(request.getImageBase64());
+        existingQuestion.setKnowledgePointCodes(validKnowledgePointCodes(request.getKnowledgePointCodes()));
 
         // 4. 保存更新
         Question updatedQuestion = questionRepository.save(existingQuestion);
         log.info("题目更新成功，ID: {}", updatedQuestion.getId());
 
         return updatedQuestion;
+    }
+
+    private List<String> validKnowledgePointCodes(List<String> codes) {
+        if (codes == null || codes.isEmpty()) return List.of();
+        var normalized = codes.stream().filter(java.util.Objects::nonNull).map(String::strip).filter(s -> !s.isEmpty()).distinct().toList();
+        if (normalized.size() != codes.size()) throw new IllegalArgumentException("知识点代码不能为空且不能重复");
+        if (knowledgePoints.findByCodeIn(normalized).size() != normalized.size()) throw new IllegalArgumentException("包含未知知识点代码");
+        return normalized;
     }
 
     @Override

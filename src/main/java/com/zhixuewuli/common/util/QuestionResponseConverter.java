@@ -84,6 +84,7 @@ public class QuestionResponseConverter {
                 .questionAnalysis(question.getExplanation())
                 .difficulty(getDifficultyString(question.getDifficulty()))
                 .imageBase64(question.getImageBase64())
+                .knowledgePointCodes(question.getKnowledgePointCodes())
                 .sessionId(record.getSessionId())
                 .build();
     }
