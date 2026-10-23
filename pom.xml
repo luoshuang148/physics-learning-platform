@@ -33,6 +33,11 @@
     <dependencies>
         <dependency>
             <groupId>dev.langchain4j</groupId>
+            <artifactId>langchain4j-open-ai</artifactId>
+            <version>1.22.0</version>
+        </dependency>
+        <dependency>
+            <groupId>dev.langchain4j</groupId>
             <artifactId>langchain4j-embeddings-bge-small-zh-v15-q</artifactId>
             <version>1.22.0-beta32</version>
         </dependency>

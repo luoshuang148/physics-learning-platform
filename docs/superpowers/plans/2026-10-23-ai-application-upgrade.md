@@ -396,11 +396,13 @@ G0 约 8h（另先完成 T0 的基线准备）；可投递闭环是 T0、T0a、T
 
 **Interfaces：** complete(turns, definitions, modelConfig, cancellation) -> ToolChatResponse；包含 callId、name、JSON arguments、finishReason、usage、usageSource。首版工具轮用非流式 HTTP，循环进度通过 SSE 上报；旧聊天流式客户端保持兼容。
 
-- [ ] WireMock 测试 schema、assistant/tool role、tool_call_id、多个 call、缺失 usage、非法 JSON、429、取消；assert 未返回 tools 的普通正文不会被硬解析成工具调用。
-- [ ] 运行 ./mvnw -B test -Dtest=ToolChatWireContractTest -Dgroups=unit 看见失败后通过选定的库/HTTP 适配实现协议；不依赖模型对“兼容 OpenAI”字样的宣称，保留实际协议夹具。
-- [ ] 请求带总截止时间，按 T0a 验证过的 SDK 取消机制或 OkHttp Call.cancel 传递取消；模型 ID、端点和能力独立配置。工具能力不可用时 agentReady=false，不影响 tutoring/reports 或已可用的固定工作流。
+- [x] WireMock 测试 schema、assistant/tool role、tool_call_id、多个 call、缺失 usage、非法 JSON、429、取消；assert 未返回 tools 的普通正文不会被硬解析成工具调用。
+- [x] 运行 ./mvnw -B test -Dtest=ToolChatWireContractTest -Dgroups=unit 看见失败后通过选定的库/HTTP 适配实现协议；不依赖模型对“兼容 OpenAI”字样的宣称，保留实际协议夹具。
+- [x] 请求带总截止时间，按 T0a 验证过的 SDK 取消机制传递取消；模型 ID、端点和能力独立配置，toolCallingEnabled 默认关闭，agentReady 仍为 false，不影响 tutoring/reports。
 - [ ] 用明确启用的独立外部冒烟测试验证一个目标模型；写日期和结果，不把付费冒烟加入普通 CI。
-- [ ] 重跑旧 AIWireContractTest 与新测试，提交 feat: add typed tool-calling model adapter。
+- [x] 重跑旧 AIWireContractTest 与新测试。
+- [ ] 用明确启用的独立外部冒烟测试验证一个目标模型；写日期和结果，不把付费冒烟加入普通 CI。
+- [ ] 提交 feat: add typed tool-calling model adapter。
 
 ### T11：先建立工作流，再实现有界 Agent（16h）
 
