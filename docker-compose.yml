@@ -68,6 +68,19 @@ services:
     networks:
       - zhixuewuli-network
 
+  # Optional local vector index; keep it off unless the knowledge feature is enabled.
+  qdrant:
+    image: qdrant/qdrant:v1.19.2
+    profiles: ["knowledge"]
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:6333:6333"
+    volumes:
+      - /data/qdrant:/qdrant/storage
+    mem_limit: 512m
+    networks:
+      - zhixuewuli-network
+
   # Spring Boot 应用服务
   app:
     # 单机部署默认本地构建镜像，也支持通过 APP_IMAGE 覆盖标签
@@ -108,6 +121,8 @@ services:
       APP_CORS_ALLOWED_ORIGIN: ${APP_CORS_ALLOWED_ORIGIN}
       VIDEO_STORAGE_PATH: /data/videos
       AI_ENABLED: ${AI_ENABLED:-true}
+      APP_KNOWLEDGE_ENABLED: ${APP_KNOWLEDGE_ENABLED:-false}
+      APP_KNOWLEDGE_QDRANT_URL: ${APP_KNOWLEDGE_QDRANT_URL:-http://qdrant:6333}
       BOOTSTRAP_TEACHER_ENABLED: ${BOOTSTRAP_TEACHER_ENABLED:-false}
       BOOTSTRAP_TEACHER_USERNAME: ${BOOTSTRAP_TEACHER_USERNAME:-}
       BOOTSTRAP_TEACHER_PASSWORD: ${BOOTSTRAP_TEACHER_PASSWORD:-}

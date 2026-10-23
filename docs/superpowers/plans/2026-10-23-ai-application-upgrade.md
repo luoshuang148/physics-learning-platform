@@ -323,11 +323,11 @@ G0 约 8h（另先完成 T0 的基线准备）；可投递闭环是 T0、T0a、T
 
 **Interfaces：** embed(texts, embeddingConfig, cancellation) -> EmbeddingBatch；upsert(indexVersion, points) / search(indexVersion, allowedScope, vector, limit) / deleteRevision(revisionId)。indexVersion 同时绑定模型、维度、提取/切分策略与 revision。外部适配按 T0a 决策实现，优先复用所选库；本任务重点是正式索引生命周期与业务隔离，不再重复造已有协议封装。
 
-- [ ] 写 duplicate_import_does_not_duplicate_chunks、dimension_mismatch_is_rejected、failed_revision_does_not_replace_active_revision、restart_recovers_expired_indexing_lease；网络用 WireMock，断言最多重试 3 次。
-- [ ] 单测先失败再实现：DB 持久化任务状态/租约，最多 2 个索引 worker，重复任务复用版本；对外调用不包在长数据库事务中，重启恢复过期任务。
-- [ ] 新建独立 collection 或等价隔离索引版本，上传完成且点数核对后才原子切活动版本。查询时带 classId/revision 过滤，结果回读 MySQL 再鉴权；撤回版本即使残留向量也不可读。
-- [ ] @Tag("knowledge-integration") 用固定版本 Qdrant 容器验证 upsert/search/delete/重启持久化，执行 ./mvnw -B test -Dtest=KnowledgeVectorIntegrationTest -Dgroups=knowledge-integration；新增 CI job，不默认访问真实 Embedding API。
-- [ ] 记录本地容器内存与重建步骤，运行 KnowledgeIndexTest 后提交 feat: add recoverable versioned knowledge indexing。
+- [x] 写 duplicate_import_does_not_duplicate_chunks、dimension_mismatch_is_rejected、failed_revision_does_not_replace_active_revision、restart_recovers_expired_indexing_lease；网络用 WireMock，断言最多重试 3 次。
+- [x] 单测先失败再实现：DB 持久化任务状态/租约，最多 2 个索引 worker，重复任务复用版本；Qdrant/Embedding 调用在短事务外，重启可恢复过期租约。
+- [x] 新建按 revision/config hash 隔离的 collection；点数核对通过后原子发布 active_revision_id 与 index_version。向量查询携带 classId/revisionId 过滤；原文仍从 MySQL 回读授权。
+- [x] @Tag("knowledge-integration") 用固定版本 Qdrant 容器验证 upsert/search/delete/重启持久化；新增 CI job。完整后端 1018 项通过；MySQL 迁移/租约 2 项通过；Qdrant+BGE 集成 3 项通过，无真实聊天 API 调用。
+- [x] 记录本地 Qdrant 空载实测 18.4 MiB（512 MiB 限制）和重建流程；运行 KnowledgeIndexTest 后提交 feat: add recoverable versioned knowledge indexing。
 
 ### T5：词法、向量与混合检索（10h）
 

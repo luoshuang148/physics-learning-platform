@@ -88,6 +88,18 @@ jobs:
       - name: Verify upgraded schema against MySQL 8.4
         run: ./mvnw -B test -Dgroups=mysql -DexcludedGroups=external-api
 
+  knowledge-vector:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Verify versioned Qdrant index, filters, deletion, and restart recovery
+        run: ./mvnw -B test -Dtest=KnowledgeVectorIntegrationTest -Dgroups=knowledge-integration
+
   delivery:
     runs-on: ubuntu-latest
     services:

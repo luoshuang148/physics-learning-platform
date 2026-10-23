@@ -5,4 +5,5 @@ import java.util.List;
 public interface KnowledgeChunkRepository extends JpaRepository<KnowledgeChunk,Long> {
     List<KnowledgeChunk> findByRevisionIdOrderByOrdinalNo(Long revisionId);
     long countByRevisionId(Long revisionId);
+    void deleteByRevisionId(Long revisionId);
 }

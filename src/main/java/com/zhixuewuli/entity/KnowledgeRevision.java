@@ -10,6 +10,8 @@ public class KnowledgeRevision extends BaseTimeEntity {
     @Column(name="content_sha256",nullable=false,length=64) private String contentSha256;
     @Enumerated(EnumType.STRING) @Column(nullable=false,length=20) private Status status=Status.UPLOADED;
     @Column(name="extractor_version",length=50) private String extractorVersion;
+    @Column(name="chunker_version",length=50) private String chunkerVersion;
+    @Column(name="index_version",length=80) private String indexVersion;
     @Column(name="embedding_model",length=120) private String embeddingModel;
     private Integer dimensions;
     @Column(name="lease_owner",length=100) private String leaseOwner;

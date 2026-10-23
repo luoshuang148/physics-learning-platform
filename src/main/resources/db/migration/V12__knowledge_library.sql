@@ -24,6 +24,8 @@ CREATE TABLE knowledge_revisions (
     content_sha256 VARCHAR(64) NOT NULL,
     status VARCHAR(20) NOT NULL DEFAULT 'UPLOADED',
     extractor_version VARCHAR(50) NULL,
+    chunker_version VARCHAR(50) NULL,
+    index_version VARCHAR(80) NULL,
     embedding_model VARCHAR(120) NULL,
     dimensions INT NULL,
     lease_owner VARCHAR(100) NULL,
