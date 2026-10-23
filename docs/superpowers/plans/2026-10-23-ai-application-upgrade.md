@@ -459,11 +459,11 @@ G0 约 8h（另先完成 T0 的基线准备）；可投递闭环是 T0、T0a、T
 
 **Interfaces：** 同一版本 runner 比较固定工作流与 Agent，输出 taskSuccess、toolValidity、steps、duration、cost。每条结果可以追溯 runId/代码 SHA/数据版本与人工评分。
 
-- [ ] 写 test_partial_plan_is_not_full_success、test_failed_calls_remain_in_denominator、test_price_version_is_preserved；重跑评测单测。
-- [ ] 在 20 工具案例上比较固定工作流与模型选择工具，增加超时、畸形参数、缺标签、候选不足场景；不把工具调用次数当作智能程度。
-- [ ] 依据开发集诊断最多选两项优化，例如 chunk 边界、检索查询、重排序、历史窗口；每项单独对照。不同模型比较时保持任务和预算可比。
-- [ ] 完成 M2 留出验证与人工核对，报告原始分子/分母和不确定性；已查看并用于优化的留出案例不再声称全新泛化验证。
-- [ ] 至少整理 5 类失败：公式损坏、检索漏召回、引文不支持、工具误用、源数据过期；写触发、定位、修复和仍有限制，提交 docs: evaluate learning agent quality cost and failure modes。
+- [x] 写 partial_plan_is_not_full_success、failed/cancelled_calls_remain_in_denominator、price_version_is_preserved；运行全套 Python 评测合同。
+- [ ] 用隔离的 20 个工具案例比较固定工作流与动态 Agent，覆盖超时、畸形参数、缺标签、候选不足；当前缺映射夹具且目标模型 smoke 未完成，暂不虚构分数。
+- [ ] 在经人工复核的开发集诊断最多两项优化，每项单独对照；人工复核和运行样本未具备，暂不调参。
+- [ ] 完成 M2 留出验证与人工核对并报告原始分子/分母；须在开发配置冻结后执行。
+- [x] 整理公式/提取损坏、检索漏召回、引文不支持、工具误用、源数据过期和上游不可用的触发及预期处理，提交后续 T15 评测材料。
 
 ### T16：部署复现、演示与简历材料（20h）
 
