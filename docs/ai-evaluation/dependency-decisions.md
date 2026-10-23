@@ -1,6 +1,6 @@
 # AI 升级依赖与能力决策
 
-状态：T0 初步验证，最终适配方式由 T0a 同题实验决定。日期：2026-10-23。
+状态：T0a 同题实验已执行，技术接入选择已确定；正式教学质量人工评分待完成。日期：2026-10-23。
 
 | 组件 | 锁定候选 | 验证 / 限制 |
 |---|---|---|
@@ -27,3 +27,13 @@
 - [LangChain4j 入门](https://docs.langchain4j.dev/get-started/)
 - [本地中文 BGE 向量模型](https://docs.langchain4j.dev/apidocs/dev/langchain4j/model/embedding/onnx/bgesmallzhv15q/BgeSmallZhV15QuantizedEmbeddingModel.html)
 - [智谱 Embedding-3 文档入口](https://bigmodel.cn/dev/api/vector/embedding-3)
+
+## T0a 最终接入选择
+
+新模型/工具调用使用 LangChain4j 1.22.0 核心模块，正式类名为 LangChain4jToolChatClient（实现 ToolChatGateway）；RAG 生成用 LangChain4jChatGateway；本地向量用 LocalBgeEmbeddingGateway（实现 EmbeddingGateway，依赖模型包 1.22.0-beta32，512 维）。避免引入 Spring Boot 自动配置，不改 Boot 3.3.8；原 ZhipuAIClient / AliyunAIClient 保留。
+
+Java21 + Boot3.3.8 父依赖约束下，实验 14 项测试通过，真实两轮工具协议与两适配生成均已运行。1.22.0 的实际模型字节码包含 propagateCancellation 链路；本地延迟响应测试确认 SDK 调用方可以及时取消。尚不能保证上游立即停止计费。
+
+不是因为 SDK 输出更准确而选择它：v1 计算题引用遗漏在两种适配中都出现，v2 来源格式改善也同时出现。选 SDK 的理由是复用结构化模型/工具合同并减少维护；HTTP 实现只保留在隔离对照实验。正式模块的身份、权限、快照、结果校验和运行预算仍由自己的业务层管理。
+
+参考 docs/ai-evaluation/g0-results.md。T1 将增加“存在摩擦不代表动能必减”的反例，保留人工待评标签。G0 技术链路通过不当作教学质量达标。
