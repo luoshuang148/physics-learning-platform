@@ -135,6 +135,18 @@ app:
     dead-letter-exchange: report.batch.dlx
     dead-letter-queue: report.batch.item.dlq
     dead-letter-routing-key: report.batch.item.dead
+  # 知识库 / 题库向量检索（对应 KnowledgeProperties）
+  # 环境变量见 .env.dev.example：APP_KNOWLEDGE_ENABLED、APP_KNOWLEDGE_QDRANT_URL 等。
+  # 注意：已配置开关 ≠ 实际模型/向量调用成功，运行状态见 GET /ai/capabilities。
+  knowledge:
+    enabled: ${APP_KNOWLEDGE_ENABLED:false}
+    storage-path: ${APP_KNOWLEDGE_STORAGE_PATH:data/knowledge}
+    qdrant-url: ${APP_KNOWLEDGE_QDRANT_URL:http://localhost:6333}
+    qdrant-api-key: ${APP_KNOWLEDGE_QDRANT_API_KEY:}
+    embedding-model: ${APP_KNOWLEDGE_EMBEDDING_MODEL:bge-small-zh-v1.5-quantized}
+    embedding-dimensions: ${APP_KNOWLEDGE_EMBEDDING_DIMENSIONS:512}
+    index-workers: ${APP_KNOWLEDGE_INDEX_WORKERS:2}
+    allow-lexical-fallback: ${APP_KNOWLEDGE_ALLOW_LEXICAL_FALLBACK:false}
   # LaTeX服务配置
   latex:
     strict-mode: true
@@ -195,6 +207,9 @@ ai:
     model-timeout-seconds: ${AI_LEARNING_ASSISTANT_MODEL_TIMEOUT_SECONDS:25}
     tool-timeout-seconds: ${AI_LEARNING_ASSISTANT_TOOL_TIMEOUT_SECONDS:5}
   context:
+    # 总开关（对应 AIBusinessProperties.enabled）；敏感密钥只放本地 .env，不入库。
+    # application-dev.yml / application-prod.yml 可覆盖默认值。
+    enabled: ${AI_ENABLED:false}
     # 上下文管理配置
     max-history-count: 15
     max-token-count: 1500000
