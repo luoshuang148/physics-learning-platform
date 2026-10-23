@@ -286,11 +286,12 @@ G0 约 8h（另先完成 T0 的基线准备）；可投递闭环是 T0、T0a、T
 
 **Interfaces：** manifest.json 定义 corpusVersion、文档逻辑 ID/哈希、caseId→split 映射和复核状态。模型输入只取允许字段，评分字段独立传给 scorer。
 
-- [ ] 写 test_splits_are_disjoint、test_references_resolve_to_versioned_documents、test_scoring_fields_are_not_model_context；分别断言 60/40 分层分割无交集、来源可解析、金标准不进入输入。
-- [ ] 先建立最小 10 案例开发批次验证合同，再整理完整 100+20 案例；运行 python3 -m unittest discover -s scripts/verification -p 'test_evaluation_corpus.py'。
+- [x] 写 test_splits_are_disjoint、test_references_resolve_to_versioned_documents、test_scoring_fields_are_not_model_context；分别断言 60/40 分层分割无交集、来源可解析、金标准不进入输入。
+- [x] 先建立最小 10 案例开发批次验证合同，再整理完整 100+20 案例；运行 python3 -m unittest discover -s scripts/verification -p 'test_evaluation_corpus.py'。
 - [ ] 为讲义建立章节与页码/小节锚点；公式人工核对。标注 relevant evidence 的等价集合、可回答性、关键错误与通过标准，保留复核人和日期。
-- [ ] 冻结留出集哈希；先仅用开发集做日常调试。案例注明自编/公开许可/脱敏来源，不使用真实未授权学生资料。
-- [ ] 检查完整语料数量、类别、许可与版本，提交 docs: add versioned physics AI evaluation corpus。
+- [x] 冻结留出集哈希；先仅用开发集做日常调试。案例注明自编/公开许可/脱敏来源，不使用真实未授权学生资料。
+- [x] 检查完整语料数量、类别、许可与版本，提交 docs: add versioned physics AI evaluation corpus。
+
 
 ### T2：知识库数据模型、上传与授权（10h）
 
