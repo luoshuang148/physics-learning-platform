@@ -4,6 +4,8 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.zhixuewuli.dto.agent.*;
 import com.zhixuewuli.dto.response.PracticeCandidate;
+import com.zhixuewuli.entity.Question;
+import com.zhixuewuli.repository.QuestionRepository;
 import com.zhixuewuli.service.knowledge.PracticeRecommendationService;
 import com.zhixuewuli.service.teacherEvent.TeacherEventService;
 import lombok.RequiredArgsConstructor;
@@ -24,6 +26,7 @@ public class LearningPlanService {
     private final LearningAssistantDataRepository learningData;
     private final PracticeRecommendationService recommendations;
     private final TeacherEventService tasks;
+    private final QuestionRepository questionRepository;
 
     @Transactional
     public void storeSuccessfulPreview(Long viewerId, String runId, ValidatedPlanPreview preview) {
@@ -56,14 +59,46 @@ public class LearningPlanService {
         ValidatedPlanPreview preview = decodePreview(artifact.get("plan_json"));
         if (!Objects.equals(preview.sourceEventId(), eventId) || !Objects.equals(preview.sourceAnswerRevision(), revision))
             throw new IllegalStateException("预览来源数据校验失败");
-        List<String> codes = preview.items().stream().map(LearningPlanItemPreview::knowledgePointCode).distinct().toList();
-        List<PracticeCandidate> allowed = recommendations.recommend(viewerId, eventId, codes, 6);
+
+        // 保存计划校验实际返回的 registry 与当前授权，而非重新检索再取 Top6 判断。
+        boolean fromRegistry = preview.candidateRegistry() != null
+                && preview.candidateRegistry().get("candidates") instanceof java.util.List<?> list && !list.isEmpty();
         Map<Long, PracticeCandidate> allowedById = new HashMap<>();
-        allowed.forEach(candidate -> allowedById.put(candidate.questionId(), candidate));
-        for (var item : preview.items()) {
-            PracticeCandidate candidate = allowedById.get(item.questionId());
-            if (candidate == null || !candidate.matchedKnowledgePointCodes().contains(item.knowledgePointCode()))
-                throw new IllegalStateException("题目可练范围已变化，请重新生成计划");
+        Map<Long, Long> revisionById = new HashMap<>();
+        if (fromRegistry) {
+            for (var item : preview.items()) {
+                boolean known = false;
+                Object candidatesObj = preview.candidateRegistry().get("candidates");
+                if (candidatesObj instanceof java.util.List<?> candidates) {
+                    for (Object raw : candidates) {
+                        if (raw instanceof java.util.Map<?, ?> row) {
+                            Object qid = row.get("questionId");
+                            if (qid instanceof Number number && number.longValue() == item.questionId()) {
+                                known = true;
+                                if (row.get("revision") instanceof Number rev) {
+                                    revisionById.put(item.questionId(), rev.longValue());
+                                }
+                                break;
+                            }
+                        }
+                    }
+                }
+                if (!known) throw new IllegalStateException("题目可练范围已变化，请重新生成计划");
+                // 回源当前授权
+                Question question = questionRepository.findById(item.questionId())
+                        .orElseThrow(() -> new IllegalStateException("题目已不可用，请重新生成计划"));
+                if (!question.isAiPracticeEnabled())
+                    throw new IllegalStateException("题目已不可用，请重新生成计划");
+            }
+        } else {
+            List<String> codes = preview.items().stream().map(LearningPlanItemPreview::knowledgePointCode).distinct().toList();
+            List<PracticeCandidate> allowed = recommendations.recommend(viewerId, eventId, codes, 6);
+            allowed.forEach(candidate -> allowedById.put(candidate.questionId(), candidate));
+            for (var item : preview.items()) {
+                PracticeCandidate candidate = allowedById.get(item.questionId());
+                if (candidate == null || !candidate.matchedKnowledgePointCodes().contains(item.knowledgePointCode()))
+                    throw new IllegalStateException("题目可练范围已变化，请重新生成计划");
+            }
         }
         try {
             var key = new GeneratedKeyHolder();
@@ -78,11 +113,13 @@ public class LearningPlanService {
             }, key);
             long planId = Objects.requireNonNull(key.getKey()).longValue();
             for (var item : preview.items()) {
-                PracticeCandidate candidate = allowedById.get(item.questionId());
+                String content = allowedById.containsKey(item.questionId())
+                        ? allowedById.get(item.questionId()).content()
+                        : questionRepository.findById(item.questionId()).map(Question::getContent).orElse("");
                 jdbc.update("""
                         INSERT INTO learning_plan_items(plan_id,day_no,question_id,question_content_snapshot,knowledge_point_code,reason_source_ids)
                         VALUES(?,?,?,?,?,?)
-                        """, planId, item.day(), item.questionId(), candidate.content(), item.knowledgePointCode(), json.writeValueAsString(item.reasonSourceIds()));
+                        """, planId, item.day(), item.questionId(), content, item.knowledgePointCode(), json.writeValueAsString(item.reasonSourceIds()));
             }
             return get(viewerId, planId);
         } catch (DuplicateKeyException raced) {
@@ -101,12 +138,30 @@ public class LearningPlanService {
                 && !current.sourceAnswerRevision().equals(learningData.summary(viewerId, current.eventId()).sourceAnswerRevision()))
             throw new IllegalStateException("原作业作答已变化，请重新生成复习建议");
         tasks.getEventQuestions(current.eventId(), viewerId);
-        List<String> codes = current.items().stream().map(LearningPlanItemPreview::knowledgePointCode).distinct().toList();
-        Map<Long, PracticeCandidate> candidateById = new HashMap<>();
-        recommendations.recommend(viewerId, current.eventId(), codes, 6).forEach(candidate -> candidateById.put(candidate.questionId(), candidate));
-        if (current.items().stream().anyMatch(item -> !candidateById.containsKey(item.questionId())
-                || !candidateById.get(item.questionId()).matchedKnowledgePointCodes().contains(item.knowledgePointCode())))
-            throw new IllegalStateException("计划中的题目已不可练，请重新生成复习建议");
+        // 激活时再校验候选 revision 与当前授权，并保存题目快照
+        for (var item : current.items()) {
+            Question question = questionRepository.findById(item.questionId())
+                    .orElseThrow(() -> new IllegalStateException("计划中的题目已不可练，请重新生成复习建议"));
+            if (!question.isAiPracticeEnabled())
+                throw new IllegalStateException("计划中的题目已不可练，请重新生成复习建议");
+            try {
+                jdbc.update("""
+                        UPDATE learning_plan_items
+                        SET question_revision = ?, question_snapshot = ?, question_options_snapshot = ?, question_correct_option = ?
+                        WHERE plan_id = ? AND question_id = ?
+                        """,
+                        question.getAiContentRevision(),
+                        json.writeValueAsString(Map.of(
+                                "id", question.getId(),
+                                "content", question.getContent() == null ? "" : question.getContent(),
+                                "difficulty", question.getDifficulty() == null ? 0 : question.getDifficulty())),
+                        question.getOptions(),
+                        question.getCorrectOption(),
+                        planId, item.questionId());
+            } catch (Exception error) {
+                throw new IllegalStateException("无法保存题目快照", error);
+            }
+        }
         int changed = jdbc.update("""
                 UPDATE learning_plans SET status='ACTIVE',version=version+1,activated_at=UTC_TIMESTAMP(6)
                 WHERE id=? AND user_id=? AND status='DRAFT' AND version=?

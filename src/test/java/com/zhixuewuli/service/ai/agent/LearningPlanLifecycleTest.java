@@ -23,7 +23,8 @@ class LearningPlanLifecycleTest {
     private final LearningAssistantDataRepository data = mock(LearningAssistantDataRepository.class);
     private final TeacherEventService tasks = mock(TeacherEventService.class);
     private final LearningPlanService plans = new LearningPlanService(jdbc, new ObjectMapper(), data,
-            mock(PracticeRecommendationService.class), tasks);
+            mock(PracticeRecommendationService.class), tasks,
+            mock(com.zhixuewuli.repository.QuestionRepository.class));
 
     @Test void duplicateSaveRequestReturnsTheExistingPlan() {
         when(jdbc.queryForObject(contains("request_id=?"), eq(Long.class), eq(3L), eq("11111111-1111-4111-8111-111111111111")))
