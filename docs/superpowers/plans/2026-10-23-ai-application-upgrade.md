@@ -347,11 +347,11 @@ G0 约 8h（另先完成 T0 的基线准备）；可投递闭环是 T0、T0a、T
 
 **Interfaces：** streamWrongAnswer(request, viewerId, sessionId, emitter)；appendSources(runId, passages)；completeRun(runId, outcome, usage)。knowledgeMode=OFF 走旧路径，AUTO 走检索路径。run 的终态、引用与 history 绑定一起校验保存，失败不会留下成功标记。
 
-- [ ] 写 off_mode_preserves_existing_request_contract、rag_uses_owned_answer_snapshot、unknown_citation_is_not_clickable、no_evidence_does_not_invent_sources；输入包含“忽略系统指令”的讲义，验证它始终是待引用数据而非系统消息。
-- [ ] 单测失败后实现证据 Prompt，先做错题场景；参考答案仍来自该学生有权读的历史快照，成绩统计来自代码。图片不足时不推断图示。
-- [ ] 落库来源绑定与 Prompt/模型/输入哈希；新增 get history 时可选 sources/runId 字段。班级变更/资料撤回后，受限历史回答显示不可用占位，也不重新送入下一轮 Prompt。
-- [ ] 取消从 SSE 向下传递到检索、Embedding 和上游请求；索引不可用明确提示，保留用户切回普通问答的选择。AI_ENABLED=false 不依赖 Qdrant 启动。
-- [ ] 运行 ./mvnw -B test -Dtest=RagAnswerContractTest,RagHistoryAccessTest,WrongQuestionSnapshotTest,StreamIsolationRegressionTest,UpstreamCancellationRegressionTest -Dgroups=unit，复核新旧流回归后提交 feat: ground wrong-question tutoring in authorized sources。
+- [x] 写 off_mode_preserves_existing_request_contract、rag_uses_owned_answer_snapshot、unknown_citation_is_not_clickable、no_evidence_does_not_invent_sources；输入包含“忽略系统指令”的讲义，验证它始终是待引用数据而非系统消息。
+- [x] 单测失败后实现证据 Prompt，先做错题场景；参考答案仍来自该学生有权读的历史快照，成绩统计来自代码。图片不足时不推断图示。
+- [x] 落库来源绑定与 Prompt/模型/输入哈希；新增 get history 时可选 sources/runId 字段。班级变更/资料撤回后，受限历史回答显示不可用占位，也不重新送入下一轮 Prompt。
+- [x] 取消从 SSE 向下传递到检索、Embedding 和上游请求；索引不可用明确提示，保留用户切回普通问答的选择。AI_ENABLED=false 不依赖 Qdrant 启动。
+- [x] 运行全量后端分组回归与隔离 MySQL schema 迁移/检索验证，复核新旧流回归后提交 feat: ground wrong-question tutoring in authorized sources。
 
 ### T7：知识库管理和引用交互（10h）
 
