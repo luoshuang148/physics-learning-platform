@@ -32,6 +32,14 @@ public class LearningAgentService {
                                         java.util.function.BooleanSupplier cancelled,
                                         java.util.function.Consumer<Runnable> cancellationRegistration,
                                         java.util.function.Consumer<LearningAssistantStep> onStep) {
+        return preview(context, question, days, cancelled, cancellationRegistration, onStep, ignored -> {});
+    }
+
+    public ValidatedPlanPreview preview(LearningToolContext context, String question, int days,
+                                        java.util.function.BooleanSupplier cancelled,
+                                        java.util.function.Consumer<Runnable> cancellationRegistration,
+                                        java.util.function.Consumer<LearningAssistantStep> onStep,
+                                        java.util.function.Consumer<ToolChatResponse> onModelResponse) {
         if (!agentProperties.isToolCallingEnabled()) throw new IllegalStateException("动态 Agent 尚未启用");
         if (days < 1 || days > 7 || question == null || question.isBlank() || question.length() > 800)
             throw new IllegalArgumentException("请求参数无效");
@@ -54,6 +62,7 @@ public class LearningAgentService {
             ToolModelConfig model = new ToolModelConfig(agentProperties.getBaseUrl(), agentProperties.getApiKey(),
                     agentProperties.getModel(), Duration.ofMillis(Math.max(1, remaining)));
             ToolChatResponse response = gateway.complete(List.copyOf(turns), tools.definitions(), model, cancellation);
+            onModelResponse.accept(response);
             if (response.toolCalls().isEmpty()) {
                 if (response.content() == null || response.content().isBlank()) throw new IllegalStateException("Agent 未返回计划");
                 return validator.validate(response.content(), context.eventId(), revision, evidence,
@@ -66,6 +75,7 @@ public class LearningAgentService {
                 String signature = call.name() + ":" + call.argumentsJson();
                 if (!seenCalls.add(signature)) throw new IllegalStateException("Agent 重复调用相同工具，已停止");
                 String resultJson;
+                long toolStarted = System.nanoTime();
                 try {
                     long toolDeadline = Math.min(deadline, System.currentTimeMillis() + limits.getToolTimeoutSeconds() * 1000);
                     ToolResult result = tools.execute(context, call, toolDeadline);
@@ -75,9 +85,9 @@ public class LearningAgentService {
                         List<PracticeCandidate> found = json.readerForListOf(PracticeCandidate.class).readValue(resultJson);
                         candidates.clear(); candidates.addAll(found);
                     }
-                    onStep.accept(new LearningAssistantStep(step.incrementAndGet(), call.name(), "SUCCEEDED", stepSummary(call.name())));
+                    onStep.accept(new LearningAssistantStep(step.incrementAndGet(), call.name(), "SUCCEEDED", stepSummary(call.name()), java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(System.nanoTime()-toolStarted)));
                 } catch (Exception error) {
-                    onStep.accept(new LearningAssistantStep(step.incrementAndGet(), call.name(), "FAILED", "此步骤暂未完成"));
+                    onStep.accept(new LearningAssistantStep(step.incrementAndGet(), call.name(), "FAILED", "此步骤暂未完成", java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(System.nanoTime()-toolStarted)));
                     resultJson = serialize(Map.of("error", "tool_failed", "message", "工具调用失败；请尝试其他证据或给出部分建议。"));
                 }
                 turns.add(new ChatTurn(ChatTurn.Role.TOOL, resultJson, call.callId(), call.name(), List.of()));

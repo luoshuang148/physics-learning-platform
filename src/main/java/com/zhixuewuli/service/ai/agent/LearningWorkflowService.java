@@ -93,6 +93,7 @@ public class LearningWorkflowService {
     private ToolResult execute(LearningToolContext context, String tool, String args, long deadline,
                                java.util.function.Consumer<LearningAssistantStep> onStep,
                                java.util.concurrent.atomic.AtomicInteger step) {
+        long started = System.nanoTime();
         try {
             ToolResult result = tools.execute(context, new ToolCall("workflow-" + tool, tool, args), deadline);
             String summary = switch (tool) {
@@ -102,10 +103,10 @@ public class LearningWorkflowService {
                 case "recommend_practice" -> "已筛选可练习题目";
                 default -> "步骤完成";
             };
-            onStep.accept(new LearningAssistantStep(step.incrementAndGet(), tool, "SUCCEEDED", summary));
+            onStep.accept(new LearningAssistantStep(step.incrementAndGet(), tool, "SUCCEEDED", summary, java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(System.nanoTime()-started)));
             return result;
         } catch (RuntimeException error) {
-            onStep.accept(new LearningAssistantStep(step.incrementAndGet(), tool, "FAILED", "此步骤暂未完成"));
+            onStep.accept(new LearningAssistantStep(step.incrementAndGet(), tool, "FAILED", "此步骤暂未完成", java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(System.nanoTime()-started)));
             throw error;
         }
     }

@@ -9,6 +9,10 @@ public class AIMetrics {
  private final MeterRegistry registry;
  public record UpstreamStatus(String state, java.time.Instant checkedAt) {}
  private final java.util.concurrent.ConcurrentMap<String,UpstreamStatus> recent=new java.util.concurrent.ConcurrentHashMap<>();
+ public void learningStage(String stage,String outcome,long durationMs){registry.timer("ai.learning.stage.duration","stage",safeTag(stage),"outcome",safeTag(outcome)).record(durationMs,java.util.concurrent.TimeUnit.MILLISECONDS);}
+ public void learningRunStarted(String mode){registry.counter("ai.learning.run.started","mode",safeTag(mode)).increment();}
+ public void learningRunFinished(String outcome){registry.counter("ai.learning.run.finished","outcome",safeTag(outcome)).increment();}
+ private String safeTag(String value){return value==null?"unknown":value.toLowerCase(java.util.Locale.ROOT).replaceAll("[^a-z0-9_-]","_");}
  public UpstreamStatus lastStatus(String provider){return recent.getOrDefault(provider,new UpstreamStatus("UNKNOWN",null));}
  private String errorState(Exception error){
   if(error instanceof com.zhixuewuli.common.exception.ai.AIUpstreamException upstream) {

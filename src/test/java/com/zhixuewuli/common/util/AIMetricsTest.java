@@ -26,4 +26,13 @@ class AIMetricsTest {
   assertThat(registry.get("ai.upstream.duration").tag("outcome","error").timer().count()).isEqualTo(1);
   assertThat(errors.get()).isEqualTo(2);
  }
+ @Test void learningMetricsUseOnlyBoundedOperationalTags(){
+  var registry=new SimpleMeterRegistry();var metrics=new AIMetrics(registry);
+  metrics.learningStage("search_knowledge","SUCCEEDED",12);
+  metrics.learningRunStarted("AGENT");metrics.learningRunFinished("FAILED");
+  var timer=registry.get("ai.learning.stage.duration").timer();
+  assertThat(timer.getId().getTags()).extracting(io.micrometer.core.instrument.Tag::getKey)
+    .containsExactlyInAnyOrder("stage","outcome").doesNotContain("userId","runId","eventId");
+  assertThat(registry.get("ai.learning.run.started").tag("mode","agent").counter().count()).isEqualTo(1);
+ }
 }

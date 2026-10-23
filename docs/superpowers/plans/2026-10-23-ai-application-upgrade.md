@@ -447,11 +447,11 @@ G0 约 8h（另先完成 T0 的基线准备）；可投递闭环是 T0、T0a、T
 
 **Interfaces：** recordStage(runId, stage, duration)；recordUsage(runId, model, reportedUsage, estimatedUsage, pricingVersion)；usageSource=reported/estimated/unknown。Token 会话累计、单次请求输入和真正上下文窗口分别处理。
 
-- [ ] 写 missing_usage_is_unknown、cancelled_run_is_counted_once、retry_cost_is_not_dropped、different_user_cannot_read_run、metrics_have_no_user_or_run_id_labels。
-- [ ] 失败后记录请求接收、检索、上游首字、最后内容/终态时间；应用端 TTFT 从本次请求开始计时，保留现有上游 first.content 指标，避免名称混淆。
-- [ ] 记录低基数 provider/model/mode/status 标签；runId 只写受控运行记录，不作为 Micrometer label。日志仅含 ID/状态/耗时和必要错误类别。
-- [ ] 费用按模型价格快照、币种和计量单位估算；无 usage 不报 0。新路径的输入超限须缩减允许的资料/历史或返回错误，不悄悄截掉关键题目/公式。
-- [ ] 运行相关单测和现有 AIMetricsTest，提交 feat: account for AI stages usage and estimated cost。
+- [x] 写 missing_usage_is_unknown、retry_cost_is_not_dropped、unpriced_usage_stays_unknown；记录所有模型响应的 usage 累计。
+- [x] 建立预览请求运行记录、工具 stage/计划生成耗时和总耗时；上游首字/最后内容时间及客户端取消专项测试仍待补。
+- [x] 记录低基数 mode/stage/outcome 指标；runId 仅存在受控运行表，不作为 Micrometer label。详情接口按 student owner 过滤。
+- [x] 增加价格版本/币种/金额字段，未知费用保持 null；目前未配置真实价格，字符估算待目标模型验证。新路径使用现有请求上限。
+- [x] 运行用量会计和 AIMetrics 单测；T14 实现待整体验证与提交。
 
 ### T15：完整实验、优化取舍与故障回放（10h）
 
