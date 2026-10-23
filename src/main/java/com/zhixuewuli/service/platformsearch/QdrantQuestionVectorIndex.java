@@ -41,15 +41,28 @@ public class QdrantQuestionVectorIndex implements QuestionVectorIndex {
     public void ensureCollection(String indexVersion, int dimensions) {
         var name = collectionName(indexVersion);
         try {
-            execute(() -> client.get().uri("/collections/{name}", name).retrieve().body(JsonNode.class));
+            client.get().uri("/collections/{name}", name).retrieve().body(JsonNode.class);
             return;
         } catch (RestClientResponseException error) {
-            if (error.getStatusCode().value() != 404) throw vectorFailure("collection lookup failed", error);
+            if (error.getStatusCode().value() != 404) {
+                throw new KnowledgeVectorException("Qdrant collection lookup failed: "
+                        + error.getStatusCode().value() + " " + error.getResponseBodyAsString(), error);
+            }
+        } catch (RestClientException error) {
+            throw vectorFailure("Qdrant collection lookup failed", error);
         }
-        execute(() -> client.put().uri("/collections/{name}", name)
-                .contentType(MediaType.APPLICATION_JSON)
-                .body(Map.of("vectors", Map.of("size", dimensions, "distance", "Cosine")))
-                .retrieve().body(JsonNode.class));
+        execute(() -> {
+            try {
+                return client.put().uri("/collections/{name}", name)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .body(Map.of("vectors", Map.of("size", dimensions, "distance", "Cosine")))
+                        .retrieve().body(JsonNode.class);
+            } catch (RestClientResponseException error) {
+                // 并发创建时 409 = 已存在，视为成功
+                if (error.getStatusCode().value() == 409) return null;
+                throw error;
+            }
+        });
     }
 
     @Override
@@ -94,31 +107,29 @@ public class QdrantQuestionVectorIndex implements QuestionVectorIndex {
                 || allowed == null || allowed.isEmpty()) {
             return List.of();
         }
-        // must: questionId 在候选集合；must_not: revision 不匹配的点（以 should 传 allowed revision）
-        var should = allowed.stream()
-                .<Map<String, Object>>map(e -> Map.of(
-                        "must", List.of(
-                                Map.of("key", "questionId", "match", Map.of("value", e.questionId())),
-                                Map.of("key", "revision", "match", Map.of("value", e.revision())))))
-                .map(m -> Map.of("filter", m))
-                .toList();
-        var filter = Map.of("should", should, "minimum_should_match", 1);
+        // 仅按 questionId 集合过滤（Qdrant match.any），revision 在结果里再校验
+        List<Long> questionIds = allowed.stream().map(EligibleQuestion::questionId).distinct().toList();
+        var filter = Map.of("must", List.of(
+                Map.of("key", "questionId", "match", Map.of("any", questionIds))));
         JsonNode result = execute(() -> client.post()
                 .uri(uriBuilder -> uriBuilder.path("/collections/{name}/points/search")
-                        .queryParam("limit", limit).build(collectionName(indexVersion)))
+                        .queryParam("limit", limit * 2).build(collectionName(indexVersion)))
                 .contentType(MediaType.APPLICATION_JSON)
-                .body(Map.of("vector", vector, "filter", filter, "limit", limit,
+                .body(Map.of("vector", vector, "filter", filter, "limit", limit * 2,
                         "with_payload", true))
                 .retrieve().body(JsonNode.class));
+        var allowedSet = new java.util.HashSet<>(allowed);
         var hits = new ArrayList<QuestionVectorPoint>();
         if (result != null && result.has("result")) {
             for (JsonNode hit : result.get("result")) {
+                if (hits.size() >= limit) break;
                 JsonNode payload = hit.path("payload");
                 long questionId = payload.path("questionId").asLong(-1);
                 long revision = payload.path("revision").asLong(-1);
                 String part = payload.path("part").asText("QUESTION");
                 int ordinal = payload.path("ordinal").asInt(0);
                 if (questionId <= 0) continue;
+                if (!allowedSet.contains(new EligibleQuestion(questionId, revision))) continue;
                 hits.add(new QuestionVectorPoint(hit.path("id").asText(), questionId, revision,
                         Part.valueOf(part), ordinal, null));
             }
@@ -152,7 +163,8 @@ public class QdrantQuestionVectorIndex implements QuestionVectorIndex {
                 if (error instanceof RestClientResponseException response
                         && response.getStatusCode().is4xxClientError()
                         && response.getStatusCode().value() != 429) {
-                    throw vectorFailure("Qdrant client error", error);
+                    throw new KnowledgeVectorException("Qdrant client error: "
+                            + response.getStatusCode().value() + " " + response.getResponseBodyAsString(), error);
                 }
             }
         }

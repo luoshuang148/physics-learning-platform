@@ -54,6 +54,8 @@ public class QuestionIndexWorker {
     private final QuestionSourceBuilder sourceBuilder;
     private final EmbeddingGateway embeddings;
     private final QuestionVectorIndex vectors;
+    private final QuestionSourceIndexService indexService;
+    private final org.springframework.transaction.PlatformTransactionManager transactionManager;
 
     private final ThreadPoolExecutor workers;
 
@@ -61,7 +63,9 @@ public class QuestionIndexWorker {
     public QuestionIndexWorker(KnowledgeProperties properties, QuestionRepository questions,
                                QuestionSearchUnitRepository searchUnits, QuestionIndexJobRepository jobs,
                                QuestionIndexPublicationRepository publications, QuestionSourceBuilder sourceBuilder,
-                               EmbeddingGateway embeddings, QuestionVectorIndex vectors) {
+                               EmbeddingGateway embeddings, QuestionVectorIndex vectors,
+                               QuestionSourceIndexService indexService,
+                               org.springframework.transaction.PlatformTransactionManager transactionManager) {
         this.properties = properties;
         this.questions = questions;
         this.searchUnits = searchUnits;
@@ -70,6 +74,8 @@ public class QuestionIndexWorker {
         this.sourceBuilder = sourceBuilder;
         this.embeddings = embeddings;
         this.vectors = vectors;
+        this.indexService = indexService;
+        this.transactionManager = transactionManager;
         int count = Math.max(1, Math.min(properties.getIndexWorkers(), 2));
         this.workers = new ThreadPoolExecutor(count, count, 0, TimeUnit.MILLISECONDS,
                 new ArrayBlockingQueue<>(2), runnable -> {
@@ -93,9 +99,17 @@ public class QuestionIndexWorker {
         }
     }
 
-    /** 处理单个任务（测试可直接调用）。 */
-    @Transactional
+    /** 处理单个任务（测试可直接调用）。使用 TransactionTemplate 保证事务生效。 */
     public void process(Long jobId) {
+        if (transactionManager == null) {
+            doProcess(jobId);
+            return;
+        }
+        var template = new org.springframework.transaction.support.TransactionTemplate(transactionManager);
+        template.executeWithoutResult(status -> doProcess(jobId));
+    }
+
+    private void doProcess(Long jobId) {
         var owner = UUID.randomUUID().toString();
         LocalDateTime now = LocalDateTime.now();
         int claimed = jobs.claim(jobId, owner, now.plusSeconds(LEASE_SECONDS), now, MAX_ATTEMPTS);
@@ -141,6 +155,9 @@ public class QuestionIndexWorker {
 
         List<SearchUnit> units = sourceBuilder.build(question);
         String indexVersion = indexVersion(job.getQuestionId(), job.getRevision());
+
+        // 同事务写入 MySQL 检索单元（有效版本依据）
+        indexService.replaceSearchUnits(job.getQuestionId(), job.getRevision(), units);
 
         jobs.renewLease(job.getId(), owner, LocalDateTime.now().plusSeconds(LEASE_SECONDS));
 
@@ -234,19 +251,27 @@ public class QuestionIndexWorker {
         jobs.save(fresh);
     }
 
-    /** 确定性 pointId：重试幂等，不增加重复点。 */
+    /**
+     * 确定性 pointId（UUID 形态）：重试幂等，不增加重复点。
+     * Qdrant 只接受 unsigned int 或 UUID，故将哈希格式化为 8-4-4-4-12。
+     */
     public static String pointId(long questionId, long revision, Part part, int ordinal) {
         String material = questionId + "|" + revision + "|" + part.name() + "|" + ordinal;
-        return DigestUtils.sha256Hex(material.getBytes(StandardCharsets.UTF_8)).substring(0, 32);
+        String hex = DigestUtils.sha256Hex(material.getBytes(StandardCharsets.UTF_8)).substring(0, 32);
+        return hex.substring(0, 8) + "-" + hex.substring(8, 12) + "-" + hex.substring(12, 16)
+                + "-" + hex.substring(16, 20) + "-" + hex.substring(20, 32);
     }
 
     public String indexVersion(long questionId, long revision) {
         return staticIndexVersion(questionId, revision, properties);
     }
 
-    /** 确定性 indexVersion：与 worker 生成规则一致，检索侧复用。 */
+    /**
+     * 确定性 indexVersion：题库共用一个 collection（含模型/维度/分块配置版本），
+     * 与 worker 生成规则一致，检索侧复用。questionId/revision 进 pointId 与 payload。
+     */
     public static String staticIndexVersion(long questionId, long revision, KnowledgeProperties properties) {
-        String material = String.join("|", "q", Long.toString(questionId), Long.toString(revision),
+        String material = String.join("|", "qbank",
                 properties.getEmbeddingModel(), Integer.toString(properties.getEmbeddingDimensions()));
         return "qidx_" + DigestUtils.sha256Hex(material.getBytes(StandardCharsets.UTF_8)).substring(0, 24);
     }
