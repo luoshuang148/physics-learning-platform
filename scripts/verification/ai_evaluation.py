@@ -1,10 +1,24 @@
 #!/usr/bin/env python3
 """Capture bounded synthetic AI evaluation runs. Teacher scores are never generated."""
-import argparse, datetime, hashlib, json, os, time, urllib.error, urllib.request
+import argparse, datetime, hashlib, json, os, subprocess, time, urllib.error, urllib.request
 from urllib.parse import urlparse
 from pathlib import Path
 
 PROMPT_VERSION = 'teaching-evaluation-v1'
+
+
+def default_cases_path():
+    return Path(__file__).resolve().parents[2] / 'src/test/resources/ai-evaluation/cases.jsonl'
+
+
+def repository_revision():
+    try:
+        return subprocess.check_output(
+            ['git', 'rev-parse', 'HEAD'], cwd=Path(__file__).resolve().parents[2],
+            text=True, stderr=subprocess.DEVNULL, timeout=3).strip()
+    except (OSError, subprocess.SubprocessError):
+        return 'unknown'
+
 
 def prepare(case, model):
     data = {key: case.get(key) for key in ('question', 'options', 'studentAnswer', 'selfReportedReason')}
@@ -17,7 +31,7 @@ def prepare(case, model):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--cases', type=Path, default=Path(__file__).resolve().parents[2] / 'docs/ai-evaluation/cases.jsonl')
+    parser.add_argument('--cases', type=Path, default=default_cases_path())
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--model', required=True)
     parser.add_argument('--base-url', default='https://open.bigmodel.cn/api/paas/v4')
@@ -29,12 +43,16 @@ def main():
     key = os.getenv(args.api_key_env, '')
     if args.allow_model_calls and not key: parser.error('Selected API key environment variable is empty')
     if urlparse(args.base_url).scheme != 'https': parser.error('Model endpoint must use HTTPS')
-    cases = [json.loads(line) for line in args.cases.read_text().splitlines() if line.strip()][:args.max_cases]
+    corpus_bytes = args.cases.read_bytes()
+    corpus_version = 'sha256:' + hashlib.sha256(corpus_bytes).hexdigest()
+    code_sha = repository_revision()
+    cases = [json.loads(line) for line in corpus_bytes.decode('utf-8').splitlines() if line.strip()][:args.max_cases]
     args.output.parent.mkdir(parents=True, exist_ok=True)
     with args.output.open('x', encoding='utf-8') as output:
         args.output.chmod(0o600)
         for case in cases:
             record = prepare(case, args.model)
+            record.update(codeSha=code_sha, corpusVersion=corpus_version, mode='baseline')
             record['capturedAt'] = datetime.datetime.now(datetime.timezone.utc).isoformat()
             record['phase'] = 'prepared'
             if args.allow_model_calls:

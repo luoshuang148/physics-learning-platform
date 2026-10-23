@@ -260,11 +260,11 @@ G0 约 8h（另先完成 T0 的基线准备）；可投递闭环是 T0、T0a、T
 
 **Interfaces：** 保留 prepare(case, model) 的现有输出合同；将默认样例定位封装为 default_cases_path() -> Path。新报告统一带 codeSha、corpusVersion、promptVersion、mode、model、capturedAt、reviewStatus。
 
-- [ ] 增加 test_default_cases_path_points_to_existing_repository_fixture，断言默认路径存在且指向既有 10 条样例；保留现有“不泄露 reference/rubric”测试。
-- [ ] 运行 python3 -m unittest discover -s scripts/verification -p 'test_ai_evaluation.py'，确认新测试在修正前失败；只修路径与元数据，不更改旧样例数量。
-- [ ] 在隔离数据库/本地 Redis 与 Docker 可用环境运行既有 ./mvnw -B test；在 frontend 运行 npm ci、npm test、npm run build。记录实际结果、失败原因、所需环境，不能将未运行项写成通过。
-- [ ] 核对并锁定 PDFBox/Qdrant 兼容版本、Embedding 接口能力和工具模型能力；验证聊天、Embedding、tools 是独立能力。dependency-decisions.md 记录来源、版本、维度、价格日期，不保存密钥。
-- [ ] 用原样例执行不联网采集，输出 .local/ai-evaluation/baseline-prepared.jsonl；复核差异后提交 fix: make AI evaluation baseline reproducible。
+- [x] 增加 test_default_cases_path_points_to_existing_repository_fixture，断言默认路径存在且指向既有 10 条样例；保留现有“不泄露 reference/rubric”测试。
+- [x] 运行 python3 -m unittest discover -s scripts/verification -p 'test_ai_evaluation.py'，确认新测试在修正前失败；只修路径与元数据，不更改旧样例数量。
+- [x] 在隔离数据库/本地 Redis 与 Docker 可用环境运行既有 ./mvnw -B test；在 frontend 运行 npm ci、npm test、npm run build。记录实际结果、失败原因、所需环境，不能将未运行项写成通过。
+- [x] 核对并锁定 PDFBox/Qdrant 兼容版本、Embedding 接口能力和工具模型能力；验证聊天、Embedding、tools 是独立能力。dependency-decisions.md 记录来源、版本、维度、价格日期，不保存密钥。
+- [x] 用原样例执行不联网采集，输出 .local/ai-evaluation/baseline-prepared.jsonl；复核差异后提交 fix: make AI evaluation baseline reproducible。
 
 ### T0a：最小 RAG 验证与 Java 接入选型（8h）
 
