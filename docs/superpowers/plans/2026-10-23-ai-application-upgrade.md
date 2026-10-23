@@ -1,6 +1,6 @@
 # 教学平台 AI 应用能力升级 Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox syntax for tracking. 本次仅产出计划，未开始实现；默认建议后续由同一执行者按依赖顺序推进，执行前再确认方案。
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox syntax for tracking. 本次按用户要求在隔离 worktree 中逐项实施；进度与验证证据记录在被忽略的 `.superpowers/sdd/2026-10-23-ai-application-upgrade/progress.md`。
 
 **Goal:** 在现有教学平台中交付“有资料依据的错题辅导、能调用业务工具的复习助手、可复现的效果评测”，形成可用于 AI 应用开发岗位投递与技术面试的完整项目。
 
@@ -8,7 +8,7 @@
 
 **Tech Stack:** Java 21、Spring Boot 3.3、Vue 3、TypeScript、MySQL 8、Redis、现有 RabbitMQ、现有 OpenAI 兼容模型接口；拟新增 PDFBox 3.x、Qdrant 与独立配置的 Embedding 接口。Java AI 接入候选为现有 HTTP 方式与 LangChain4j，Spring AI 仅在兼容现有基线时列入候选；T0a 比较后只选一种新模块接入方式。新增依赖具体版本在 T0/T0a 验证后锁定，不使用浮动 latest 镜像。
 
-**Spec:** 本文件第 1–8 节是本计划的设计基线；均为待实施建议。第 9 节将其拆成任务，第 10–14 节规定验证与交付。用户已选择在现有项目继续深化，尚未要求开始编码。
+**Spec:** 本文件第 1–8 节是本计划的设计基线；第 9 节将其拆成任务，第 10–14 节规定验证与交付。用户已要求按计划开始实施，功能状态以任务勾选、提交记录及进度账本中的验证证据为准。
 
 **编写日期 / 时区：** 2026-10-23，Asia/Shanghai。
 
@@ -311,11 +311,11 @@ G0 约 8h（另先完成 T0 的基线准备）；可投递闭环是 T0、T0a、T
 
 **Interfaces：** extract(path, mediaType) -> List<ExtractedSection>，Section 含 page（PDF 从 1 起）、heading、text；chunk(sections, policy) -> List<ChunkDraft>，含稳定 ordinal、hash 和来源锚点。
 
-- [ ] 写 extract_text_pdf_preserves_page_numbers、reject_scanned_or_encrypted_pdf、chunk_keeps_formula_and_heading；验证双页 PDF、无文字 PDF、加密文件、跨行公式与中文段落。
-- [ ] 运行 ./mvnw -B test -Dtest=KnowledgeExtractionTest -Dgroups=unit，确认失败后实现提取和可理解的失败状态。
-- [ ] 按标题/段落优先切分，目标 600–900 字符，硬上限 1200，重叠最多 100；避免拆开短 LaTeX 块，超长单公式标为需教师修订。字符限制不称作精确 Token 限制。
-- [ ] PDF 无可用文本时记录 FAILED/OCR_REQUIRED；不上传空向量。上传到 100 页上限和提取总字符 200000 上限分别设测试。
-- [ ] 人工检查开发集涉及的所有公式片段，重跑单测后提交 feat: extract physics knowledge with stable source anchors。
+- [x] 写 extract_text_pdf_preserves_page_numbers、reject_scanned_or_encrypted_pdf、chunk_keeps_formula_and_heading；验证双页 PDF、无文字 PDF、加密文件、跨行公式与中文段落。
+- [x] 运行 ./mvnw -B test -Dtest=KnowledgeExtractionTest -Dgroups=unit，先确认失败，再实现提取和可理解的失败状态；最终 10 项通过。
+- [x] 按标题/段落优先切分，目标 600–900 字符，硬上限 1200，重叠最多 100；避免拆开短 LaTeX 块，超长单公式标为需教师修订。字符限制不称作精确 Token 限制。
+- [x] PDF 无可用文本时报告 OCR_REQUIRED，不产出空向量；测试 100 页/200000 字符硬上限及配置覆盖限制。
+- [x] 开发者逐份检查开发语料讲义公式与适用条件；教师复核仍 pending。重跑提取单测后提交 feat: extract physics knowledge with stable source anchors。
 
 ### T4：Embedding、向量索引与失败恢复（12h）
 
