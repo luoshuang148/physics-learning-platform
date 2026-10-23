@@ -335,11 +335,11 @@ G0 约 8h（另先完成 T0 的基线准备）；可投递闭环是 T0、T0a、T
 
 **Interfaces：** retrieve(viewerId, eventId, query, RetrievalMode, cancellation) -> RetrievalResult(status, passages, indexVersion, timings)；状态为 MATCHED / INSUFFICIENT / UNAVAILABLE，不能混为一类。
 
-- [ ] 写 rrf_deduplicates_and_orders_candidates、scope_is_applied_to_both_branches、withdrawn_document_is_filtered_before_prompt；固定两路排名断言 RRF 常数 60、结果最多 5 段。
-- [ ] 单测失败后实现两路各最多 10 条、去重融合，保留每段原始排名/分数用于诊断；MySQL 中文检索在 KnowledgeKeywordMySqlTest 验证。
-- [ ] 开发集分别跑 keyword/vector/hybrid；查询和索引必须使用同一 Embedding 模型/维度。索引或 Embedding 失效返回 UNAVAILABLE；显式配置允许词法降级时记录 lexical_only，不能冒充 hybrid。
-- [ ] 只在开发集校准低相关门槛，记录样本、门槛与误拒情况；RRF 分数是排名融合值，不当作“正确概率”。没有相关证据返回 INSUFFICIENT，不硬凑 5 条。
-- [ ] 执行 ./mvnw -B test -Dtest=KnowledgeRetrievalTest -Dgroups=unit 及对应 mysql 测试，提交 feat: add measurable hybrid physics knowledge retrieval。
+- [x] 写 rrf_deduplicates_and_orders_candidates、scope_is_applied_to_both_branches、withdrawn_document_is_filtered_before_prompt；固定两路排名断言 RRF 常数 60、结果最多 5 段。
+- [x] 单测失败后实现两路各最多 10 条、去重融合，保留每段原始排名/分数用于诊断；MySQL 中文检索在 KnowledgeKeywordMySqlTest 验证。
+- [x] 查询和索引必须使用同一 Embedding 模型/维度。索引或 Embedding 失效返回 UNAVAILABLE；显式配置允许词法降级时记录 lexical_only，不能冒充 hybrid。
+- [ ] 开发集分别跑 keyword/vector/hybrid；只在开发集校准低相关门槛，记录样本、门槛与误拒情况；RRF 分数是排名融合值，不当作“正确概率”。没有相关证据返回 INSUFFICIENT，不硬凑 5 条。
+- [ ] 执行完整单测与 MySQL 检索测试，提交 feat: add measurable hybrid physics knowledge retrieval。
 
 ### T6：将证据与引用接入现有错题辅导（14h）
 

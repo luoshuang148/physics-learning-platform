@@ -17,4 +17,6 @@ public class KnowledgeProperties {
     private String extractorVersion="pdfbox-3-v1";
     private String chunkerVersion="char-900-overlap-100-v1";
     private int indexWorkers=2;
+    private double minVectorScore=0.60;
+    private boolean allowLexicalFallback=false;
 }

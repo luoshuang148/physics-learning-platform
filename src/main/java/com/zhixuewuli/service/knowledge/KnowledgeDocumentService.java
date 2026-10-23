@@ -54,6 +54,15 @@ public class KnowledgeDocumentService {
         if(document.getWithdrawnAt()!=null || revision.getStatus()!=KnowledgeRevision.Status.READY)throw new KnowledgeNotFoundException();
         return new KnowledgeChunkView(chunk.getId(),revision.getId(),document.getTitle(),chunk.getPageNo(),chunk.getSectionTitle(),chunk.getText());
     }
+    @Transactional(readOnly=true)
+    public KnowledgeChunkView requireActiveReadable(Long viewerId,Long chunkId){
+        enabled();var chunk=chunks.findById(chunkId).orElseThrow(KnowledgeNotFoundException::new);
+        var revision=revisions.findById(chunk.getRevisionId()).orElseThrow(KnowledgeNotFoundException::new);
+        var document=documents.findById(revision.getDocumentId()).orElseThrow(KnowledgeNotFoundException::new);
+        access.requireReader(viewerId,document.getClassId());
+        if(document.getWithdrawnAt()!=null || !Objects.equals(document.getActiveRevisionId(),revision.getId()) || revision.getStatus()!=KnowledgeRevision.Status.READY)throw new KnowledgeNotFoundException();
+        return new KnowledgeChunkView(chunk.getId(),revision.getId(),document.getTitle(),chunk.getPageNo(),chunk.getSectionTitle(),chunk.getText());
+    }
     @Transactional
     public void withdraw(Long viewerId,Long documentId){
         enabled();var document=documents.lockById(documentId).orElseThrow(KnowledgeNotFoundException::new);
