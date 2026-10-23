@@ -12,6 +12,8 @@
 
 **编写日期 / 时区：** 2026-10-23，Asia/Shanghai。
 
+**实施决策（T0a）：** G0 技术链路已通过；新模块采用 LangChain4j 1.22.0，使用 512 维本地中文 BGE（1.22.0-beta32）。云 Embedding 429/1113 未视为通过。内容人工/教师评分仍为 pending；已发现的摩擦与动能过度推断保留为反例。详见 docs/ai-evaluation/g0-results.md。
+
 **修订记录：** 2026-10-23，v1.1：增加最小 RAG 验证与 Java 接入方案比较；先建立固定工作流再引入 Agent；补开源参考与能力判定标准；更新任务依赖和工时。业务目标及原有接口兼容要求不变。
 
 **代码基线：** 6583cbd。编写时工作区无未提交修改。以下新类、表、端点均为拟议设计，不能当作已经实现的功能。
@@ -272,11 +274,11 @@ G0 约 8h（另先完成 T0 的基线准备）；可投递闭环是 T0、T0a、T
 
 **Interfaces：** RagSpike.run(question, document, adapter) -> {retrievedPassages, answer, sourceIds, usage, timings}；adapter 的 HTTP/框架两种实现只在实验中比较。无凭证时默认模拟上游；真实调用显式启用并使用既定预算。实验输出进入 .local/ai-evaluation/，不会直接成为正式业务能力。
 
-- [ ] 建立一份人工核对短讲义、10 个带预期来源的开发问题，其中包含无答案问题；写问题检索到正确片段、无结果不造来源、最终上下文包含所选片段、工具往返参数不丢失的合同测试，先用模拟响应验证。
-- [ ] 跑通 HTTP 版“切分→Embedding→本地临时向量检索→模型回答→来源映射”；首版实验可用内存索引，不先部署 Qdrant 或搭上传管理。真实 Embedding 与回答的用量分别记录。
-- [ ] 用相同资料、模型和问题验证 LangChain4j 核心模块是否兼容 JDK 21/现有 Spring Boot 依赖树，检查工具调用往返与取消；若兼容检查失败，记录证据而非为此升级主应用。Spring AI 只有在不改变主基线时才作备选。
-- [ ] 在 experiments/rag-spike 运行 ./../../mvnw -B test；真实调用显式开启后检查 10 案例来源与回答，至少展示一条正确引用和一条资料不足。记录失败，不从这 10 个开发样例推导泛化准确率。
-- [ ] 在 dependency-decisions.md 选定唯一新模块接入方式、适配类名/路径、版本、取消办法、兼容性和选择理由；README 标记实验局限，复核后提交 chore: validate minimal RAG and select Java model adapter。G0 不通过则停在对应技术问题，不继续 T1/T2 的完整建设。
+- [x] 建立一份 AI 辅助初核、人工待审的短讲义、10 个带预期来源的开发问题，其中包含无答案问题；写问题检索到正确片段、无结果不造来源、最终上下文包含所选片段、工具往返参数不丢失的合同测试，先用模拟响应验证。
+- [x] 跑通 HTTP 版“切分→Embedding→本地临时向量检索→模型回答→来源映射”；首版实验可用内存索引，不先部署 Qdrant 或搭上传管理。真实 Embedding 与回答的用量分别记录。
+- [x] 用相同资料、模型和问题验证 LangChain4j 核心模块是否兼容 JDK 21/现有 Spring Boot 依赖树，检查工具调用往返与取消；若兼容检查失败，记录证据而非为此升级主应用。Spring AI 只有在不改变主基线时才作备选。
+- [x] 在 experiments/rag-spike 运行 ./../../mvnw -B test；真实调用显式开启后检查 10 案例来源与回答，至少展示一条正确引用和一条资料不足。记录失败，不从这 10 个开发样例推导泛化准确率。
+- [x] 在 dependency-decisions.md 选定唯一新模块接入方式、适配类名/路径、版本、取消办法、兼容性和选择理由；README 标记实验局限，复核后提交 chore: validate minimal RAG and select Java model adapter。G0 不通过则停在对应技术问题，不继续 T1/T2 的完整建设。
 
 ### T1：建立资料、标注与评测合同（10h）
 
