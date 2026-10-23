@@ -22,6 +22,9 @@ public class LearningToolRegistry {
     private final KnowledgeRetriever knowledge;
     private final PracticeRecommendationService recommendations;
     private final TeacherEventService tasks;
+    private final com.zhixuewuli.service.platformsearch.PlatformQuestionRetriever platformRetriever;
+    private final com.zhixuewuli.service.platformsearch.PlatformSourceService platformSources;
+    private final PlanCandidateRegistry candidateRegistry;
 
     public List<ToolDefinition> definitions() {
         return List.of(
@@ -36,6 +39,12 @@ public class LearningToolRegistry {
                         """),
                 definition("recommend_practice", "按人工维护知识点查找可练题目", """
                         {"type":"object","properties":{"eventId":{"type":"integer"},"knowledgePointCodes":{"type":"array","items":{"type":"string"}},"limit":{"type":"integer"}},"required":["eventId","knowledgePointCodes"],"additionalProperties":false}
+                        """),
+                definition("search_platform_questions", "按自然语言检索平台候选题及来源", """
+                        {"type":"object","properties":{"query":{"type":"string"},"knowledgePointCodes":{"type":"array","items":{"type":"string"}},"difficulty":{"type":"integer"},"excludeAttempted":{"type":"boolean"},"limit":{"type":"integer"}},"required":["query"],"additionalProperties":false}
+                        """),
+                definition("get_question_evidence", "读取已授权候选的原题与解析", """
+                        {"type":"object","properties":{"sourceIds":{"type":"array","items":{"type":"string"}}},"required":["sourceIds"],"additionalProperties":false}
                         """));
     }
 
@@ -48,6 +57,9 @@ public class LearningToolRegistry {
             case "get_wrong_questions" -> Set.of("eventId", "limit");
             case "search_knowledge" -> Set.of("eventId", "query", "limit");
             case "recommend_practice" -> Set.of("eventId", "knowledgePointCodes", "limit");
+            case "search_platform_questions" -> Set.of("query", "knowledgePointCodes", "difficulty",
+                    "excludeAttempted", "limit");
+            case "get_question_evidence" -> Set.of("sourceIds");
             default -> throw new IllegalArgumentException("未注册的学习工具");
         };
         arguments.fieldNames().forEachRemaining(name -> {
@@ -57,8 +69,10 @@ public class LearningToolRegistry {
         if (!eventNode.isMissingNode() && eventNode.asLong() != context.eventId())
             throw new IllegalArgumentException("工具不能切换当前作业");
 
-        // Re-check task visibility at each call. The model never supplies viewerId or class scope.
-        tasks.getEventQuestions(context.eventId(), context.viewerId());
+        // 平台检索/来源工具不绑定 eventId；其余工具继续校验作业可见性
+        if (!tool.equals("search_platform_questions") && !tool.equals("get_question_evidence")) {
+            tasks.getEventQuestions(context.eventId(), context.viewerId());
+        }
         return switch (tool) {
             case "get_learning_summary" -> result(tool, learningData.summary(context.viewerId(), context.eventId()));
             case "get_wrong_questions" -> result(tool, learningData.wrongQuestions(context.viewerId(), context.eventId(), arguments.path("limit").asInt(10)));
@@ -77,6 +91,32 @@ public class LearningToolRegistry {
                 List<PracticeCandidate> candidates = recommendations.recommend(context.viewerId(), context.eventId(), codes,
                         arguments.path("limit").asInt(6));
                 yield result(tool, candidates);
+            }
+            case "search_platform_questions" -> {
+                String query = arguments.path("query").asText("").strip();
+                if (query.isEmpty() || query.length() > 500) throw new IllegalArgumentException("平台检索问题须为1到500字");
+                JsonNode codesNode = arguments.path("knowledgePointCodes");
+                List<String> codes = new java.util.ArrayList<>();
+                if (codesNode.isArray()) codesNode.forEach(c -> codes.add(c.asText()));
+                var request = new com.zhixuewuli.dto.platformsearch.PlatformRetrievalTypes.SearchRequest(
+                        query, context.eventId(), codes,
+                        arguments.path("difficulty").isMissingNode() ? null : arguments.path("difficulty").asInt(),
+                        arguments.path("excludeAttempted").asBoolean(false),
+                        arguments.path("limit").asInt(5),
+                        com.zhixuewuli.dto.platformsearch.PlatformRetrievalTypes.RetrievalMode.HYBRID);
+                var retrieval = platformRetriever.retrieve(context.viewerId(), request,
+                        () -> System.currentTimeMillis() >= deadlineEpochMillis);
+                candidateRegistry.add(retrieval);
+                yield result(tool, retrieval);
+            }
+            case "get_question_evidence" -> {
+                JsonNode idsNode = arguments.path("sourceIds");
+                if (!idsNode.isArray() || idsNode.isEmpty()) throw new IllegalArgumentException("sourceIds 必须为非空数组");
+                List<String> ids = new java.util.ArrayList<>();
+                idsNode.forEach(n -> ids.add(n.asText()));
+                var evidenceList = platformSources.readableAll(context.viewerId(), ids);
+                evidenceList.forEach(candidateRegistry::addSource);
+                yield result(tool, evidenceList);
             }
             default -> throw new IllegalArgumentException("未注册的学习工具");
         };

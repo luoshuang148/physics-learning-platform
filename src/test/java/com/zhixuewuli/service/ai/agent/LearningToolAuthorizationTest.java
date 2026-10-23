@@ -18,8 +18,12 @@ import static org.mockito.Mockito.*;
 class LearningToolAuthorizationTest {
     private final LearningAssistantDataRepository data = mock(LearningAssistantDataRepository.class);
     private final TeacherEventService tasks = mock(TeacherEventService.class);
+    private final PlanCandidateRegistry candidateRegistry = new PlanCandidateRegistry();
     private final LearningToolRegistry tools = new LearningToolRegistry(new ObjectMapper(), data,
-            mock(KnowledgeRetriever.class), mock(PracticeRecommendationService.class), tasks);
+            mock(KnowledgeRetriever.class), mock(PracticeRecommendationService.class), tasks,
+            mock(com.zhixuewuli.service.platformsearch.PlatformQuestionRetriever.class),
+            mock(com.zhixuewuli.service.platformsearch.PlatformSourceService.class),
+            candidateRegistry);
 
     @Test void modelCannotOverrideAuthenticatedViewer() {
         var context = new LearningToolContext(44L, 900L);
