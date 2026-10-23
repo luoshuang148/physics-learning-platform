@@ -402,7 +402,7 @@ G0 约 8h（另先完成 T0 的基线准备）；可投递闭环是 T0、T0a、T
 - [ ] 用明确启用的独立外部冒烟测试验证一个目标模型；写日期和结果，不把付费冒烟加入普通 CI。
 - [x] 重跑旧 AIWireContractTest 与新测试。
 - [ ] 用明确启用的独立外部冒烟测试验证一个目标模型；写日期和结果，不把付费冒烟加入普通 CI。
-- [ ] 提交 feat: add typed tool-calling model adapter。
+- [x] 提交 feat: add typed tool-calling model adapter。
 
 ### T11：先建立工作流，再实现有界 Agent（16h）
 
