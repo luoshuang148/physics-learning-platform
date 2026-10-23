@@ -181,6 +181,19 @@ app:
 
 # AI 业务配置 (对应 AIBusinessProperties)
 ai:
+  agent:
+    tool-calling-enabled: ${AI_AGENT_TOOL_CALLING_ENABLED:false}
+    base-url: ${AI_AGENT_BASE_URL:}
+    api-key: ${AI_AGENT_API_KEY:}
+    model: ${AI_AGENT_MODEL:}
+    timeout-seconds: ${AI_AGENT_TIMEOUT_SECONDS:30}
+  learning-assistant:
+    mode: ${AI_LEARNING_ASSISTANT_MODE:WORKFLOW}
+    max-model-rounds: ${AI_LEARNING_ASSISTANT_MAX_MODEL_ROUNDS:6}
+    max-tool-calls: ${AI_LEARNING_ASSISTANT_MAX_TOOL_CALLS:8}
+    total-deadline-seconds: ${AI_LEARNING_ASSISTANT_DEADLINE_SECONDS:60}
+    model-timeout-seconds: ${AI_LEARNING_ASSISTANT_MODEL_TIMEOUT_SECONDS:25}
+    tool-timeout-seconds: ${AI_LEARNING_ASSISTANT_TOOL_TIMEOUT_SECONDS:5}
   context:
     # 上下文管理配置
     max-history-count: 15
