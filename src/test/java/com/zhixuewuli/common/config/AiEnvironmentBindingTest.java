@@ -65,7 +65,11 @@ class AiEnvironmentBindingTest {
                 .withUserConfiguration(BindingConfig.class);
     }
 
-    @Configuration
+    /**
+     * 仅通过 {@code withUserConfiguration} 显式注册。
+     * <strong>不要</strong>加 {@code @Configuration}：该类位于 {@code com.zhixuewuli} 下，
+     * 会被主应用组件扫描收进 @SpringBootTest 上下文，造成重复 Bean。
+     */
     @EnableConfigurationProperties({
             KnowledgeProperties.class,
             AgentProperties.class,
