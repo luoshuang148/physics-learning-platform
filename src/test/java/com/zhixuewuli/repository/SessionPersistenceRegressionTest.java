@@ -34,7 +34,7 @@ class SessionPersistenceRegressionTest extends BaseControllerIntegrationTest {
     void aNewManagerRestoresSequenceHistoryAndTokenUsage() {
         Long alice = user("recover_alice");
         history(alice, "previous-response", 7, 90);
-        var restarted = new SessionManager(histories, answers, properties, events);
+        var restarted = new SessionManager(histories, answers, properties, events, org.mockito.Mockito.mock(com.zhixuewuli.service.knowledge.AiRunRecorder.class),org.mockito.Mockito.mock(com.zhixuewuli.service.knowledge.AiRunHistoryService.class));
         var recovered = restarted.getOrCreateSession("shared-id", alice, ConversationType.REAL_TIME_QA,
                 null, () -> "physics");
         assertThat(recovered.getInteractionRecords().values()).extracting(ConversationHistory::getAnswer)

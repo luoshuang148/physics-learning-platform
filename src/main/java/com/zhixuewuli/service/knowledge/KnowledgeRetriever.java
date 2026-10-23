@@ -20,6 +20,7 @@ public class KnowledgeRetriever {
 
     public RetrievalResult retrieve(Long viewerId,Long eventId,String query,RetrievalMode mode,BooleanSupplier cancelled) {
         long start=System.nanoTime();
+        if(!properties.isEnabled())return result(RetrievalStatus.UNAVAILABLE,List.of(),"disabled",List.of(),start);
         var event=events.findById(eventId).orElseThrow(KnowledgeNotFoundException::new);
         if(event.getClassId()==null)throw new KnowledgeNotFoundException();
         access.requireReader(viewerId,event.getClassId());

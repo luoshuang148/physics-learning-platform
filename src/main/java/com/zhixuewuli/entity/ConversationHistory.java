@@ -177,6 +177,9 @@ public class ConversationHistory extends BaseTimeEntity {
     @Schema(description = "是否激活", example = "true")
     private Boolean isActive = true;
 
+    @Transient private Long aiRunId;
+    @Transient private java.util.List<com.zhixuewuli.dto.knowledge.AiMessageSourceView> sources = java.util.List.of();
+
     /**
      * Token 消耗数量
      * 

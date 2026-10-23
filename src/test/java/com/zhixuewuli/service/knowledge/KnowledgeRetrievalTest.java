@@ -23,7 +23,7 @@ import static org.mockito.Mockito.*;
     private final KeywordKnowledgeSearch keyword = mock(KeywordKnowledgeSearch.class);
     private final EmbeddingGateway embeddings = mock(EmbeddingGateway.class);
     private final KnowledgeVectorStore vectors = mock(KnowledgeVectorStore.class);
-    private final KnowledgeProperties properties = new KnowledgeProperties();
+    private final KnowledgeProperties properties = enabledProperties();
     private final KnowledgeRetriever retriever = new KnowledgeRetriever(events, access, documents,
             documentsRepo, keyword, embeddings, vectors, new RetrievalPolicy(), properties);
 
@@ -72,4 +72,5 @@ import static org.mockito.Mockito.*;
     private KnowledgeSearchHit hit(long id,long doc,long rev,long cls,long ordinal,int rank,double score) {
         return new KnowledgeSearchHit(id,doc,rev,cls,ordinal,"题目",1,"力学","正文",rank,score);
     }
+    private static KnowledgeProperties enabledProperties(){var p=new KnowledgeProperties();p.setEnabled(true);return p;}
 }

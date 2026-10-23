@@ -63,7 +63,7 @@ public class SessionManagerUnitTest extends BaseUnitTest {
         sessionManager = new SessionManager(
                 conversationHistoryRepository,
                 answerRecordRepository,
-                aiProperties, mock(com.zhixuewuli.repository.TeacherEventRepository.class));
+                aiProperties, mock(com.zhixuewuli.repository.TeacherEventRepository.class), mock(com.zhixuewuli.service.knowledge.AiRunRecorder.class), mock(com.zhixuewuli.service.knowledge.AiRunHistoryService.class));
     }
 
     /**

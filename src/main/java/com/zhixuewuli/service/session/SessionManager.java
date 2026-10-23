@@ -11,6 +11,7 @@ import com.zhixuewuli.repository.ConversationHistoryRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -34,6 +35,8 @@ public class SessionManager {
     private final AnswerRecordRepository answerRecordRepository;
     private final AIBusinessProperties aiProperties;
     private final com.zhixuewuli.repository.TeacherEventRepository teacherEventRepository;
+    private final com.zhixuewuli.service.knowledge.AiRunRecorder aiRunRecorder;
+    private final com.zhixuewuli.service.knowledge.AiRunHistoryService aiRunHistoryService;
 
     // 会话存储：复合键 -> SessionContextInternalDTO
     private final Map<String, SessionContextInternalDTO> sessionStore = new ConcurrentHashMap<>();
@@ -120,6 +123,7 @@ public class SessionManager {
                             userId, sessionId, conversationType, questionId, eventId, true,
                             org.springframework.data.domain.PageRequest.of(0, Math.max(1, aiProperties.getMaxHistoryCount())));
             persisted.stream().sorted(java.util.Comparator.comparing(ConversationHistory::getSequenceNumber))
+                    .map(history->{var hydrated=aiRunHistoryService.attachSources(history,userId);return hydrated==null?history:hydrated;})
                     .forEach(context::addInteractionRecord);
             long tokens = accounting == null ? 0 : accounting.getTokens();
             context.setTotalInteractionCount(accounting == null ? 0 : accounting.getSequence());
@@ -157,6 +161,23 @@ public class SessionManager {
 
         // 再添加到内存（加写锁已在 addInteractionRecord 内）
         context.addInteractionRecord(history);
+    }
+
+    /** Persist the history row and its RAG run/sources as one transaction. */
+    @Transactional
+    public ConversationHistory addRagInteraction(SessionContextInternalDTO context,String question,String answer,int tokenCount,
+                                                   com.zhixuewuli.service.knowledge.RagInteractionData rag) {
+        context.setLastActiveTime(LocalDateTime.now());
+        int seq=context.generateNextSequence();
+        ConversationHistory history=new ConversationHistory();
+        history.setUserId(context.getUserId());history.setEventId(context.getEventId());history.setSessionId(context.getSessionId());
+        history.setQuestion(question);history.setAnswer(answer);history.setSequenceNumber(seq);history.setTokenCount(tokenCount);
+        history.setConversationType(context.getConversationType());history.setQuestionId(context.getQuestionId());history.setIsActive(context.getIsActive());
+        history=conversationHistoryRepository.saveAndFlush(history);
+        var run=aiRunRecorder.record(history,rag);
+        history.setAiRunId(run.getId());
+        context.addInteractionRecord(history);
+        return history;
     }
 
     /**

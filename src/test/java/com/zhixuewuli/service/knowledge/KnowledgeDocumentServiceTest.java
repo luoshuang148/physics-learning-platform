@@ -59,6 +59,12 @@ class KnowledgeDocumentServiceTest {
         var view=service.requireReadable(5L,3L);assertNotNull(view);
         assertEquals("授权原文",view.text());assertEquals(2L,view.revisionId());
     }
+    @Test void activeReadableRequiresCurrentActiveRevisionAfterAuthorization() {
+        document.setActiveRevisionId(2L);
+        assertEquals("授权原文",service.requireActiveReadable(5L,3L).text());
+        document.setActiveRevisionId(99L);
+        assertThrows(KnowledgeNotFoundException.class,()->service.requireActiveReadable(5L,3L));
+    }
     @Test void indexingVersionIsNotReadable() {
         revision.setStatus(KnowledgeRevision.Status.INDEXING);
         assertThrows(BusinessException.class,()->service.requireReadable(5L,3L));

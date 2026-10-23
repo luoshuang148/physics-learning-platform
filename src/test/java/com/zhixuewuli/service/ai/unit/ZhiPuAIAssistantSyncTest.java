@@ -70,6 +70,9 @@ class ZhiPuAIAssistantSyncTest extends AIServiceSyncTestBase {
     private ConversationHistoryRepository conversationHistoryRepository;
 
     @Mock
+    private com.zhixuewuli.service.knowledge.AiRunHistoryService aiRunHistoryService;
+
+    @Mock
     private OptionMappingUtil optionMappingUtil;
 
     @Spy
@@ -91,6 +94,8 @@ class ZhiPuAIAssistantSyncTest extends AIServiceSyncTestBase {
 
         // 配置基本的Mock行为
         setupCommonMockBehaviors();
+        lenient().when(aiRunHistoryService.attachSources(any(), anyLong()))
+                .thenAnswer(invocation -> invocation.getArgument(0));
     }
 
     private void initializeTestData() {
