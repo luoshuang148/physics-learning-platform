@@ -15,6 +15,12 @@
             :disabled="state.loading"
             @click="switchMode('wrong')"
           >题目分析</button>
+          <button
+            class="mode-tab"
+            :class="{ active: activeMode === 'platform' }"
+            :disabled="state.loading"
+            @click="switchMode('platform')"
+          >平台找题</button>
           <button class="mode-tab" :class="{ active: activePanel === 'plan' }" :disabled="state.loading" @click="openPlanPanel">复习计划</button>
         </div>
       </section>
@@ -34,14 +40,27 @@
             <input v-model.number="questionId" type="number" placeholder="例如 1001" />
           </template>
 
+          <template v-if="activeMode === 'platform'">
+            <label class="field-label">
+              <input v-model="platformExcludeAttempted" type="checkbox" /> 排除我已做过的题
+            </label>
+            <div class="panel-actions">
+              <button class="submit-btn" :disabled="platformLoading || !question.trim()" @click="runPlatformSearch">
+                {{ platformLoading ? '检索中…' : '搜平台题库' }}
+              </button>
+            </div>
+            <div v-if="platformStatus" class="platform-status">{{ platformStatus }}</div>
+            <PlatformSources :sources="platformSources" @open="openPlatformSource" />
+          </template>
+
           <div class="panel-actions">
             <button
               v-if="state.loading"
               class="stop-btn"
               @click="stopCurrentAnalysis"
             >{{ activeMode === 'realtime' ? '停止生成' : '停止分析' }}</button>
-            <button class="submit-btn" :disabled="state.loading || !question.trim()" @click="submitCurrentMode">
-              {{ activeMode === 'realtime' ? '发送提问' : '开始分析' }}
+            <button class="submit-btn" :disabled="state.loading || platformLoading || !question.trim()" @click="submitCurrentMode">
+              {{ activeMode === 'realtime' ? '发送提问' : activeMode === 'platform' ? '搜平台题库' : '开始分析' }}
             </button>
           </div>
         </div>
@@ -127,6 +146,8 @@ import { getStudentTasksApi } from '@/api/teacher-event';
 import { activateLearningPlanApi, cancelLearningPlanApi, getLearningPlanApi, getLearningPlansApi, saveLearningPlanApi } from '@/api/learning-plan';
 import AgentExecutionSteps from '@/components/AgentExecutionSteps.vue';
 import LearningPlanCard from '@/components/LearningPlanCard.vue';
+import PlatformSources from '@/components/assistant/PlatformSources.vue';
+import { platformSearchApi, type PlatformSource } from '@/api/study-assistant';
 import { acceptLearningPlanEvent, emptyLearningPlanState, startLearningPlanRun } from '@/composables/learningPlanState';
 import type { LearningAssistantStep, LearningPlanPreview } from '@/types/learning-plan';
 import type { LearningPlanView } from '@/types/learning-plan';
@@ -143,11 +164,12 @@ interface ChatMessage {
   meta?: string;
 }
 
-type AIMode = 'realtime' | 'wrong';
+type AIMode = 'realtime' | 'wrong' | 'platform';
 
 const SESSION_TYPE_MAP: Record<AIMode, string> = {
   realtime: 'student_realtime',
   wrong: 'student_wrong_analysis',
+  platform: 'student_platform',
 };
 
 const auth = useAuthStore();
@@ -159,7 +181,7 @@ const question = ref('');
 const questionId = ref<number | undefined>(undefined);
 const activeMode = ref<AIMode>('realtime');
 const activePanel = ref<'chat' | 'plan'>('chat');
-const histories = ref<Record<AIMode, ChatMessage[]>>({ realtime: [], wrong: [] });
+const histories = ref<Record<AIMode, ChatMessage[]>>({ realtime: [], wrong: [], platform: [] });
 const activeAbortController = ref<AbortController | null>(null);
 const learningPlanAbort = ref<AbortController | null>(null);
 const learningPlan = ref(emptyLearningPlanState());
@@ -174,6 +196,53 @@ const loadingTasks = ref(false);
 const savedLearningPlans = ref<LearningPlanView[]>([]);
 
 const currentMessages = computed(() => histories.value[activeMode.value]);
+
+const platformLoading = ref(false);
+const platformStatus = ref('');
+const platformSources = ref<PlatformSource[]>([]);
+const platformExcludeAttempted = ref(false);
+
+const runPlatformSearch = async () => {
+  if (!question.value.trim() || platformLoading.value) return;
+  platformLoading.value = true;
+  platformStatus.value = '检索中…';
+  platformSources.value = [];
+  try {
+    const result = await platformSearchApi({
+      query: question.value.trim(),
+      excludeAttempted: platformExcludeAttempted.value,
+      limit: 5,
+    });
+    platformSources.value = result.sources ?? [];
+    if (result.status === 'UNAVAILABLE') {
+      platformStatus.value = '检索暂不可用，请稍后重试。';
+    } else if (result.status === 'INSUFFICIENT') {
+      platformStatus.value = '平台暂无足够相关内容。可切换通用讲解或换一个更具体的提问。';
+    } else {
+      const modeText = result.actualMode === 'lexical_only' ? '（关键词模式）' : '';
+      platformStatus.value = `找到 ${result.questions.length} 道相关题${modeText}，来源 ${result.sources.length} 条，耗时 ${result.durationMs}ms`;
+      histories.value.platform.push({
+        id: String(Date.now()),
+        role: 'assistant',
+        content: result.questions.map((q) => `【题 ${q.questionId}】${q.content}`).join('\n\n'),
+        meta: `平台检索 · ${result.status}`,
+      });
+    }
+  } catch {
+    platformStatus.value = '检索失败，请稍后重试。';
+  } finally {
+    platformLoading.value = false;
+  }
+};
+
+const openPlatformSource = (source: PlatformSource) => {
+  histories.value.platform.push({
+    id: String(Date.now()),
+    role: 'assistant',
+    content: `【来源 ${source.sourceId}】\n${source.text}`,
+    meta: '平台来源',
+  });
+};
 
 onMounted(async () => {
   loadingTasks.value = true;
@@ -365,6 +434,10 @@ const buildCallbacks = (mode: AIMode) => ({
 const submitCurrentMode = async () => {
   if (!question.value.trim()) return;
   if (activeMode.value === 'wrong' && !questionId.value) return;
+  if (activeMode.value === 'platform') {
+    await runPlatformSearch();
+    return;
+  }
 
   const mode = activeMode.value;
   const currentQuestion = question.value.trim();
