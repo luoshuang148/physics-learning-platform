@@ -249,6 +249,18 @@ public class ZhiPuAIAssistantServiceImpl implements ZhiPuAIAssistantService {
     }
 
     @Override
+    public List<ConversationHistory> getSessionHistory(String sessionId, Long userId, String recordId) {
+        if (recordId == null || recordId.isBlank()) return getSessionHistory(sessionId,userId);
+        AnswerRecord record=answerRecordRepository.findById(recordId)
+                .orElseThrow(() -> new AnswerRecordNotFoundException("作答记录不存在"));
+        if (!userId.equals(record.getUserId())) throw new InsufficientPermissionException("无权读取该会话");
+        String scopedSession=java.util.UUID.nameUUIDFromBytes((sessionId+":"+record.getId())
+                .getBytes(java.nio.charset.StandardCharsets.UTF_8)).toString();
+        return conversationHistoryRepository.findByUserIdAndSessionIdAndIsActiveOrderByCreatedAtAsc(userId,scopedSession,true)
+                .stream().map(history->aiRunHistoryService.attachSources(history,userId)).toList();
+    }
+
+    @Override
     public void clearSession(String sessionId, Long userId) {
         // 直接调用会话管理器的清除方法
         sessionManager.clearSession(sessionId, userId);

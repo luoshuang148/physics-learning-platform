@@ -91,6 +91,7 @@ public interface ZhiPuAIAssistantService {
          * @param userId    当前用户ID（已由拦截器设置）
          */
         List<ConversationHistory> getSessionHistory(String sessionId, Long userId);
+        List<ConversationHistory> getSessionHistory(String sessionId, Long userId, String recordId);
 
         /**
          * 清除会话，需验证会话所有权

@@ -22,8 +22,8 @@ class AIReportKeyFallbackTest {
         properties.setZhipuApiKey("tutoring-fixture-key");
 
         assertThat(properties.getAliyunApiKey()).isEqualTo("tutoring-fixture-key");
-        assertThat(new AICapabilityController(properties,new com.zhixuewuli.common.metrics.AIMetrics(new io.micrometer.core.instrument.simple.SimpleMeterRegistry())).capabilities().getData())
-                .containsEntry("reports", true);
+        assertThat(new AICapabilityController(properties,new com.zhixuewuli.common.metrics.AIMetrics(new io.micrometer.core.instrument.simple.SimpleMeterRegistry()),new com.zhixuewuli.common.config.properties.KnowledgeProperties()).capabilities().getData())
+                .containsEntry("reports", true).containsEntry("workflowReady", false).containsEntry("agentReady", false);
     }
 
     @Test
@@ -42,7 +42,7 @@ class AIReportKeyFallbackTest {
         properties.setAliyunApiKey("");
         properties.setZhipuApiKey("");
 
-        assertThat(new AICapabilityController(properties,new com.zhixuewuli.common.metrics.AIMetrics(new io.micrometer.core.instrument.simple.SimpleMeterRegistry())).capabilities().getData())
+        assertThat(new AICapabilityController(properties,new com.zhixuewuli.common.metrics.AIMetrics(new io.micrometer.core.instrument.simple.SimpleMeterRegistry()),new com.zhixuewuli.common.config.properties.KnowledgeProperties()).capabilities().getData())
                 .containsEntry("reports", false);
     }
 }

@@ -203,10 +203,11 @@ public class AIController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "401", description = "未认证")
         }
     )
-    public Result<List<ConversationHistory>> getSessionHistory(@AuthenticationPrincipal AuthenticatedUser user, HttpServletRequest request) {
+    public Result<List<ConversationHistory>> getSessionHistory(@AuthenticationPrincipal AuthenticatedUser user, HttpServletRequest request,
+            @RequestParam(required = false) String recordId) {
         Long userId = user.id();
         String sessionId = (String) request.getAttribute("sessionId");
-        List<ConversationHistory> history = zhiPuAIAssistantService.getSessionHistory(sessionId, userId);
+        List<ConversationHistory> history = zhiPuAIAssistantService.getSessionHistory(sessionId, userId, recordId);
         return Result.success(history);
     }
 

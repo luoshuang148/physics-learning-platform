@@ -3,6 +3,19 @@ export interface AIAskPayload {
   questionId?: number;
   recordId?: string;
   imageBase64?: string;
+  knowledgeMode?: 'OFF' | 'AUTO';
+}
+
+export interface AISource {
+  sourceId: string;
+  chunkId: number;
+  documentId: number;
+  revisionId: number;
+  title: string;
+  page: number | null;
+  section: string | null;
+  text: string;
+  available?: boolean;
 }
 
 export interface StudentReportResponse {
@@ -18,4 +31,6 @@ export interface ConversationHistory {
   question: string;
   answer: string;
   createdAt: string;
+  aiRunId?: number | null;
+  sources?: AISource[];
 }

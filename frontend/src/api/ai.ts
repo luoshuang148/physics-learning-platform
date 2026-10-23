@@ -3,13 +3,15 @@ import type { AIAskPayload, ConversationHistory, StudentReportResponse } from '@
 import request, { resolveApiBaseUrl } from '@/utils/request';
 import { getSessionId } from '@/utils/session';
 import { requiredAICapability } from '@/utils/aiCapabilities';
+import { dispatchAIStreamEvent } from '@/utils/aiEventDispatch';
 
-export const getSessionHistoryApi = async (sessionType?: string): Promise<ConversationHistory[]> => {
+export const getSessionHistoryApi = async (sessionType?: string, recordId?: string): Promise<ConversationHistory[]> => {
   const sessionId = getSessionId(sessionType);
   const { data } = await request.get<ApiResponse<ConversationHistory[]>>('/ai/session/history', {
     headers: {
       'X-Session-Id': sessionId,
     },
+    params: recordId ? {recordId} : undefined,
   });
   return data.data;
 };
@@ -39,6 +41,11 @@ export interface StreamOptions {
   onReasoning?: (payload: { reasoning: string }) => void;
   onComplete?: (payload: SSECompleteEventPayload) => void;
   onError?: (payload: SSEErrorEventPayload) => void;
+  onSources?: (payload: import('@/types/ai').AISource[]) => void;
+  onToolStep?: (payload: Record<string, unknown>) => void;
+  onPlan?: (payload: Record<string, unknown>) => void;
+  onKnowledgeStatus?: (payload: Record<string, unknown>) => void;
+  onCitationValidation?: (payload: string[]) => void;
 }
 
 interface SSEParseState {
@@ -123,48 +130,7 @@ export const streamAI = async (endpoint: string, options: StreamOptions): Promis
 
     console.debug(`[SSE] type: ${parsed.type}, data length: ${parsed.data.length}`);
 
-    let payload: any;
-    let parseSuccess = true;
-    try {
-      payload = JSON.parse(parsed.data);
-    } catch {
-      parseSuccess = false;
-    }
-
-    switch (parsed.type) {
-      case 'evidence':
-        options.onEvidence?.(parseSuccess ? payload : {});
-        break;
-      case 'content':
-        options.onMessage?.({ content: parsed.data });
-        break;
-      case 'message':
-        if (parseSuccess && payload?.content) {
-          options.onMessage?.(payload);
-        } else if (parsed.data && parsed.data !== '连接成功') {
-          options.onMessage?.({ content: parsed.data });
-        }
-        break;
-      case 'progress':
-        options.onProgress?.(parseSuccess ? payload : { progress: parseInt(parsed.data) || 0 });
-        break;
-      case 'reasoning':
-        options.onReasoning?.({ reasoning: parsed.data });
-        break;
-      case 'complete':
-        options.onComplete?.(parseSuccess ? payload : {});
-        break;
-      case 'error':
-        options.onError?.(parseSuccess ? payload : { message: parsed.data });
-        break;
-      default:
-        if (parseSuccess) {
-          if (payload.reasoning) options.onReasoning?.(payload);
-          else options.onMessage?.({ content: payload.content ?? payload.data ?? parsed.data });
-        } else {
-          options.onMessage?.({ content: parsed.data });
-        }
-    }
+    dispatchAIStreamEvent(parsed.type, parsed.data, options);
   };
 
   while (true) {
@@ -208,7 +174,7 @@ export const streamStudentReport = (options: Omit<StreamOptions, 'body'> & { eve
 export const streamTeacherReport = (options: Omit<StreamOptions, 'body'> & { eventId?: number }) =>
   streamAI(`/ai/teacher/report${options.eventId == null ? '' : `?eventId=${options.eventId}`}`, { ...options, method: 'GET' });
 
-export interface AICapabilities { reports: boolean; tutoring: boolean; notice: string; reportStatus?: { state: string; checkedAt: string | null }; tutoringStatus?: { state: string; checkedAt: string | null }; }
+export interface AICapabilities { reports: boolean; tutoring: boolean; knowledgeReady?: boolean; workflowReady?: boolean; agentReady?: boolean; notice: string; reportStatus?: { state: string; checkedAt: string | null }; tutoringStatus?: { state: string; checkedAt: string | null }; }
 export const getAICapabilitiesApi = async (): Promise<AICapabilities> => {
   const {data}=await request.get('/ai/capabilities'); return data.data;
 };

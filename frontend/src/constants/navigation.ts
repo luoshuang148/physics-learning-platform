@@ -17,5 +17,6 @@ export const teacherNavLinks: AppShellLink[] = [
   { label: '题库管理', to: '/teacher/questions' },
   { label: '学生学情', to: '/teacher/student-analysis' },
   { label: '任务管理', to: '/teacher/event-manage' },
+  { label: '班级知识库', to: '/teacher/knowledge' },
 ];
 
