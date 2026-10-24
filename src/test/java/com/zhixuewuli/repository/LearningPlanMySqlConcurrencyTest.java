@@ -22,7 +22,15 @@ class LearningPlanMySqlConcurrencyTest {
         url = System.getenv("MYSQL_TEST_URL"); user = System.getenv().getOrDefault("MYSQL_TEST_USER", "root");
         password = System.getenv().getOrDefault("MYSQL_TEST_PASSWORD", "");
         assertNotNull(url, "Set MYSQL_TEST_URL to an isolated test schema; no fallback to application database");
-        Flyway.configure().dataSource(url, user, password).locations("classpath:db/migration").load().migrate();
+        // Match application.yml: the CI upgrade fixture leaves a non-empty V7 schema
+        // without flyway_schema_history; baseline at 8 then apply V9+.
+        Flyway.configure()
+                .dataSource(url, user, password)
+                .locations("classpath:db/migration")
+                .baselineOnMigrate(true)
+                .baselineVersion("8")
+                .load()
+                .migrate();
     }
 
     @Test void twoConcurrentActivationsHaveOneVersionIncrement() throws Exception {
