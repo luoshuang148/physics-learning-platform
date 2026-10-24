@@ -783,7 +783,6 @@ select:focus {
 .step-item,
 .action-item,
 .wp-item,
-.exp-item,
 .event-item,
 .filter-btn,
 .diff-btn,
@@ -801,7 +800,6 @@ select:focus {
 .step-item:hover,
 .action-item:hover,
 .wp-item:hover,
-.exp-item:hover,
 .event-item:hover {
   background: #f8fafc !important;
   border-color: #dbe3ec !important;
@@ -809,7 +807,6 @@ select:focus {
 .rail-item.active,
 .student-item.active,
 .question-item.active,
-.exp-item.active,
 .filter-btn.active,
 .diff-btn.active,
 .mode-tab.active {
@@ -925,8 +922,6 @@ select:focus {
 .wb-ai-panel,
 .record-layout,
 .detail-panel,
-.exp-main,
-.exp-sidebar,
 .ai-drawer,
 .ai-dialog,
 .ai-panel,
@@ -1081,12 +1076,7 @@ select:focus {
 .record-item,
 .record-item-top,
 .latex-text,
-.panel-kicker,
-.exp-item-title,
-.exp-item-desc,
-.exp-sidebar-title,
-.exp-series-badge,
-.exp-count {
+.panel-kicker {
   color: #334155 !important;
 }
 .panel-title,
@@ -1094,18 +1084,14 @@ select:focus {
 .detail-title,
 .question-title,
 .user-name,
-.overview-task-title,
-.exp-item-title,
-.exp-sidebar-title {
+.overview-task-title {
   color: #172033 !important;
 }
 .panel-kicker,
 .field-label,
 .selected-head,
 .panel-count,
-.record-meta,
-.exp-count,
-.exp-item-desc {
+.record-meta {
   color: #64748b !important;
 }
 .panel-count { color: #94a3b8 !important; }
@@ -1132,12 +1118,6 @@ select option { background: #ffffff !important; color: #172033 !important; }
 .archive-panel summary { color: #172033 !important; font-size: 13px !important; }
 .archive-note, .archive-row, .archive-row span { color: #64748b !important; }
 .archive-row strong { color: #172033 !important; }
-.exp-page { background: #f5f7fa !important; }
-.exp-sidebar { background: #ffffff !important; border-color: #e2e8f0 !important; }
-.exp-main { background: #ffffff !important; border-color: #e2e8f0 !important; }
-.exp-frame { background: #ffffff !important; border: 1px solid #e2e8f0 !important; }
-.exp-item-body { color: #334155 !important; }
-.exp-series-badge { background: #ecfdf5 !important; color: #0f766e !important; border-color: #d1fae5 !important; }
 .q-save-feedback { background: #ecfdf5 !important; border-color: #d1fae5 !important; color: #0f766e !important; }
 .wb-detail-block, .wb-ai-panel { background: #ffffff !important; border-color: #e2e8f0 !important; }
 .wb-empty-title, .wb-empty-sub { color: #64748b !important; }
@@ -1178,8 +1158,6 @@ select option { background: #ffffff !important; color: #172033 !important; }
 .step-title { font-size: 13px !important; color: #172033 !important; }
 .step-desc { font-size: 11px !important; color: #64748b !important; }
 .wb-count, .wb-empty-title, .wb-empty-sub { color: #64748b !important; }
-.exp-page { padding: 0 !important; }
-.exp-sidebar, .exp-main { border-radius: 12px !important; }
 section.toolbar,
 .toolbar,
 .query-strip {

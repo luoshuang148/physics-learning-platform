@@ -86,9 +86,8 @@ class AiEnvironmentBindingTest {
         AICapabilityController aiCapabilityController(
                 AIBusinessProperties business,
                 AIMetrics metrics,
-                KnowledgeProperties knowledge,
                 AgentProperties agent) {
-            return new AICapabilityController(business, metrics, knowledge, agent);
+            return new AICapabilityController(business, metrics, agent);
         }
     }
 
@@ -202,15 +201,13 @@ class AiEnvironmentBindingTest {
         }
 
         @Test
-        @DisplayName("全部开关关闭时 agentReady/knowledgeReady 均为 false")
+        @DisplayName("全部开关关闭时 agentReady 为 false")
         void allSwitchesOff() {
             Map<String, Object> caps = capabilities(envRunner(Map.of(
                     "AI_ENABLED", "false",
-                    "APP_KNOWLEDGE_ENABLED", "false",
                     "AI_AGENT_TOOL_CALLING_ENABLED", "false"
             )));
             assertEquals(Boolean.FALSE, caps.get("agentReady"));
-            assertEquals(Boolean.FALSE, caps.get("knowledgeReady"));
             assertEquals(Boolean.FALSE, caps.get("reports"));
             assertEquals(Boolean.FALSE, caps.get("tutoring"));
         }
@@ -240,22 +237,6 @@ class AiEnvironmentBindingTest {
             assertEquals(Boolean.TRUE, caps.get("agentReady"));
             assertTrue(String.valueOf(caps.get("notice")).contains("已配置"),
                     "notice 应区分「已配置」与「实际调用成功」");
-        }
-
-        @Test
-        @DisplayName("知识库开启需 AI_ENABLED 与 APP_KNOWLEDGE_ENABLED 同时为真")
-        void knowledgeReadyRequiresBoth() {
-            Map<String, Object> onlyKnowledge = capabilities(envRunner(Map.of(
-                    "AI_ENABLED", "false",
-                    "APP_KNOWLEDGE_ENABLED", "true"
-            )));
-            assertEquals(Boolean.FALSE, onlyKnowledge.get("knowledgeReady"));
-
-            Map<String, Object> both = capabilities(envRunner(Map.of(
-                    "AI_ENABLED", "true",
-                    "APP_KNOWLEDGE_ENABLED", "true"
-            )));
-            assertEquals(Boolean.TRUE, both.get("knowledgeReady"));
         }
     }
 }

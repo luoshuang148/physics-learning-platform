@@ -3,7 +3,6 @@ export interface AIAskPayload {
   questionId?: number;
   recordId?: string;
   imageBase64?: string;
-  knowledgeMode?: 'OFF' | 'AUTO';
 }
 
 export interface AISource {

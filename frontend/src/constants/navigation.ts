@@ -7,7 +7,7 @@ export const studentNavLinks: AppShellLink[] = [
   { label: '首页', to: '/student/home' },
   { label: '作业', to: '/student/task' },
   { label: '错题本', to: '/student/wrong-book' },
-  { label: '3D 实验', to: '/student/experiments' },
+  { label: '学习助手', to: '/student/ai' },
 ];
 
 export const teacherNavLinks: AppShellLink[] = [
@@ -17,6 +17,5 @@ export const teacherNavLinks: AppShellLink[] = [
   { label: '题库管理', to: '/teacher/questions' },
   { label: '学生学情', to: '/teacher/student-analysis' },
   { label: '任务管理', to: '/teacher/event-manage' },
-  { label: '班级知识库', to: '/teacher/knowledge' },
 ];
 

@@ -4,9 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.zhixuewuli.dto.agent.*;
 import com.zhixuewuli.dto.response.PracticeCandidate;
-import com.zhixuewuli.service.knowledge.KnowledgeRetriever;
 import com.zhixuewuli.service.knowledge.PracticeRecommendationService;
-import com.zhixuewuli.service.knowledge.RetrievalMode;
 import com.zhixuewuli.service.teacherEvent.TeacherEventService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -19,7 +17,6 @@ import java.util.Set;
 public class LearningToolRegistry {
     private final ObjectMapper json;
     private final LearningAssistantDataRepository learningData;
-    private final KnowledgeRetriever knowledge;
     private final PracticeRecommendationService recommendations;
     private final TeacherEventService tasks;
     private final com.zhixuewuli.service.platformsearch.PlatformQuestionRetriever platformRetriever;
@@ -33,9 +30,6 @@ public class LearningToolRegistry {
                         """),
                 definition("get_wrong_questions", "读取当前学生的错题及历史题目快照", """
                         {"type":"object","properties":{"eventId":{"type":"integer"},"limit":{"type":"integer"}},"required":["eventId"],"additionalProperties":false}
-                        """),
-                definition("search_knowledge", "搜索当前作业班级已授权的知识资料", """
-                        {"type":"object","properties":{"eventId":{"type":"integer"},"query":{"type":"string"},"limit":{"type":"integer"}},"required":["eventId","query"],"additionalProperties":false}
                         """),
                 definition("recommend_practice", "按人工维护知识点查找可练题目", """
                         {"type":"object","properties":{"eventId":{"type":"integer"},"knowledgePointCodes":{"type":"array","items":{"type":"string"}},"limit":{"type":"integer"}},"required":["eventId","knowledgePointCodes"],"additionalProperties":false}
@@ -55,7 +49,6 @@ public class LearningToolRegistry {
         Set<String> allowed = switch (tool) {
             case "get_learning_summary" -> Set.of("eventId");
             case "get_wrong_questions" -> Set.of("eventId", "limit");
-            case "search_knowledge" -> Set.of("eventId", "query", "limit");
             case "recommend_practice" -> Set.of("eventId", "knowledgePointCodes", "limit");
             case "search_platform_questions" -> Set.of("query", "knowledgePointCodes", "difficulty",
                     "excludeAttempted", "limit");
@@ -76,13 +69,6 @@ public class LearningToolRegistry {
         return switch (tool) {
             case "get_learning_summary" -> result(tool, learningData.summary(context.viewerId(), context.eventId()));
             case "get_wrong_questions" -> result(tool, learningData.wrongQuestions(context.viewerId(), context.eventId(), arguments.path("limit").asInt(10)));
-            case "search_knowledge" -> {
-                String query = arguments.path("query").asText("").strip();
-                if (query.isEmpty() || query.length() > 500) throw new IllegalArgumentException("资料检索问题须为1到500字");
-                var retrieval = knowledge.retrieve(context.viewerId(), context.eventId(), query, RetrievalMode.HYBRID,
-                        () -> System.currentTimeMillis() >= deadlineEpochMillis);
-                yield result(tool, retrieval);
-            }
             case "recommend_practice" -> {
                 JsonNode codesNode = arguments.path("knowledgePointCodes");
                 if (!codesNode.isArray()) throw new IllegalArgumentException("知识点代码必须为数组");

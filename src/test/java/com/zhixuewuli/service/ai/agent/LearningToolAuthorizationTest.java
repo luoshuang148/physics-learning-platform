@@ -5,7 +5,6 @@ import com.zhixuewuli.common.exception.*;
 import com.zhixuewuli.dto.agent.LearningToolContext;
 import com.zhixuewuli.dto.agent.PersonalLearningSummary;
 import com.zhixuewuli.dto.agent.ToolCall;
-import com.zhixuewuli.service.knowledge.KnowledgeRetriever;
 import com.zhixuewuli.service.knowledge.PracticeRecommendationService;
 import com.zhixuewuli.service.teacherEvent.TeacherEventService;
 import org.junit.jupiter.api.Test;
@@ -20,7 +19,7 @@ class LearningToolAuthorizationTest {
     private final TeacherEventService tasks = mock(TeacherEventService.class);
     private final PlanCandidateRegistry candidateRegistry = new PlanCandidateRegistry();
     private final LearningToolRegistry tools = new LearningToolRegistry(new ObjectMapper(), data,
-            mock(KnowledgeRetriever.class), mock(PracticeRecommendationService.class), tasks,
+            mock(PracticeRecommendationService.class), tasks,
             mock(com.zhixuewuli.service.platformsearch.PlatformQuestionRetriever.class),
             mock(com.zhixuewuli.service.platformsearch.PlatformSourceService.class),
             candidateRegistry);

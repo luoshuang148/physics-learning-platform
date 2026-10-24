@@ -61,7 +61,8 @@ class QuestionIndexConsistencyTest {
         properties.setEmbeddingDimensions(4);
         properties.setEmbeddingModel("bge-small-zh-v1.5-quantized");
         worker = new QuestionIndexWorker(properties, questions, searchUnits, jobs, publications,
-                sourceBuilder, embeddings, vectors);
+                sourceBuilder, embeddings, vectors,
+                new QuestionSourceIndexService(jobs, searchUnits), null);
     }
 
     private Question question(long revision, boolean aiEnabled) {

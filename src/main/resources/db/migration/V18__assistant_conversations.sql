@@ -25,6 +25,7 @@ CREATE TABLE assistant_messages (
     status VARCHAR(20) NOT NULL DEFAULT 'COMPLETED' COMMENT 'COMPLETED | CANCELLED | FAILED',
     sources_json JSON NULL COMMENT '公开来源快照',
     created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    updated_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
     UNIQUE KEY uk_assistant_msg (conversation_id, seq),
     CONSTRAINT fk_assistant_msg_conv FOREIGN KEY (conversation_id) REFERENCES assistant_conversations(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

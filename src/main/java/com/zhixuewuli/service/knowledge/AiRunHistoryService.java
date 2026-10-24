@@ -1,6 +1,5 @@
 package com.zhixuewuli.service.knowledge;
 
-import com.zhixuewuli.common.exception.BusinessException;
 import com.zhixuewuli.dto.knowledge.AiMessageSourceView;
 import com.zhixuewuli.entity.ConversationHistory;
 import com.zhixuewuli.dto.internal.SessionContextInternalDTO;
@@ -11,18 +10,17 @@ import java.util.*;
 
 @Service @RequiredArgsConstructor
 public class AiRunHistoryService {
-    private final AiRunRepository runs; private final AiMessageSourceRepository sources; private final KnowledgeDocumentService documents;
+    private final AiRunRepository runs; private final AiMessageSourceRepository sources;
+    /**
+     * 班级资料库已下线：历史来源统一标记为不可用，不再回源文档内容。
+     * 保留此处理是为了不把已撤回资料的原文继续展示给用户。
+     */
     public ConversationHistory attachSources(ConversationHistory history,Long viewerId) {
         var run=runs.findByConversationHistoryId(history.getId());if(run.isEmpty())return history;
         var sourceEntities=sources.findByRunIdOrderById(run.get().getId()); var views=new ArrayList<AiMessageSourceView>(); boolean inaccessible=false;
         for(var source:sourceEntities) {
-            try {
-                var fresh=documents.requireActiveReadable(viewerId,source.getChunkId());
-                if(!Objects.equals(fresh.revisionId(),source.getRevisionId()))throw new BusinessException("资料版本已变化");
-                views.add(new AiMessageSourceView(source.getCitationId(),source.getDocumentId(),source.getRevisionId(),fresh.title(),fresh.page(),fresh.section(),fresh.text(),true));
-            } catch(BusinessException unavailable) {
-                inaccessible=true;views.add(new AiMessageSourceView(source.getCitationId(),source.getDocumentId(),source.getRevisionId(),"资料已不可用",null,null,null,false));
-            }
+            inaccessible=true;
+            views.add(new AiMessageSourceView(source.getCitationId(),source.getDocumentId(),source.getRevisionId(),"资料已不可用",null,null,null,false));
         }
         history.setAiRunId(run.get().getId());history.setSources(List.copyOf(views));
         if(inaccessible)history.setAnswer("本次回答引用的部分资料已撤回或当前无权访问，无法继续查看该回答的证据内容。");

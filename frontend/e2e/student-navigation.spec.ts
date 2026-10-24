@@ -6,8 +6,8 @@ const task = { id: 42, eventTitle: '牛顿运动定律 · 课后练习', teacher
   startAt: null, dueAt: '2026-10-22T20:00:00', eventDescription: null };
 const question = { id: 1, content: '质量为 2 kg 的物体受到 6 N 的合力，加速度是多少？',
   options: { A: '3 m/s²', B: '6 m/s²' }, correctOption: 'A', difficulty: 1 };
-const labels = ['首页', '作业', '错题本', '3D 实验'];
-const teacherLabels = ['总览', '班级管理', '学生名册', '题库管理', '学生学情', '任务管理'];
+const labels = ['首页', '作业', '错题本', '学习助手'];
+const teacherLabels = ['总览', '班级管理', '学生名册', '题库管理', '学生学情', '任务管理', '班级知识库'];
 
 async function fixture(page: Page, role = 'STUDENT', tasks: object[] = [task]) {
   await page.addInitScript(() => localStorage.setItem('zhixue_token', 'browser-layout-fixture'));
@@ -41,6 +41,7 @@ test('student desktop has shared top navigation and preserves assignment entry a
   await expect(page.locator('.sidebar')).toHaveCount(0);
   const nav = page.getByRole('navigation', { name: '学生主导航', exact: true });
   await expect(nav.getByRole('link')).toHaveText(labels);
+  await expect(page.getByRole('link', { name: /虚拟实验室|探索 3D 实验/ })).toHaveCount(0);
   await expect(page.getByRole('heading', { name: '牛顿运动定律 · 课后练习' })).toBeVisible();
   await page.getByRole('button', { name: '个人菜单', exact: true }).click();
   await expect(page.locator('.user-menu')).toBeVisible();
@@ -59,12 +60,18 @@ test('student desktop has shared top navigation and preserves assignment entry a
   expect(await page.evaluate(() => sessionStorage.getItem('student_task_entry_event_id_7'))).toBe('42');
   await page.reload();
   await expect(nav.getByRole('link', { name: '作业', exact: true })).toHaveAttribute('aria-current', 'page');
-  for (const label of ['错题本', '3D 实验', '首页']) {
+  for (const label of ['错题本', '首页']) {
     await nav.getByRole('link', { name: label, exact: true }).click();
     await expect(nav.getByRole('link', { name: label, exact: true })).toHaveAttribute('aria-current', 'page');
   }
+  await nav.getByRole('link', { name: '学习助手', exact: true }).click();
+  await expect(page).toHaveURL(/student\/ai$/);
+  await expect(nav.getByRole('link', { name: '学习助手', exact: true })).toHaveAttribute('aria-current', 'page');
   await page.goto('student/practice?eventId=42&questionId=1');
   await expect(nav.getByRole('link', { name: '错题本', exact: true })).toHaveAttribute('aria-current', 'page');
+  await page.goto('student/experiments');
+  await expect(page).toHaveURL(/student\/home$/);
+  await expect(page.getByRole('navigation', { name: '学生主导航', exact: true }).getByRole('link')).toHaveText(labels);
   await noOverflow(page);
 });
 
@@ -89,16 +96,17 @@ test('student mobile navigation stays accessible', async ({ page }) => {
   await page.setViewportSize({ width: 768, height: 1000 });
   await noOverflow(page);
   await page.setViewportSize({ width: 320, height: 720 });
-  await expect(nav.getByRole('link', { name: '3D 实验', exact: true })).toBeVisible();
+  await expect(nav.getByRole('link')).toHaveText(labels);
   await noOverflow(page);
 });
 
-test('empty student home keeps all navigation entries and does not offer assignment answering', async ({ page }) => {
+test('empty student home keeps student navigation and does not offer assignment answering or lab promotion', async ({ page }) => {
   await fixture(page, 'STUDENT', []);
   await page.goto('student/home');
   await expect(page.getByRole('heading', { name: '当前暂无教师任务' })).toBeVisible();
   await expect(page.getByRole('button', { name: '开始作答', exact: true })).toHaveCount(0);
-  await expect(page.getByRole('navigation', { name: '学生主导航', exact: true }).getByRole('link')).toHaveCount(4);
+  await expect(page.getByRole('navigation', { name: '学生主导航', exact: true }).getByRole('link')).toHaveText(labels);
+  await expect(page.getByRole('link', { name: /虚拟实验室|探索 3D 实验/ })).toHaveCount(0);
 });
 
 test('teacher uses the shared desktop navigation and retains account controls', async ({ page }) => {

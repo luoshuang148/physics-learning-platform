@@ -175,7 +175,7 @@ public class QuestionIndexWorker {
                 points.add(new QuestionVectorPoint(
                         pointId(job.getQuestionId(), job.getRevision(), unit.part(), unit.ordinal()),
                         job.getQuestionId(), job.getRevision(), unit.part(), unit.ordinal(),
-                        batch.vectors().get(i)));
+                        batch.vectors().get(i), 0d));
             }
             jobs.renewLease(job.getId(), owner, LocalDateTime.now().plusSeconds(LEASE_SECONDS));
         }

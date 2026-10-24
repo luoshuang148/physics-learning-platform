@@ -33,7 +33,7 @@ test('report lives inside assignments, including previously answered archived wo
   const streams = await fixture(page);
   await page.goto('student/task');
   const nav = page.getByRole('navigation', { name: '学生主导航', exact: true });
-  await expect(nav.getByRole('link')).toHaveText(['首页', '作业', '错题本', '3D 实验']);
+  await expect(nav.getByRole('link')).toHaveText(['首页', '作业', '错题本', '学习助手']);
   await page.locator('.task-item').filter({ hasText: '运动学作业' }).getByRole('link', { name: '查看结果 / 复盘' }).click();
   await expect(page).toHaveURL(/student\/report\?eventId=43$/);
   await expect(page.getByRole('heading', { name: '运动学作业', exact: true })).toBeVisible();

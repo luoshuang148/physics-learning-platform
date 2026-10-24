@@ -1,5 +1,5 @@
 <template>
-  <div class="shell app-shell" :class="{ 'app-shell-wide': route.path === '/student/experiments' }">
+  <div class="shell app-shell">
     <header class="app-topbar">
       <div class="app-topbar-inner">
         <RouterLink class="app-brand" :to="homePath" aria-label="教学管理平台首页">
@@ -334,7 +334,6 @@ onBeforeUnmount(() => {
 .app-account-name { font-size: .8125rem; max-width: 120px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .app-account-chevron { color: #94a3b8; font-size: .8125rem; }
 .app-shell > .shell-main { width: 100%; max-width: 1244px; margin: 0 auto; padding: 36px 32px 48px; gap: 24px; overflow: visible; animation: none; }
-.app-shell-wide > .shell-main { max-width: none; }
 .app-page-heading { display: grid; gap: 18px; }
 .app-back { justify-self: start; border: 0; background: none; padding: 0; color: #64748b; font-size: .8125rem; cursor: pointer; }
 .app-page-heading h1 { font-size: 1.75rem; font-weight: 600; letter-spacing: -.03em; overflow-wrap: anywhere; }

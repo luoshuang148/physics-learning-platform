@@ -21,7 +21,7 @@
           <span v-else class="student-eyebrow">教师作业</span>
           <h2>{{ task?.eventTitle ?? '当前暂无教师任务' }}</h2>
           <p v-if="task">{{ taskQuestionCount }} 道题 · {{ task.dueAt ? '截止 ' + formatTime(task.dueAt) : '不限截止时间' }}</p>
-          <p v-else>任务发布后会显示在这里，也可以先去探索实验。</p>
+          <p v-else>教师发布任务后，会显示在这里。</p>
           <div v-if="currentResult" class="student-task-progress">
             <span>已完成 {{ currentResult.progress.answered }} / {{ currentResult.progress.total }} 题</span>
             <span>{{ !currentResult.progress.total ? '等待教师配置题目' : currentResult.progress.completed ? '全部题目已保存' : '还剩 ' + currentResult.progress.remaining + ' 题' }}</span>
@@ -58,11 +58,6 @@
           </div>
           <p v-else class="student-wrong-empty">暂无错题，继续保持。</p>
         </section>
-        <RouterLink to="/student/experiments" class="student-experiment-card">
-          <div class="student-experiment-label"><AppIcon name="experiments" /><span>虚拟实验室</span><span aria-hidden="true">↗</span></div>
-          <div class="student-lab-art" aria-hidden="true"><i /><span class="student-lab-charge">+</span><span class="student-lab-charge charge-two">−</span></div>
-          <div class="student-experiment-copy"><h2>把物理，放进实验里。</h2><p>自主探索实验，观察规律与变化。</p><span>探索 3D 实验<AppIcon name="arrow" /></span></div>
-        </RouterLink>
       </div>
     </template>
     <AppToast :visible="visible" :type="type" :message="message" />
@@ -204,7 +199,7 @@ onMounted(loadAll);
 .student-summary strong { font-size: 1.65rem; font-weight: 600; letter-spacing: -.03em; }
 .student-summary small { font-size: .75rem; color: #7c8c9e; margin-left: 5px; font-weight: 400; }
 .student-summary > a { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; background: #f4f7f6; }
-.student-home-lower { display: grid; grid-template-columns: 1.35fr 1fr; gap: 20px; }
+.student-home-lower { display: grid; grid-template-columns: 1fr; gap: 20px; }
 .student-recent-wrong { border: 1px solid #e3e8ec; border-radius: 10px; background: #fff; min-width: 0; }
 .student-panel-heading { padding: 23px 25px 18px; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 .student-panel-heading h2 { font-size: 1rem; font-weight: 600; }
@@ -215,25 +210,11 @@ onMounted(loadAll);
 .student-wrong-copy > span { display: block; margin-top: 5px; color: #7c8c9e; font-size: .6875rem; }
 .student-row-arrow { margin-left: auto; color: #94a3b8; font-size: 20px; }
 .student-wrong-empty { padding: 35px 25px 50px; color: #7c8c9e; font-size: .875rem; }
-.student-experiment-card { border: 1px solid #dfe8e2; border-radius: 10px; background: #f0f5f2; padding: 23px 26px; min-height: 270px; position: relative; overflow: hidden; text-decoration: none; }
-.student-experiment-card:hover { background: #eaf2ed; }
-.student-experiment-label { display: flex; align-items: center; gap: 7px; color: #60846d; font-size: .75rem; }
-.student-experiment-label > span:last-child { margin-left: auto; font-size: 1rem; }
-.student-experiment-label .app-icon { width: 17px; height: 17px; }
-.student-experiment-copy { padding-top: 65px; position: relative; z-index: 1; }
-.student-experiment-copy h2 { color: #345d4b; font-size: 1.25rem; font-weight: 500; }
-.student-experiment-copy p { color: #698273; font-size: .75rem; margin-top: 7px; }
-.student-experiment-copy > span { display: flex; align-items: center; gap: 12px; color: #557d66; font-size: .75rem; margin-top: 19px; }
-.student-experiment-copy .app-icon { width: 17px; height: 17px; }
-.student-lab-art { position: absolute; right: 26px; top: 64px; width: 140px; height: 100px; opacity: .8; }
-.student-lab-art > i { position: absolute; inset: 12px 0; border: 1px solid #bdcfc2; border-radius: 50%; transform: rotate(-25deg); }
-.student-lab-charge { width: 25px; height: 25px; position: absolute; top: 29px; left: 25px; background: #7ea389; color: #fff; display: grid; place-items: center; border-radius: 50%; font-size: 1rem; }
-.charge-two { left: 89px; background: #c6d4c4; color: #6c8a70; }
 @media (max-width: 1000px) {
   .student-summary { gap: 20px; padding: 20px 25px; }
   .student-summary > div { gap: 15px; }
   .student-atom { margin-right: 0; transform: scale(.9); }
-  .student-home-lower { grid-template-columns: 1.2fr 1fr; }
+  .student-home-lower { grid-template-columns: 1fr; }
 }
 @media (max-width: 760px) {
   .student-welcome { align-items: flex-start; gap: 12px; }
@@ -259,9 +240,5 @@ onMounted(loadAll);
   .student-panel-heading h2 { font-size: .9375rem; }
   .student-wrong-row { margin: 0 20px; gap: 12px; padding: 15px 0; }
   .student-wrong-copy { font-size: .8125rem; }
-  .student-experiment-card { padding: 20px; min-height: 235px; }
-  .student-lab-art { right: 22px; top: 44px; transform: scale(.7); transform-origin: top right; }
-  .student-experiment-copy { padding-top: 70px; }
-  .student-experiment-copy h2 { font-size: 1.1875rem; }
 }
 </style>

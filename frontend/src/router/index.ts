@@ -7,7 +7,6 @@ const RegisterView = () => import('@/views/auth/RegisterView.vue');
 const StudentHomeView = () => import('@/views/student/StudentHomeView.vue');
 const StudentTaskView = () => import('@/views/student/StudentTaskView.vue');
 const StudentQuestionView = () => import('@/views/student/StudentQuestionView.vue');
-const StudentExperimentView = () => import('@/views/student/StudentExperimentView.vue');
 const StudentWrongBookView = () => import('@/views/student/StudentWrongBookView.vue');
 const StudentAIView = () => import('@/views/student/StudentAIView.vue');
 const StudentReportView = () => import('@/views/student/StudentReportView.vue');
@@ -18,7 +17,6 @@ const TeacherQuestionManageView = () => import('@/views/teacher/TeacherQuestionM
 const TeacherStudentAnalysisView = () => import('@/views/teacher/TeacherStudentAnalysisView.vue');
 const TeacherEventView = () => import('@/views/teacher/TeacherEventView.vue');
 const TeacherAssignmentDetailView = () => import('@/views/teacher/TeacherAssignmentDetailView.vue');
-const TeacherKnowledgeView = () => import('@/views/teacher/TeacherKnowledgeView.vue');
 
 const TASK_ENTRY_EVENT_ID_KEY_PREFIX = 'student_task_entry_event_id';
 const STUDENT_LEARNING_PATHS = new Set(['/student/question']);
@@ -34,7 +32,7 @@ const router = createRouter({
 
     { path: '/student/home', component: StudentHomeView, meta: { requiresAuth: true, role: 'STUDENT', sidebarDefault: 'expanded' } },
     { path: '/student/task', component: StudentTaskView, meta: { requiresAuth: true, role: 'STUDENT', sidebarDefault: 'collapsed' } },
-    { path: '/student/experiments', component: StudentExperimentView, meta: { requiresAuth: true, role: 'STUDENT', sidebarDefault: 'collapsed' } },
+    { path: '/student/experiments', redirect: '/student/home' },
     { path: '/student/practice', component: StudentQuestionView, meta: { requiresAuth: true, role: 'STUDENT' } },
     { path: '/student/question', component: StudentQuestionView, meta: { requiresAuth: true, role: 'STUDENT', sidebarDefault: 'collapsed' } },
     { path: '/student/wrong-book', component: StudentWrongBookView, meta: { requiresAuth: true, role: 'STUDENT', sidebarDefault: 'collapsed' } },
@@ -51,7 +49,6 @@ const router = createRouter({
     { path: '/teacher/questions', component: TeacherQuestionManageView, meta: { requiresAuth: true, role: 'TEACHER', sidebarDefault: 'expanded' } },
     { path: '/teacher/student-analysis', component: TeacherStudentAnalysisView, meta: { requiresAuth: true, role: 'TEACHER', sidebarDefault: 'expanded' } },
     { path: '/teacher/event-manage', component: TeacherEventView, meta: { requiresAuth: true, role: 'TEACHER', sidebarDefault: 'expanded' } },
-    { path: '/teacher/knowledge', component: TeacherKnowledgeView, meta: { requiresAuth: true, role: 'TEACHER', sidebarDefault: 'expanded' } },
     { path: '/teacher/assignments/:id', component: TeacherAssignmentDetailView, meta: { requiresAuth: true, role: 'TEACHER', sidebarDefault: 'expanded' } },
 
     { path: '/:pathMatch(.*)*', redirect: '/auth/login' },

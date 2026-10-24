@@ -38,9 +38,6 @@ import lombok.Data;
 @Data
 public class AIAskRequest {
 
-    @Schema(description = "知识库辅导模式；默认 OFF 保持旧请求行为", example = "OFF")
-    private com.zhixuewuli.service.knowledge.KnowledgeMode knowledgeMode = com.zhixuewuli.service.knowledge.KnowledgeMode.OFF;
-
     /**
      * 用户提出的问题内容
      * 

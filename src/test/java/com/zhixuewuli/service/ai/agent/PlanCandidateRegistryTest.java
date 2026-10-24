@@ -49,7 +49,6 @@ class PlanCandidateRegistryTest {
         var registry = new PlanCandidateRegistry();
         var tools = new LearningToolRegistry(new ObjectMapper(),
                 mock(LearningAssistantDataRepository.class),
-                mock(com.zhixuewuli.service.knowledge.KnowledgeRetriever.class),
                 mock(com.zhixuewuli.service.knowledge.PracticeRecommendationService.class),
                 mock(com.zhixuewuli.service.teacherEvent.TeacherEventService.class),
                 retriever, sources, registry);
@@ -78,7 +77,6 @@ class PlanCandidateRegistryTest {
     void rejectsUnknownToolAndFields() {
         var tools = new LearningToolRegistry(new ObjectMapper(),
                 mock(LearningAssistantDataRepository.class),
-                mock(com.zhixuewuli.service.knowledge.KnowledgeRetriever.class),
                 mock(com.zhixuewuli.service.knowledge.PracticeRecommendationService.class),
                 mock(com.zhixuewuli.service.teacherEvent.TeacherEventService.class),
                 mock(PlatformQuestionRetriever.class),

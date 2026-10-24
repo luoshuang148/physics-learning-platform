@@ -39,7 +39,6 @@
                 <div class="wap-reasoning-text" v-html="renderMixedContent(item.reasoning)"></div>
               </details>
               <div class="wap-content" v-html="renderMixedContent(item.content)" />
-              <KnowledgeSources :sources="item.sources" />
             </div>
           </div>
 
@@ -52,7 +51,6 @@
               </details>
               <div v-if="content">
                 <div class="wap-content" v-html="renderedContent" />
-                <KnowledgeSources :sources="currentSources" />
               </div>
               <div v-else class="wap-thinking">
                 <span class="thinking-dot"></span>
@@ -82,7 +80,6 @@
       </div>
 
       <div v-else class="wap-initial-actions">
-        <label v-if="knowledgeReady" class="wap-knowledge-mode"><input v-model="useKnowledge" type="checkbox" />依据班级讲义辅导</label>
         <button class="wap-send-btn" :disabled="loading" @click="start">
           {{ loading ? '分析中…' : 'AI解惑' }}
         </button>
@@ -97,12 +94,11 @@
 </template>
 
 <script setup lang="ts">
+import { streamWrongQuestionAnalysis, getSessionHistoryApi } from '@/api/ai';
 import { ref, watch, onMounted, onBeforeUnmount, computed } from 'vue';
 import { renderMarkdown as renderMixedContent } from '@/utils/markdown';
 
 import 'katex/dist/katex.min.css';
-import { streamWrongQuestionAnalysis, getSessionHistoryApi, getAICapabilitiesApi } from '@/api/ai';
-import KnowledgeSources from '@/components/KnowledgeSources.vue';
 import type {AISource} from '@/types/ai';
 
 const props = defineProps<{
@@ -120,8 +116,6 @@ const error    = ref('');
 const followupQuestion = ref('');
 const chatHistory = ref<Array<{ id: string; role: 'user' | 'assistant'; content: string; reasoning?: string; sources?: AISource[] }>>([]);
 const currentSources = ref<AISource[]>([]);
-const useKnowledge = ref(false);
-const knowledgeReady = ref(false);
 const activeAbortController = ref<AbortController | null>(null);
 
 const renderedContent = ref('');
@@ -177,7 +171,7 @@ const runAnalysis = async (question: string, appendUserMessage = false) => {
 
   try {
     await streamWrongQuestionAnalysis(
-      { question, questionId: props.questionId, recordId: props.recordId, knowledgeMode: useKnowledge.value ? 'AUTO' : 'OFF' },
+      { question, questionId: props.questionId, recordId: props.recordId },
       {
         signal: abortController.signal,
         sessionType: sessionType(),
@@ -258,7 +252,6 @@ const askFollowup = async () => {
 };
 
 onMounted(async () => {
-  getAICapabilitiesApi().then(capabilities => {knowledgeReady.value = Boolean(capabilities.knowledgeReady);}).catch(() => {knowledgeReady.value = false;});
   const restored = await restoreHistory();
   if (props.autoStart && !restored) start();
 });

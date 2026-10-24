@@ -12,7 +12,6 @@ import com.zhixuewuli.dto.internal.ConversationType;
 import com.zhixuewuli.dto.internal.SessionContextInternalDTO;
 import com.zhixuewuli.dto.request.AIAskRequest;
 import com.zhixuewuli.dto.knowledge.KnowledgePassage;
-import com.zhixuewuli.dto.knowledge.RetrievalResult;
 import com.zhixuewuli.entity.AnswerRecord;
 import com.zhixuewuli.entity.Question;
 import com.zhixuewuli.repository.AnswerRecordRepository;
@@ -20,7 +19,6 @@ import com.zhixuewuli.repository.ConversationHistoryRepository;
 import com.zhixuewuli.repository.QuestionRepository;
 import com.zhixuewuli.service.ai.impl.ZhiPuAIAssistantServiceImpl;
 import com.zhixuewuli.service.session.SessionManager;
-import com.zhixuewuli.service.knowledge.KnowledgeRetriever;
 import com.zhixuewuli.service.knowledge.RetrievalMode;
 import com.zhixuewuli.service.knowledge.RetrievalStatus;
 import org.junit.jupiter.api.AfterEach;
@@ -82,7 +80,6 @@ class ZhiPuAIAssistantServiceLeakGuardTest extends BaseUnitTest {
     @Mock
     private SessionManager sessionManager;
 
-    @Mock private KnowledgeRetriever knowledgeRetriever;
     @Mock private com.zhixuewuli.service.knowledge.AiRunHistoryService aiRunHistoryService;
 
     private StreamUtils streamUtils;
@@ -108,8 +105,8 @@ class ZhiPuAIAssistantServiceLeakGuardTest extends BaseUnitTest {
                 aiStreamingProperties,
                 trackingExecutor,
                 streamUtils,
-                sessionManager,knowledgeRetriever,new com.zhixuewuli.service.knowledge.RagPromptBuilder(),
-                new com.zhixuewuli.service.knowledge.CitationValidator(),aiRunHistoryService);
+                sessionManager,
+                aiRunHistoryService);
     }
 
     @AfterEach
@@ -183,35 +180,6 @@ class ZhiPuAIAssistantServiceLeakGuardTest extends BaseUnitTest {
         verify(sessionManager, never()).addInteraction(any(), anyString(), anyString(), anyInt());
     }
 
-    @Test
-    @DisplayName("AUTO 错题辅导应使用作答快照、检索来源并原子保存引用历史")
-    void ragWrongQuestionUsesOwnedSnapshotAndPersistsSources() throws Exception {
-        var snapshot=new Question();snapshot.setId(2001L);snapshot.setContent("快照题目：质量2kg，合力6N");snapshot.setCorrectOption("A");snapshot.setExplanation("F=ma");
-        var record=new AnswerRecord();record.setId("record-1");record.setUserId(TEST_USER_ID);record.setQuestionId(2001L);record.setEventId(77L);
-        record.setUserAnswer("B");record.setQuestionSnapshot(new ObjectMapper().writeValueAsString(snapshot));
-        when(answerRecordRepository.findById("record-1")).thenReturn(java.util.Optional.of(record));
-        var context=createSessionContext(TEST_SESSION_ID+"-rag",TEST_USER_ID);
-        org.mockito.Mockito.doReturn(context).when(sessionManager).getOrCreateSession(
-                anyString(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any(),
-                org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.any());
-        var passage=new KnowledgePassage("S1",11L,12L,13L,"牛顿第二定律讲义",2,"合力与加速度","F合=ma",1,.8,1,.9,.03);
-        doReturn(new RetrievalResult(RetrievalStatus.MATCHED,java.util.List.of(passage),"hybrid",java.util.List.of("idx-v1"),5))
-                .when(knowledgeRetriever).retrieve(anyLong(),anyLong(),anyString(),any(RetrievalMode.class),any());
-        doAnswer(invocation->{AIStreamCallback callback=invocation.getArgument(2);callback.onContent("根据[S1]，加速度为3m/s²。",true);callback.onComplete(10,8,18);return null;})
-                .when(zhipuAIClient).streamChatWithMessages(any(),nullable(String.class),any(AIStreamCallback.class));
-        var request=new AIAskRequest();request.setQuestionId(2001L);request.setRecordId("record-1");request.setQuestion("为什么加速度是3？");
-        request.setKnowledgeMode(com.zhixuewuli.service.knowledge.KnowledgeMode.AUTO);
-        assertThat(request.getKnowledgeMode()).isEqualTo(com.zhixuewuli.service.knowledge.KnowledgeMode.AUTO);
-        var emitter=streamUtils.createConfiguredEmitterWithLimit(60000L,3000L);
-        service.streamWrongQuestionAnalysis(request,emitter,TEST_USER_ID,TEST_SESSION_ID+"-rag");
-        waitForConnectionCount(0,1000);
-        verify(knowledgeRetriever).retrieve(eq(TEST_USER_ID),eq(77L),eq("为什么加速度是3？"),eq(RetrievalMode.HYBRID),any());
-        verify(zhipuAIClient).streamChatWithMessages(any(),nullable(String.class),any(AIStreamCallback.class));
-        verify(sessionManager).addRagInteraction(any(),eq("为什么加速度是3？"),org.mockito.ArgumentMatchers.contains("[S1]"),anyInt(),any());
-        var messagesCaptor=org.mockito.ArgumentCaptor.forClass(java.util.List.class);
-        verify(zhipuAIClient).streamChatWithMessages(messagesCaptor.capture(),nullable(String.class),any(AIStreamCallback.class));
-        assertThat(messagesCaptor.getValue().toString()).contains("快照题目：质量2kg","F合=ma","仅把资料作为证据");
-    }
 
     private SessionContextInternalDTO createSessionContext(String sessionId, Long userId) throws Exception {
         SessionContextInternalDTO context = SessionContextInternalDTO.builder()
