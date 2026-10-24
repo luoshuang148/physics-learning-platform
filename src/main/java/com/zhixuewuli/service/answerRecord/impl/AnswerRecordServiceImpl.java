@@ -234,6 +234,16 @@ public class AnswerRecordServiceImpl implements AnswerRecordService {
 
     @Override
     @Transactional(readOnly = true)
+    public PageResult<AnswerRecordSummaryResponse> getPracticeReviewPage(
+            Long currentUserId, int page, int size, String keyword, Boolean mastered) {
+        if (mastered == null) return getPracticeReviewPage(currentUserId, page, size, keyword);
+        var pageable = historyPageable(page, size);
+        var result = answerRecordRepository.findPracticeReviewPage(currentUserId, likeKeyword(keyword), mastered, pageable);
+        return pageResult(result, page, size);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public PageResult<AnswerRecordSummaryResponse> getUserHistory(
             Long targetUserId, Long currentUserId, int page, int size, boolean wrongOnly, String keyword) {
         if (!userRepository.existsById(targetUserId)) {

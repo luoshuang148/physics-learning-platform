@@ -121,9 +121,11 @@ public class AnswerRecordController {
     @GetMapping("/student/practice-review/page")
     public Result<com.zhixuewuli.common.result.PageResult<com.zhixuewuli.dto.response.AnswerRecordSummaryResponse>> practiceReviewPage(
             @RequestParam(defaultValue = "1") int page, @RequestParam(defaultValue = "20") int size,
-            @RequestParam(defaultValue = "") String keyword, @AuthenticationPrincipal AuthenticatedUser user) {
-        return Result.success(answerRecordService.getPracticeReviewPage(
-                user.id(), page, size, keyword));
+            @RequestParam(defaultValue = "") String keyword, @RequestParam(required = false) Boolean mastered,
+            @AuthenticationPrincipal AuthenticatedUser user) {
+        return Result.success(mastered == null
+                ? answerRecordService.getPracticeReviewPage(user.id(), page, size, keyword)
+                : answerRecordService.getPracticeReviewPage(user.id(), page, size, keyword, mastered));
     }
 
     @GetMapping("/user/{userId}/history")

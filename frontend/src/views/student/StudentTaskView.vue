@@ -1,119 +1,399 @@
 <template>
-  <AppShell :subtitle="`教师任务 · ${auth.user?.realName ?? ''}`">
-    <section class="grid one">
-      <GlassPanel title="教师作业">
-        <div v-if="loading" class="muted">正在加载任务…</div>
-        <div v-else-if="loadError" class="task-error" role="alert"><p>{{ loadError }}</p><button class="ghost-btn" @click="loadTasks">重试</button></div>
-        <div v-else-if="results.length === 0" class="task-empty">
-          <p class="muted">教师暂未发布任务，暂时不能答题。</p>
+  <AppShell hide-heading subtitle="我的作业">
+    <div class="sw-page">
+      <header class="sw-header">
+        <div>
+          <h1>我的作业</h1>
+          <p>找到下一份待完成的练习，按自己的节奏继续。</p>
         </div>
-        <div v-else>
-          <div class="task-summary" aria-label="我的作业进度">
-            <span>待完成 <strong>{{ pendingCount }}</strong></span>
-            <span>已完成 <strong>{{ completedCount }}</strong></span>
-            <span>已截止未答完 <strong>{{ overdueCount }}</strong></span>
+        <RouterLink to="/student/ai" class="sw-button"><AppIcon name="spark" />学习助手</RouterLink>
+      </header>
+      <section class="sw-surface">
+        <div class="sw-section-head">
+          <div>
+            <h2>作业安排</h2>
+            <p>每题提交后自动保存，答完全部题目即完成作业。</p>
           </div>
-          <p class="task-help">每题提交后保存进度，答完全部题目即完成作业。继续作答会定位到下一道未答题。</p>
-          <details class="task-definitions"><summary>状态说明</summary><p>开放期间：0 题为“未开始”，部分作答为“进行中”，全部答完为“已完成”（与答对题数无关）。截止后：0 题为“未交”，部分作答为“未完成”。“未开放”表示尚未到开始时间。</p></details>
-          <div class="task-list">
-          <article v-for="{ task, answeredQuestions, correctQuestions, progress, canResume } in taskRows" :key="task.id" class="task-item">
-            <div class="task-copy">
-              <div class="task-heading">
-                <h3 class="task-title">{{ task.eventTitle }}</h3>
-                <span class="task-status" :class="{ completed: progress.completed }">{{ progress.label }}</span>
-                <span class="task-availability">{{ taskAvailabilityText(task.availability ?? task.status) }}</span>
-              </div>
-              <div class="assignment-meta">
-                <span>发布教师：{{ task.teacherName }}</span>
-                <span>开始：{{ task.startAt ? formatTime(task.startAt) : '立即' }}</span>
-                <span>截止：{{ task.dueAt ? formatTime(task.dueAt) : '不限' }}</span>
-              </div>
-              <div class="task-progress">
-                <div class="task-progress-label"><strong>已完成 {{ progress.answered }} / {{ progress.total }} 题</strong><span>{{ progress.percent }}%</span></div>
-                <progress :value="progress.percent" max="100" :aria-label="task.eventTitle + '完成进度'" />
-                <p>{{ progress.total ? progress.completed ? '全部题目已保存' : '还剩 ' + progress.remaining + ' 题' : '请等待教师配置题目' }}<span v-if="answeredQuestions > 0"> · 首次答对 {{ correctQuestions }} 题</span></p>
-              </div>
+          <button class="sw-link" :disabled="loading" @click="loadTasks">刷新</button>
+        </div>
+        <div class="sw-tabs" role="tablist" aria-label="作业状态">
+          <button
+            v-for="(tab, index) in tabs"
+            :id="`assignment-${tab.id}`"
+            :key="tab.id"
+            role="tab"
+            :aria-selected="filter === tab.id"
+            :tabindex="filter === tab.id ? 0 : -1"
+            aria-controls="assignments-panel"
+            @click="filter = tab.id"
+            @keydown="navigateTabs($event, index)"
+          >
+            {{ tab.label
+            }}<span v-if="!loading && !loadError" class="sw-count">{{
+              tab.id === 'all'
+                ? taskRows.length
+                : taskRows.filter((row) => bucket(row) === tab.id).length
+            }}</span>
+          </button>
+        </div>
+        <div class="sw-toolbar">
+          <input
+            v-model="search"
+            class="sw-input sw-search"
+            aria-label="搜索作业"
+            placeholder="搜索作业名称或教师…"
+          /><span class="sw-muted">待完成作业按截止时间优先排列</span>
+        </div>
+        <div id="assignments-panel" role="tabpanel" :aria-labelledby="`assignment-${filter}`">
+          <div v-if="loading" class="sw-empty" role="status">正在读取作业安排…</div>
+          <p v-else-if="loadError" class="sw-error task-load-error" role="alert">
+            {{ loadError }} <button class="sw-link" @click="loadTasks">重新加载</button>
+          </p>
+          <div v-else-if="!taskRows.length" class="sw-empty">
+            <strong>暂时没有教师作业</strong>可以先复习错题，或向学习助手提问。
+            <div class="sw-actions">
+              <RouterLink class="sw-button primary" to="/student/wrong-book">去复习错题</RouterLink
+              ><RouterLink class="sw-button" to="/student/ai">问学习助手</RouterLink>
             </div>
-            <div v-if="answeredQuestions > 0 || canResume" class="task-actions">
-              <RouterLink v-if="answeredQuestions > 0" class="task-review-link" :to="{ path: '/student/report', query: { eventId: task.id } }">查看结果 / 复盘</RouterLink>
-              <button v-if="canResume" class="neon-btn primary" @click="enterTask(task)">{{ progress.answered ? '继续作答' : '开始作答' }}</button>
+          </div>
+          <div v-else-if="!filteredTasks.length" class="sw-empty">
+            <strong>这里暂时没有作业</strong
+            >{{
+              search
+                ? '试试其他名称或教师，或者切换作业状态。'
+                : filter === 'pending'
+                  ? '当前没有待完成作业，继续保持。'
+                  : '可以切换其他状态查看作业。'
+            }}
+            <div v-if="search" class="sw-actions">
+              <button class="sw-button" @click="search = ''">清除搜索</button>
             </div>
-          </article>
+          </div>
+          <div v-else class="assignment-list">
+            <article v-for="row in pagedTasks" :key="row.task.id" class="assignment-row">
+              <div class="assignment-symbol" :class="bucket(row)" aria-hidden="true">
+                <AppIcon name="task" />
+              </div>
+              <div class="assignment-copy">
+                <div class="assignment-heading">
+                  <h3>{{ row.task.eventTitle }}</h3>
+                  <span
+                    class="sw-badge"
+                    :class="{
+                      amber: bucket(row) === 'pending',
+                      neutral: bucket(row) === 'upcoming',
+                      rose: bucket(row) === 'overdue',
+                    }"
+                    >{{ bucket(row) === 'upcoming' ? '未开放' : row.progress.label }}</span
+                  >
+                </div>
+                <div class="assignment-meta">
+                  <span>{{ row.task.teacherName }}</span
+                  ><span>{{ row.progress.total }} 道题</span
+                  ><span v-if="bucket(row) === 'upcoming'">{{
+                    row.task.startAt ? formatTime(row.task.startAt) + ' 开始' : '等待开放'
+                  }}</span
+                  ><span v-else :class="{ urgent: isDueSoon(row) }">{{
+                    row.task.dueAt ? formatTime(row.task.dueAt) + ' 截止' : '不限截止时间'
+                  }}</span>
+                </div>
+                <div class="assignment-progress">
+                  <div>
+                    <span>已完成 {{ row.progress.answered }} / {{ row.progress.total }} 题</span
+                    ><strong>{{ row.progress.percent }}%</strong>
+                  </div>
+                  <progress
+                    class="sw-progress"
+                    :value="row.progress.percent"
+                    max="100"
+                    :aria-label="row.task.eventTitle + '完成进度'"
+                  />
+                </div>
+              </div>
+              <div class="assignment-actions">
+                <button v-if="row.canResume" class="sw-button primary" @click="enterTask(row.task)">
+                  {{ row.progress.answered ? '继续作答' : '开始作答'
+                  }}<AppIcon name="arrow" /></button
+                ><RouterLink
+                  v-if="row.answeredQuestions > 0 || bucket(row) === 'overdue'"
+                  class="sw-link"
+                  :to="{ path: '/student/report', query: { eventId: row.task.id } }"
+                  >查看结果 / 复盘</RouterLink
+                ><span v-else-if="!row.canResume" class="sw-muted">{{
+                  row.progress.total
+                    ? taskAvailabilityText(row.task.availability ?? row.task.status)
+                    : '等待教师配置题目'
+                }}</span>
+              </div>
+            </article>
           </div>
         </div>
-      </GlassPanel>
-    </section>
-    <AppToast :visible="visible" :type="type" :message="message" />
+        <footer v-if="!loading && !loadError && filteredTasks.length" class="sw-pagination">
+          <span>共 {{ filteredTasks.length }} 份作业 · 每页 10 份</span>
+          <nav aria-label="作业分页">
+            <button class="sw-button" :disabled="page <= 1" @click="page--">上一页</button
+            ><span>{{ page }} / {{ pages }}</span
+            ><button class="sw-button" :disabled="page >= pages" @click="page++">下一页</button>
+          </nav>
+        </footer>
+      </section>
+    </div>
   </AppShell>
 </template>
-
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
-import { useRouter } from 'vue-router';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
+import '@/assets/student-workspace.css';
 import AppShell from '@/layouts/AppShell.vue';
-import GlassPanel from '@/components/GlassPanel.vue';
-import AppToast from '@/components/AppToast.vue';
-import { useToast } from '@/composables/useToast';
+import AppIcon from '@/components/AppIcon.vue';
 import { getStudentTaskResultsApi, type StudentTaskResult } from '@/api/teacher-event';
 import type { TeacherEventResponse } from '@/types/teacher-event';
 import { useAuthStore } from '@/stores/auth';
 import { sortStudentTasks, taskAvailabilityText } from '@/utils/assignmentProgress';
-
-const TASK_ENTRY_EVENT_ID_KEY_PREFIX = 'student_task_entry_event_id';
-const auth = useAuthStore();
-const router = useRouter();
-const { visible, type, message } = useToast();
-const getTaskEntryEventIdKey = () => TASK_ENTRY_EVENT_ID_KEY_PREFIX + '_' + (auth.user?.id ?? 'anonymous');
-const loading = ref(false);
-const results = ref<StudentTaskResult[]>([]);
-const taskRows = computed(() => sortStudentTasks(results.value));
-const pendingCount = computed(() => taskRows.value.filter(row => row.canResume).length);
-const completedCount = computed(() => taskRows.value.filter(row => row.progress.completed).length);
-const overdueCount = computed(() => taskRows.value.filter(row => ['ENDED', 'CLOSED', 'ARCHIVED'].includes(row.task.availability ?? row.task.status) && !row.progress.completed).length);
-const loadError = ref('');
-const formatTime = (time: string) => new Date(time).toLocaleString('zh-CN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-const loadTasks = async () => {
+type Filter = 'all' | 'pending' | 'upcoming' | 'completed' | 'overdue';
+const auth = useAuthStore(),
+  router = useRouter(),
+  route = useRoute();
+const tabs: Array<{ id: Filter; label: string }> = [
+  { id: 'all', label: '全部' },
+  { id: 'pending', label: '待完成' },
+  { id: 'upcoming', label: '未开放' },
+  { id: 'completed', label: '已完成' },
+  { id: 'overdue', label: '已截止未完成' },
+];
+const filter = ref<Filter>(
+    tabs.some((tab) => tab.id === route.query.status) ? (route.query.status as Filter) : 'all',
+  ),
+  search = ref(''),
+  page = ref(1),
+  loading = ref(true),
+  loadError = ref(''),
+  results = ref<StudentTaskResult[]>([]),
+  now = ref(Date.now());
+type TaskRow = ReturnType<typeof sortStudentTasks>[number];
+const bucket = (row: TaskRow): Exclude<Filter, 'all'> =>
+  row.progress.completed
+    ? 'completed'
+    : row.task.availability === 'SCHEDULED'
+      ? 'upcoming'
+      : ['ENDED', 'CLOSED', 'ARCHIVED'].includes(row.task.availability ?? row.task.status)
+        ? 'overdue'
+        : 'pending';
+const taskRows = computed(() =>
+  sortStudentTasks(results.value).sort((a, b) =>
+    bucket(a) === 'pending' && bucket(b) === 'pending'
+      ? (a.task.dueAt ? new Date(a.task.dueAt).getTime() : Infinity) -
+          (b.task.dueAt ? new Date(b.task.dueAt).getTime() : Infinity) || 0
+      : 0,
+  ),
+);
+const filteredTasks = computed(() => {
+  const keyword = search.value.trim().toLowerCase();
+  return taskRows.value.filter(
+    (row) =>
+      (filter.value === 'all' || bucket(row) === filter.value) &&
+      (!keyword ||
+        `${row.task.eventTitle} ${row.task.teacherName}`.toLowerCase().includes(keyword)),
+  );
+});
+const pages = computed(() => Math.max(1, Math.ceil(filteredTasks.value.length / 10))),
+  pagedTasks = computed(() => filteredTasks.value.slice((page.value - 1) * 10, page.value * 10));
+watch([filter, search], () => {
+  page.value = 1;
+});
+watch(pages, (value) => {
+  page.value = Math.min(page.value, value);
+});
+let alive = true,
+  sequence = 0;
+async function loadTasks() {
+  const owner = ++sequence;
   loading.value = true;
   loadError.value = '';
-  try { results.value = await getStudentTaskResultsApi(); }
-  catch { loadError.value = '任务加载失败，请稍后重试'; }
-  finally { loading.value = false; }
-};
-const enterTask = async (task: TeacherEventResponse) => {
-  sessionStorage.setItem(getTaskEntryEventIdKey(), String(task.id));
+  try {
+    const data = await getStudentTaskResultsApi();
+    if (alive && owner === sequence) {
+      results.value = data;
+      now.value = Date.now();
+    }
+  } catch {
+    if (alive && owner === sequence) loadError.value = '作业加载失败，请稍后重试。';
+  } finally {
+    if (alive && owner === sequence) loading.value = false;
+  }
+}
+const formatTime = (date: string) =>
+  new Date(date).toLocaleString('zh-CN', {
+    month: 'numeric',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+const isDueSoon = (row: TaskRow) =>
+  bucket(row) === 'pending' &&
+  !!row.task.dueAt &&
+  new Date(row.task.dueAt).getTime() - now.value >= 0 &&
+  new Date(row.task.dueAt).getTime() - now.value <= 48 * 60 * 60 * 1000;
+async function enterTask(task: TeacherEventResponse) {
+  sessionStorage.setItem(
+    'student_task_entry_event_id_' + (auth.user?.id ?? 'anonymous'),
+    String(task.id),
+  );
   await router.push({ path: '/student/question', query: { resume: '1' } });
-};
+}
+async function navigateTabs(event: KeyboardEvent, index: number) {
+  let next: number;
+  if (event.key === 'ArrowRight') next = (index + 1) % tabs.length;
+  else if (event.key === 'ArrowLeft') next = (index + tabs.length - 1) % tabs.length;
+  else if (event.key === 'Home') next = 0;
+  else if (event.key === 'End') next = tabs.length - 1;
+  else return;
+  event.preventDefault();
+  filter.value = tabs[next]!.id;
+  await nextTick();
+  document.getElementById(`assignment-${filter.value}`)?.focus();
+}
+watch(
+  () => route.query.status,
+  (value) => {
+    filter.value = tabs.some((tab) => tab.id === value) ? (value as Filter) : 'all';
+  },
+);
 onMounted(loadTasks);
+onBeforeUnmount(() => {
+  alive = false;
+  ++sequence;
+});
 </script>
-
 <style scoped>
-.task-summary { display: flex; flex-wrap: wrap; gap: 12px 28px; color: #64748b; font-size: 13px; margin-bottom: 12px; }
-.task-summary strong { color: #1d715b; font-size: 22px; margin-left: 6px; }
-.task-help, .task-definitions { color: #64748b; font-size: 12px; line-height: 1.7; }
-.task-help { margin: 0 0 6px; }
-.task-definitions { margin-bottom: 18px; }
-.task-definitions summary { cursor: pointer; width: fit-content; }
-.task-definitions p { max-width: 760px; margin: 6px 0; }
-.task-copy { flex: 1; min-width: 0; }
-.task-progress { margin: 14px 0 0; max-width: 430px; color: #64748b; font-size: 12px; }
-.task-progress-label { display: flex; justify-content: space-between; gap: 16px; }
-.task-progress-label strong { color: #476658; font-weight: 500; }
-.task-progress progress { display: block; width: 100%; height: 6px; appearance: none; border: 0; border-radius: 6px; overflow: hidden; margin: 8px 0; background: #edf2ef; }
-.task-progress progress::-webkit-progress-bar { background: #edf2ef; }
-.task-progress progress::-webkit-progress-value { background: #42856b; border-radius: 6px; }
-.task-progress progress::-moz-progress-bar { background: #42856b; }
-.task-progress p { margin: 0; font-size: 11px; }
-.task-availability { color: #849389; font-size: 11px; }
-.task-actions { display: flex; align-items: center; gap: 12px; flex-shrink: 0; flex-wrap: wrap; }
-.task-review-link { font-size: 12px; color: #1d715b; text-decoration: none; border: 1px solid #dbe6e0; border-radius: 6px; padding: 9px 12px; }
-.task-error { display: grid; gap: 12px; justify-items: start; color: #b91c1c; }
-.task-list { display: grid; gap: 10px; }
-.task-item { display: flex; justify-content: space-between; gap: 18px; align-items: center; padding: 14px; border: 1px solid #e2e8f0; border-radius: 10px; background: #fff; }
-.task-heading { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-.task-title { margin: 0; font-size: 18px; overflow-wrap: anywhere; }
-.task-status { padding: 2px 7px; border-radius: 4px; background: #f5f2e9; color: #8c7646; font-size: 11px; }
-.task-status.completed { background: #ecfdf5; color: #0f766e; }
-.assignment-meta { margin-top: 8px; display: flex; gap: 14px; flex-wrap: wrap; color: #64748b; font-size: 12px; }
-.task-empty { min-height: 120px; display: flex; align-items: center; }
-@media (max-width: 700px) { .task-item { flex-direction: column; align-items: stretch; } }
+.task-load-error {
+  margin: 0 24px 24px;
+}
+.assignment-list {
+  padding: 0 24px;
+}
+.assignment-row {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 25px 0;
+  border-top: 1px solid #eaf0ec;
+}
+.assignment-symbol {
+  width: 44px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  background: #f2f6f3;
+  border-radius: 11px;
+  color: #91aa99;
+  flex-shrink: 0;
+}
+.assignment-symbol.pending {
+  background: #f7f4e9;
+  color: #ad9a6b;
+}
+.assignment-symbol.completed {
+  background: #edf6ef;
+  color: #73a07c;
+}
+.assignment-copy {
+  flex: 1;
+  min-width: 0;
+}
+.assignment-heading {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.assignment-heading h3 {
+  font-size: 16px;
+  font-weight: 500;
+  margin: 0;
+  color: #3e5f48;
+  overflow-wrap: anywhere;
+}
+.assignment-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  color: #8c9e91;
+  font-size: 12px;
+  line-height: 1.8;
+  margin: 10px 0 16px;
+}
+.assignment-meta > .urgent {
+  color: #ac8651;
+}
+.assignment-progress {
+  max-width: 350px;
+}
+.assignment-progress > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  color: #91a496;
+  margin-bottom: 8px;
+  gap: 16px;
+}
+.assignment-progress strong {
+  font-weight: 400;
+  color: #6f977a;
+}
+.assignment-actions {
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  gap: 15px;
+  flex-shrink: 0;
+}
+.assignment-actions > .sw-button {
+  min-width: 118px;
+  font-size: 12px;
+}
+.assignment-actions > .sw-link {
+  font-size: 11px;
+}
+@media (max-width: 640px) {
+  .assignment-list {
+    padding-inline: 16px;
+  }
+  .assignment-row {
+    gap: 12px;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    padding: 22px 0;
+  }
+  .assignment-symbol {
+    width: 34px;
+    height: 38px;
+    border-radius: 8px;
+  }
+  .assignment-symbol .app-icon {
+    width: 18px;
+    height: 18px;
+  }
+  .assignment-heading h3 {
+    font-size: 14px;
+  }
+  .assignment-actions {
+    flex-basis: 100%;
+    padding-left: 46px;
+    flex-direction: row;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+  }
+  .assignment-meta {
+    font-size: 11px;
+    gap: 5px 10px;
+  }
+  .assignment-copy {
+    flex-basis: calc(100% - 50px);
+  }
+  .assignment-progress {
+    max-width: none;
+  }
+}
 </style>

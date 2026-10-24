@@ -55,6 +55,7 @@ public class PlanPracticeService {
                 .options(com.zhixuewuli.common.util.OptionMappingUtil.class != null
                         ? parseOptions(question.getOptions()) : null)
                 .difficulty(question.getDifficulty())
+                .imageBase64(question.getImageBase64())
                 .knowledgePointCodes(question.getKnowledgePointCodes())
                 .build();
     }
@@ -101,6 +102,18 @@ public class PlanPracticeService {
         record.setUserAnswer(request.getUserAnswer());
         record.setCorrect(correct);
         record.setRequestId(request.getRequestId());
+        record.setAnsweredAt(java.time.LocalDateTime.now(java.time.ZoneOffset.UTC));
+        record.setContentSnapshot(question.getContent());
+        record.setOptionsSnapshot(question.getOptions());
+        record.setCorrectSnapshot(question.getCorrectOption());
+        record.setAnalysisSnapshot(question.getExplanation());
+        record.setDifficultySnapshot(question.getDifficulty());
+        try {
+            // Plan records retain the exact graded question, including its image, for later review.
+            record.setQuestionSnapshot(json.writeValueAsString(question));
+        } catch (com.fasterxml.jackson.core.JsonProcessingException invalidSnapshot) {
+            throw new BusinessException("无法保存题目快照，请重试");
+        }
         answers.save(record);
 
         // 同事务关联条目；answer_record_id 与 (user_id, request_id) 唯一

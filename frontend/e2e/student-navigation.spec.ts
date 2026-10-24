@@ -7,7 +7,7 @@ const task = { id: 42, eventTitle: '牛顿运动定律 · 课后练习', teacher
 const question = { id: 1, content: '质量为 2 kg 的物体受到 6 N 的合力，加速度是多少？',
   options: { A: '3 m/s²', B: '6 m/s²' }, correctOption: 'A', difficulty: 1 };
 const labels = ['首页', '作业', '错题本', '学习助手'];
-const teacherLabels = ['总览', '班级管理', '学生名册', '题库管理', '学生学情', '任务管理', '班级知识库'];
+const teacherLabels = ['总览', '班级管理', '学生名册', '题库管理', '学生学情', '任务管理'];
 
 async function fixture(page: Page, role = 'STUDENT', tasks: object[] = [task]) {
   await page.addInitScript(() => localStorage.setItem('zhixue_token', 'browser-layout-fixture'));

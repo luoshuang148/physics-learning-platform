@@ -181,19 +181,23 @@ public class LearningPlanService {
                 FROM learning_plans WHERE id=? AND user_id=?
                 """, planId, viewerId);
         List<LearningPlanItemPreview> items = jdbc.query("""
-                SELECT day_no,question_id,knowledge_point_code,reason_source_ids FROM learning_plan_items WHERE plan_id=? ORDER BY day_no,id
+                SELECT id,day_no,question_id,knowledge_point_code,reason_source_ids FROM learning_plan_items WHERE plan_id=? ORDER BY day_no,id
                 """, (rs, n) -> new LearningPlanItemPreview(rs.getInt("day_no"), rs.getString("knowledge_point_code"),
-                rs.getLong("question_id"), parseStrings(rs.getString("reason_source_ids"))), planId);
+                rs.getLong("question_id"), parseStrings(rs.getString("reason_source_ids")), rs.getLong("id")), planId);
         ValidatedPlanPreview preview = decodePreview(jdbc.queryForObject("SELECT plan_json FROM learning_plan_previews WHERE run_id=? AND user_id=?",
                 String.class, row.get("source_run_id"), viewerId));
         int attempts = 0, correct = 0;
-        if ("ACTIVE".equals(row.get("status")) && !items.isEmpty()) {
+        if (row.get("activated_at") != null && !items.isEmpty()) {
             var ids = items.stream().map(LearningPlanItemPreview::questionId).toList();
             String placeholders = String.join(",", Collections.nCopies(ids.size(), "?"));
             Map<String, Object> stats = jdbc.queryForMap("""
-                    SELECT COUNT(*) AS attempts,COALESCE(SUM(CASE WHEN correct=1 THEN 1 ELSE 0 END),0) AS correct_count
-                    FROM answer_records WHERE user_id=? AND event_id=? AND practice=1 AND answered_at>=? AND question_id IN (%s)
-                    """.formatted(placeholders), concat(viewerId, row.get("event_id"), row.get("activated_at"), ids));
+                    SELECT COUNT(*) AS attempts,COALESCE(SUM(CASE WHEN a.correct=1 THEN 1 ELSE 0 END),0) AS correct_count
+                    FROM answer_records a WHERE a.user_id=? AND a.practice=1 AND (
+                        (a.event_id=? AND a.answered_at>=? AND a.question_id IN (%s))
+                        OR EXISTS (SELECT 1 FROM learning_plan_attempt_links l
+                            JOIN learning_plan_items i ON i.id=l.plan_item_id
+                            WHERE l.answer_record_id=a.id AND i.plan_id=? AND l.user_id=?))
+                    """.formatted(placeholders), planProgressArgs(viewerId, row.get("event_id"), row.get("activated_at"), ids, planId));
             attempts = ((Number) stats.get("attempts")).intValue(); correct = ((Number) stats.get("correct_count")).intValue();
         }
         String status = "CANCELLED".equals(row.get("status")) ? "CANCELLED" : attempts == 0 ? "NOT_STARTED" : correct == attempts ? "ON_TRACK" : "IN_PROGRESS";
@@ -201,6 +205,13 @@ public class LearningPlanService {
                 String.valueOf(row.get("status")), ((Number) row.get("version")).longValue(), ((Number) row.get("days")).intValue(),
                 items, String.valueOf(row.get("source_answer_revision")), attempts, correct, status,
                 preview.executionMode(), preview.evidenceSummary());
+    }
+
+    private Object[] planProgressArgs(Long viewerId, Object eventId, Object activatedAt, List<Long> ids, Long planId) {
+        List<Object> args = new ArrayList<>();
+        args.add(viewerId); args.add(eventId); args.add(activatedAt); args.addAll(ids);
+        args.add(planId); args.add(viewerId);
+        return args.toArray();
     }
 
     @Transactional(readOnly = true)

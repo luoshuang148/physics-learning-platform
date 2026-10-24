@@ -20,7 +20,7 @@ Java 21 · Spring Boot 3 · Vue 3 · MySQL / Redis / RabbitMQ。<br>
 
 | 教师掌握作业进度 | 学生查看任务与学习进度 | 教师维护题库 |
 |:---:|:---:|:---:|
-| ![教师总览：任务列表、作业参与人数与正确率](docs/images/teacher-dashboard.png) | ![学生首页：当前作业、答题进度与错题概览](docs/images/student-home.png) | ![教师题库：筛选、编辑与维护物理试题](docs/images/teacher-questions.png) |
+| ![教师总览：班级概况、待跟进任务与完成统计](docs/images/teacher-dashboard.png) | ![学生首页：当前作业、学习概览与最近错题](docs/images/student-home.png) | ![教师题库：筛选、编辑与维护物理试题](docs/images/teacher-questions.png) |
 
 本地体验（Docker Compose 2.24.4+）：`./scripts/demo-up.sh`
 
@@ -34,7 +34,7 @@ Java 21 · Spring Boot 3 · Vue 3 · MySQL / Redis / RabbitMQ。<br>
 
 | 登录 | 教师总览 |
 |:----:|:--------:|
-| ![教学管理平台用户名与密码登录表单](docs/images/login.png) | ![教师总览：任务列表与完成统计](docs/images/teacher-dashboard.png) |
+| ![教学管理平台用户名与密码登录表单](docs/images/login.png) | ![教师总览：班级概况指标、待跟进任务与接下来的安排](docs/images/teacher-dashboard.png) |
 
 | 题库管理 | 作业详情 |
 |:--------:|:--------:|
@@ -42,7 +42,7 @@ Java 21 · Spring Boot 3 · Vue 3 · MySQL / Redis / RabbitMQ。<br>
 
 | 学生首页 | 错题本 |
 |:--------:|:------:|
-| ![学生首页：当前任务与学习进度](docs/images/student-home.png) | ![学生错题本：历史错题和掌握情况](docs/images/student-wrong-book.png) |
+| ![学生首页：当前作业、学习概览与继续巩固](docs/images/student-home.png) | ![学生错题本：复习清单按状态筛选并支持补练](docs/images/student-wrong-book.png) |
 
 ## 项目简介
 
@@ -61,7 +61,7 @@ Java 21 · Spring Boot 3 · Vue 3 · MySQL / Redis / RabbitMQ。<br>
 ### 学生端
 - 注册登录（JWT + BCrypt），登录限流，退出/改密即时吊销令牌
 - 作业列表与进度、首次作答与补练分离、幂等提交（`requestId` 重试不重复记分）
-- 错题本按最后一次尝试展示掌握状态；历史快照与题库解耦，改题不影响已做记录
+- 错题本按最后一次尝试展示掌握状态（复习清单支持全部/待复习/已通过补练筛选）；历史快照与题库解耦，改题不影响已做记录
 - AI 实时问答与错题分析（SSE 流式，可取消）
 - 可选班级讲义 RAG 错题辅导：来源卡片可展开，历史引用读取时重新鉴权（默认关闭）
 - 学习助手：共享只读学情/错题/知识检索/练习推荐工具，固定工作流默认启用；Agent Function Calling 可配置但默认关闭

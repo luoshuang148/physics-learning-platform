@@ -83,4 +83,26 @@ class MultiClassIsolationTest extends BaseControllerIntegrationTest {
         assertThat(access.classesForTeacher(2002L)).extracting(TeachingClass::getName)
                 .contains("默认班级");
     }
+
+    @Test
+    void archivedHistoryFiltersTheSelectedClassBeforePaginationAndChecksMembership() throws Exception {
+        var a = classrooms.create(new ClassCreateRequest() {{ setName("归档 A 班"); }}, 2001L);
+        var b = classrooms.create(new ClassCreateRequest() {{ setName("归档 B 班"); }}, 2001L);
+        var foreign = classrooms.create(new ClassCreateRequest() {{ setName("其他教师班级"); }}, 2002L);
+        var first = tasks.publishEvent(task("A 归档任务", a.getId(), question("A archive")), 2001L);
+        var second = tasks.publishEvent(task("B 归档任务", b.getId(), question("B archive")), 2001L);
+        tasks.archiveEvent(first.getId());
+        tasks.archiveEvent(second.getId());
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/teacher/events/history")
+                .header("Authorization", createAuthHeader(2001L, "teacher_user"))
+                .param("classId", a.getId().toString()).param("page", "1").param("size", "1"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.data.total").value(1))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.data.records[0].id").value(first.getId()));
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/teacher/events/history")
+                .header("Authorization", createAuthHeader(2001L, "teacher_user"))
+                .param("classId", foreign.getId().toString()))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().is4xxClientError());
+    }
 }

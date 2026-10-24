@@ -17,8 +17,8 @@ const staging = await fs.mkdtemp(path.join(ROOT, '.readme-shots-'));
 const shots = [
   { name: 'login', route: '/auth/login', marker: 'form' },
   { name: 'student-home', route: '/student/home', role: 'student', marker: '.student-summary' },
-  { name: 'student-wrong-book', route: '/student/wrong-book', role: 'student', marker: '.wb-page' },
-  { name: 'teacher-dashboard', route: '/teacher/dashboard', role: 'teacher', marker: '.overview-strip' },
+  { name: 'student-wrong-book', route: '/student/wrong-book', role: 'student', marker: '.sw-page' },
+  { name: 'teacher-dashboard', route: '/teacher/dashboard', role: 'teacher', marker: '.tw-metrics' },
   { name: 'teacher-questions', route: '/teacher/questions', role: 'teacher', marker: '.qm-layout' },
   { name: 'teacher-assignment', role: 'teacher', marker: '.detail-page' },
 ];

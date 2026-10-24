@@ -490,8 +490,15 @@ public class TeacherEventServiceImpl implements TeacherEventService {
     @Override
     @Transactional(readOnly = true)
     public com.zhixuewuli.common.result.PageResult<TeacherEventResponse> getEventHistory(int page, int size, Long teacherId) {
+        return getEventHistory(page, size, teacherId, null);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public com.zhixuewuli.common.result.PageResult<TeacherEventResponse> getEventHistory(int page, int size, Long teacherId, Long classId) {
         if (page < 1 || size < 1 || size > 100) throw new IllegalArgumentException("分页参数不合法");
-        var classIds = classIds(teacherId);
+        if (classId != null) classAccess.requireTeacher(classId, teacherId);
+        var classIds = classId == null ? classIds(teacherId) : List.of(classId);
         var pageable = org.springframework.data.domain.PageRequest.of(page - 1, size,
                 org.springframework.data.domain.Sort.by("updatedAt", "id").descending());
         var result = classIds.isEmpty()

@@ -136,6 +136,7 @@ public interface AnswerRecordRepository extends JpaRepository<AnswerRecord, Stri
                 "AND (x.eventId=a.eventId OR (x.eventId IS NULL AND a.eventId IS NULL)) AND x.correct=false) " +
                 "AND NOT EXISTS (SELECT b.id FROM AnswerRecord b WHERE b.userId=a.userId AND b.questionId=a.questionId " +
                 "AND (b.eventId=a.eventId OR (b.eventId IS NULL AND a.eventId IS NULL)) AND b.attemptOrder>a.attemptOrder) " +
+                "AND (:mastered IS NULL OR a.correct=:mastered) " +
                 "AND (:keyword='' OR LOWER(coalesce(a.contentSnapshot,q.content)) LIKE LOWER(:keyword) ESCAPE '!') " +
                 "ORDER BY a.answeredAt DESC, a.attemptOrder DESC",
                 countQuery = "SELECT COUNT(a) FROM AnswerRecord a LEFT JOIN a.question q WHERE a.userId=:userId " +
@@ -143,9 +144,15 @@ public interface AnswerRecordRepository extends JpaRepository<AnswerRecord, Stri
                 "AND (x.eventId=a.eventId OR (x.eventId IS NULL AND a.eventId IS NULL)) AND x.correct=false) " +
                 "AND NOT EXISTS (SELECT b.id FROM AnswerRecord b WHERE b.userId=a.userId AND b.questionId=a.questionId " +
                 "AND (b.eventId=a.eventId OR (b.eventId IS NULL AND a.eventId IS NULL)) AND b.attemptOrder>a.attemptOrder) " +
+                "AND (:mastered IS NULL OR a.correct=:mastered) " +
                 "AND (:keyword='' OR LOWER(coalesce(a.contentSnapshot,q.content)) LIKE LOWER(:keyword) ESCAPE '!')")
         Page<com.zhixuewuli.dto.response.AnswerRecordSummaryResponse> findPracticeReviewPage(
-                @Param("userId") Long userId, @Param("keyword") String keyword, Pageable pageable);
+                @Param("userId") Long userId, @Param("keyword") String keyword, @Param("mastered") Boolean mastered, Pageable pageable);
+
+        default Page<com.zhixuewuli.dto.response.AnswerRecordSummaryResponse> findPracticeReviewPage(
+                Long userId, String keyword, Pageable pageable) {
+            return findPracticeReviewPage(userId, keyword, null, pageable);
+        }
 
 
 

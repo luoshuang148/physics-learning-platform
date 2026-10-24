@@ -56,8 +56,9 @@ public class TeacherEventController {
     @TeacherOnly
     public Result<com.zhixuewuli.common.result.PageResult<TeacherEventResponse>> history(
             @RequestParam(defaultValue = "1") int page, @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) Long classId,
             @AuthenticationPrincipal AuthenticatedUser user) {
-        return Result.success(teacherEventService.getEventHistory(page, size, user.id()));
+        return Result.success(teacherEventService.getEventHistory(page, size, user.id(), classId));
     }
 
 

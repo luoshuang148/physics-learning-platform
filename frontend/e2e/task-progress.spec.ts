@@ -59,10 +59,10 @@ test('each assignment shows saved progress and distinguishes personal state from
   await expect(card('等待开放')).toContainText('未开放');
   await expect(page.locator('.task-item').first()).toContainText('继续力学作业');
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
-  await page.screenshot({ path: 'test-results/task-progress-mobile.png', fullPage: true });
+  await page.screenshot({ path: 'artifacts/verification/task-progress-mobile.png', fullPage: true });
   await page.setViewportSize({ width: 1440, height: 1000 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
-  await page.screenshot({ path: 'test-results/task-progress-desktop.png', fullPage: true });
+  await page.screenshot({ path: 'artifacts/verification/task-progress-desktop.png', fullPage: true });
 });
 
 test('continue opens the first unanswered question and saved completion refreshes the assignment card', async ({ page }) => {

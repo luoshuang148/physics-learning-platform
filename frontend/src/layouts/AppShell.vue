@@ -24,7 +24,7 @@
       </div>
     </header>
     <main class="shell-main">
-      <div v-if="route.path !== '/student/home'" class="app-page-heading">
+      <div v-if="route.path !== '/student/home' && !hideHeading" class="app-page-heading">
         <button v-if="showBackButton" class="app-back" @click="goBack">← 返回上一步</button>
         <h1>{{ pageTitle }}</h1>
       </div>
@@ -132,7 +132,7 @@ const FONT_SIZE_MIN = 13;
 const FONT_SIZE_MAX = 18;
 const DEFAULT_FONT_SIZE = 15;
 
-const props = defineProps<{ subtitle: string }>();
+const props = defineProps<{ subtitle: string; hideHeading?: boolean }>();
 
 const auth = useAuthStore();
 const classroom = useClassroomStore();

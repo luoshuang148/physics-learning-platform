@@ -26,6 +26,7 @@ public interface AnswerRecordService {
     PageResult<AnswerRecordSummaryResponse> getStudentHistory(Long currentUserId, int page, int size, boolean wrongOnly, String keyword);
 
     PageResult<AnswerRecordSummaryResponse> getPracticeReviewPage(Long currentUserId, int page, int size, String keyword);
+    PageResult<AnswerRecordSummaryResponse> getPracticeReviewPage(Long currentUserId, int page, int size, String keyword, Boolean mastered);
 
     PageResult<AnswerRecordSummaryResponse> getUserHistory(Long targetUserId, Long currentUserId, int page, int size, boolean wrongOnly, String keyword);
 

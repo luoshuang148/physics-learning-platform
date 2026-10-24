@@ -1,4 +1,5 @@
 export interface LearningPlanItem {
+  id?: number;
   day: number;
   knowledgePointCode: string;
   questionId: number;

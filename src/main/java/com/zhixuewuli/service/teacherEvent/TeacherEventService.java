@@ -21,6 +21,8 @@ public interface TeacherEventService {
 
     com.zhixuewuli.common.result.PageResult<TeacherEventResponse> getEventHistory(int page, int size, Long teacherId);
 
+    com.zhixuewuli.common.result.PageResult<TeacherEventResponse> getEventHistory(int page, int size, Long teacherId, Long classId);
+
     /** Legacy endpoint: create a task. status defaults to PUBLISHED. */
     TeacherEventResponse publishEvent(TeacherEventCreateRequest request, Long currentUserId);
 

@@ -1,0 +1,370 @@
+.sw-page {
+  display: grid;
+  gap: 24px;
+  min-width: 0;
+  color: #314b3b;
+}
+.sw-header,
+.sw-toolbar,
+.sw-section-head,
+.sw-actions,
+.sw-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.sw-header h1 {
+  font-size: 27px;
+  font-weight: 600;
+  letter-spacing: -0.035em;
+  margin: 0 0 8px;
+}
+.sw-header p,
+.sw-subtitle {
+  color: #7c9082;
+  font-size: 13px;
+  line-height: 1.8;
+  margin: 0;
+}
+.sw-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 10px 16px;
+  border: 1px solid #dce6df;
+  border-radius: 8px;
+  background: white;
+  color: #54765e;
+  font: inherit;
+  font-size: 13px;
+  text-decoration: none;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.sw-button.primary {
+  background: #2b7058;
+  border-color: #2b7058;
+  color: #fff;
+}
+.sw-button:hover {
+  filter: brightness(0.97);
+}
+.sw-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.sw-button .app-icon {
+  width: 16px;
+  height: 16px;
+}
+.sw-link {
+  border: 0;
+  background: none;
+  padding: 0;
+  color: #43815b;
+  text-decoration: none;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.sw-link:hover {
+  text-decoration: underline;
+}
+.sw-surface {
+  background: #fff;
+  border: 1px solid #e0e8e2;
+  border-radius: 14px;
+  min-width: 0;
+}
+.sw-section-head {
+  padding: 22px 24px;
+}
+.sw-section-head h2 {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0 0 5px;
+}
+.sw-section-head p {
+  font-size: 12px;
+  color: #839889;
+  line-height: 1.8;
+  margin: 0;
+}
+.sw-toolbar {
+  flex-wrap: wrap;
+  padding: 20px 24px;
+}
+.sw-input {
+  min-width: 0;
+  padding: 10px 12px;
+  min-height: 40px;
+  border: 1px solid #dce6df;
+  border-radius: 8px;
+  background: white;
+  color: #3d5c46;
+  font: inherit;
+  font-size: 13px;
+}
+.sw-search {
+  width: 300px;
+  max-width: 100%;
+}
+.sw-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #edf4ef;
+  color: #698c73;
+  border-radius: 5px;
+  font-size: 11px;
+  padding: 3px 7px;
+  margin-left: 7px;
+  font-weight: 400;
+}
+.sw-badge {
+  display: inline-flex;
+  padding: 4px 8px;
+  border-radius: 5px;
+  font-size: 11px;
+  line-height: 1.5;
+  background: #edf6ef;
+  color: #568560;
+  white-space: nowrap;
+}
+.sw-badge.amber {
+  background: #faf4e8;
+  color: #a08146;
+}
+.sw-badge.neutral {
+  background: #f0f3f1;
+  color: #829387;
+}
+.sw-badge.rose {
+  background: #faf0ec;
+  color: #aa7562;
+}
+.sw-tabs {
+  display: flex;
+  gap: 24px;
+  border-bottom: 1px solid #e7eee9;
+  padding: 0 24px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+.sw-tabs button {
+  border: 0;
+  border-bottom: 2px solid transparent;
+  padding: 16px 0;
+  background: none;
+  color: #889c8f;
+  font: inherit;
+  font-size: 13px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.sw-tabs button[aria-selected='true'] {
+  color: #39774f;
+  border-color: #39774f;
+}
+.sw-tabs .sw-count {
+  color: inherit;
+  background: #f0f5f1;
+}
+.sw-muted {
+  color: #859a8b;
+  font-size: 12px;
+}
+.sw-empty {
+  padding: 54px 24px;
+  text-align: center;
+  color: #8a9d90;
+  font-size: 13px;
+  line-height: 1.9;
+}
+.sw-empty strong {
+  display: block;
+  font-size: 16px;
+  font-weight: 500;
+  color: #5c7b65;
+  margin-bottom: 8px;
+}
+.sw-empty .sw-actions {
+  justify-content: center;
+  margin-top: 20px;
+  flex-wrap: wrap;
+}
+.sw-error {
+  background: #fffaf6;
+  border: 1px solid #ecddd2;
+  border-radius: 9px;
+  padding: 14px 16px;
+  font-size: 13px;
+  color: #a67558;
+  line-height: 1.9;
+}
+.sw-error button {
+  margin-left: 10px;
+}
+.sw-pagination {
+  padding: 18px 24px;
+  font-size: 12px;
+  color: #8ca092;
+  border-top: 1px solid #eaf0ec;
+  flex-wrap: wrap;
+}
+.sw-pagination nav {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.sw-inline-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.sw-progress {
+  display: block;
+  width: 100%;
+  height: 6px;
+  border: 0;
+  border-radius: 8px;
+  overflow: hidden;
+  appearance: none;
+  background: #edf3ef;
+  accent-color: #679a78;
+}
+.sw-progress::-webkit-progress-bar {
+  background: #edf3ef;
+}
+.sw-progress::-webkit-progress-value {
+  background: #679a78;
+  border-radius: 8px;
+}
+.sw-progress::-moz-progress-bar {
+  background: #679a78;
+}
+.sw-formula {
+  overflow-wrap: anywhere;
+  line-height: 1.9;
+}
+.sw-formula .katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+.sw-result-options {
+  display: grid;
+  gap: 9px;
+  margin-top: 18px;
+}
+.sw-result-option {
+  display: flex;
+  gap: 13px;
+  align-items: flex-start;
+  padding: 12px 14px;
+  border: 1px solid #e0e9e3;
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.8;
+}
+.sw-result-option.correct {
+  background: #f1f8f3;
+  border-color: #bcd9c6;
+}
+.sw-result-option.wrong {
+  background: #fff8f4;
+  border-color: #e9cfc1;
+}
+.sw-result-option > strong {
+  font-weight: 500;
+  flex-shrink: 0;
+}
+.sw-question-image {
+  display: block;
+  max-width: 100%;
+  max-height: 360px;
+  object-fit: contain;
+  margin: 20px 0;
+}
+.sw-explanation {
+  padding: 18px;
+  background: #f7faf8;
+  border-radius: 9px;
+  margin-top: 22px;
+  font-size: 13px;
+  line-height: 1.9;
+}
+.sw-explanation h3 {
+  font-size: 13px;
+  font-weight: 600;
+  margin: 0 0 10px;
+}
+.sw-feedback {
+  font-size: 12px;
+  color: #7f9786;
+  line-height: 1.8;
+}
+.sw-dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+  border-top: 1px solid #e5eee8;
+  padding-top: 20px;
+  margin-top: 24px;
+}
+.sw-page button:focus-visible,
+.sw-button:focus-visible,
+.sw-link:focus-visible {
+  outline: 2px solid #709b7f;
+  outline-offset: 3px;
+}
+@media (max-width: 640px) {
+  .sw-page {
+    gap: 20px;
+  }
+  .sw-header {
+    align-items: flex-start;
+  }
+  .sw-header h1 {
+    font-size: 24px;
+  }
+  .sw-header p {
+    font-size: 12px;
+  }
+  .sw-header > .sw-button {
+    font-size: 12px;
+    padding: 9px 12px;
+  }
+  .sw-section-head,
+  .sw-toolbar {
+    padding: 18px 16px;
+  }
+  .sw-section-head h2 {
+    font-size: 15px;
+  }
+  .sw-tabs {
+    padding-inline: 16px;
+    gap: 20px;
+  }
+  .sw-tabs button {
+    font-size: 12px;
+    padding-block: 14px;
+  }
+  .sw-search {
+    width: 100%;
+  }
+  .sw-pagination {
+    padding: 16px;
+    font-size: 11px;
+  }
+  .sw-result-option {
+    padding: 10px 12px;
+  }
+  .sw-empty {
+    padding: 38px 18px;
+  }
+}
