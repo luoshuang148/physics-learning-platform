@@ -5,7 +5,7 @@ test('student generates, saves, activates and opens a learning plan using mocked
   let planStatus = 'DRAFT';
   let planVersion = 1;
   const planView = () => ({ id: 91, eventId: 42, status: planStatus, version: planVersion, days: 3,
-    items: [{ day: 1, knowledgePointCode: 'mechanics.newton_2', questionId: 31, reasonSourceIds: ['W1', 'S1'] }],
+    items: [{ id: 701, day: 1, knowledgePointCode: 'mechanics.newton_2', questionId: 31, reasonSourceIds: ['W1', 'S1'] }],
     sourceAnswerRevision: 'revision-42', practiceAttempts: 0, practiceCorrect: 0, progressStatus: 'NOT_STARTED',
     executionMode: 'WORKFLOW', evidenceSummary: ['W1', 'S1'] });
   await page.route('**/api/v1/**', async route => {
@@ -17,7 +17,7 @@ test('student generates, saves, activates and opens a learning plan using mocked
     if (path === '/teacher/events/available') return route.fulfill({ json: { code: 200, data: [{ id: 42, eventTitle: '牛顿定律作业', questionIds: [31], questionCount: 1 }] } });
     if (path === '/ai/student/learning-plan/preview' && request.method() === 'POST') {
       const body = request.postDataJSON();
-      const planPreview = { days: body.days, sourceEventId: 42, sourceAnswerRevision: 'revision-42', executionMode: 'WORKFLOW', items: [{ day: 1, knowledgePointCode: 'mechanics.newton_2', questionId: 31, reasonSourceIds: ['W1', 'S1'] }], evidenceSummary: ['W1', 'S1'], partial: false };
+      const planPreview = { days: body.days, sourceEventId: 42, sourceAnswerRevision: 'revision-42', executionMode: 'WORKFLOW', items: [{ id: 701, day: 1, knowledgePointCode: 'mechanics.newton_2', questionId: 31, reasonSourceIds: ['W1', 'S1'] }], evidenceSummary: ['W1', 'S1'], partial: false };
       const events = [
         ['progress', { runId: 'run-42', requestId: body.requestId, mode: 'WORKFLOW' }],
         ['tool-step', { runId: 'run-42', seq: 1, toolName: 'get_wrong_questions', status: 'SUCCEEDED', summary: '已读取本人错题和历史快照' }],
@@ -38,18 +38,21 @@ test('student generates, saves, activates and opens a learning plan using mocked
   await page.goto('student/ai');
   await page.getByRole('textbox', { name: '输入你的物理问题' }).fill('帮我针对这次作业的错题安排三天复习');
   await page.getByRole('button', { name: '发送消息', exact: true }).click();
-  await expect(page.getByText('复习工作流', { exact: true })).toBeVisible();
+  // With a single available assignment the plan card auto-generates after mount.
+  await expect(page.getByRole('heading', { name: '3 天复习计划' })).toBeVisible();
   await page.getByText('查看生成依据', { exact: true }).click();
   await expect(page.getByText('已读取本人错题和历史快照')).toBeVisible();
-  await expect(page.getByText('使用的证据标识：W1、S1')).toBeVisible();
-  await page.getByRole('button', { name: '保存草稿' }).click();
-  await expect(page.getByText('状态：DRAFT')).toBeVisible();
-  await page.getByRole('button', { name: '激活计划' }).click();
-  await expect(page.getByText('状态：ACTIVE')).toBeVisible();
+  await page.getByText('查看计划依据', { exact: true }).click();
+  await expect(page.getByText('W1、S1', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '保存为我的计划' }).click();
+  await expect(page.locator('.plan-state').getByText('草稿', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: '启用计划', exact: true }).click();
+  await expect(page.locator('.plan-state').getByText('进行中', { exact: true })).toBeVisible();
   await page.reload();
   await page.getByRole('button', { name: '我的复习计划', exact: true }).click();
-  await page.getByRole('button', { name: /3 天复习 · 进行中/ }).click();
-  await expect(page.getByText('状态：ACTIVE')).toBeVisible();
-  await page.getByRole('button', { name: '去练习' }).click();
-  await expect(page).toHaveURL(/student\/practice\?eventId=42&questionId=31/);
+  await expect(page.getByRole('heading', { name: '3 天复习计划' })).toBeVisible();
+  await page.getByRole('button', { name: '继续复习' }).click();
+  await expect(page.locator('.plan-state').getByText('进行中', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: /开始补练/ }).click();
+  await expect(page.getByRole('dialog', { name: '计划补练' })).toBeVisible();
 });

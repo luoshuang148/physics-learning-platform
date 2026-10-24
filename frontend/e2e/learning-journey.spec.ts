@@ -32,10 +32,13 @@ test('publish → answer → archive → reuse → archived practice, and safe A
   expect(created.ok()).toBeTruthy(); const question = (await created.json()).data;
   // Select and publish from the actual teacher page.
   await tp.goto(url('teacher/event-manage'));
-  await tp.locator('#task-title').fill(`E2E ${tag}`);
-  await tp.getByPlaceholder('搜索题目 ID 或内容…').fill(content);
-  await tp.locator('.bank-item').filter({ hasText: content }).getByRole('button', { name: '加入', exact: true }).click();
-  await tp.locator('.publish-btn').click();
+  await tp.getByRole('button', { name: '新建任务', exact: true }).click();
+  await tp.getByLabel('任务名称', { exact: true }).fill(`E2E ${tag}`);
+  await tp.getByRole('button', { name: '从题库选题', exact: true }).click();
+  await tp.getByLabel('搜索题库').fill(content);
+  await tp.locator('.bank-item').getByRole('checkbox').check();
+  await tp.getByRole('button', { name: '完成选题', exact: true }).click();
+  await tp.getByRole('button', { name: '发布任务', exact: true }).click();
   await expect(tp.locator('.task-row').filter({ hasText: `E2E ${tag}` })).toHaveCount(1);
   const originalTask = (await (await request.get(url('teacher/events/all'), { headers: teacherHeaders })).json()).data.find((item: any) => item.questionIds.includes(question.id) && item.eventTitle === `E2E ${tag}`);
   expect(originalTask.questionIds).toContain(question.id);
@@ -53,17 +56,23 @@ test('publish → answer → archive → reuse → archived practice, and safe A
   let summary = await request.get(url(`answer-records/teacher/summary?eventId=${originalTask.id}`), { headers: teacherHeaders });
   expect((await summary.json()).data).toMatchObject({ assignmentAnswers: 1, assignmentCorrect: 0 });
 
-  await tp.locator('.task-row').filter({ hasText: `E2E ${tag}` }).getByRole('button', { name: '归档', exact: true }).click();
+  const archiveRow = tp.locator('.task-row').filter({ hasText: `E2E ${tag}` });
+  await archiveRow.getByRole('button', { name: '更多操作' }).click();
+  await archiveRow.getByRole('button', { name: '归档任务', exact: true }).click();
+  await tp.getByRole('dialog', { name: '归档任务' }).getByRole('button', { name: '确认归档' }).click();
   await expect(tp.locator('.task-row').filter({ hasText: `E2E ${tag}` })).toHaveCount(0);
   // Edit the bank after archiving; the old task must keep the original text and answer.
   const changed = await request.put(url('questions/teacher/update'), { headers: teacherHeaders, data: {
     id: question.id, content: `${content} EDITED`, options: JSON.stringify({ A: '3m/s²', B: '12m/s²', C: '6m/s²', D: '0m/s²' }), correctOption: 'B', difficulty: 1,
   } });
   expect(changed.ok()).toBeTruthy();
-  await tp.locator('#task-title').fill(`E2E R ${tag}`);
-  await tp.getByPlaceholder('搜索题目 ID 或内容…').fill(content);
-  await tp.locator('.bank-item').filter({ hasText: content }).getByRole('button', { name: '加入', exact: true }).click();
-  await tp.locator('.publish-btn').click();
+  await tp.getByRole('button', { name: '新建任务', exact: true }).click();
+  await tp.getByLabel('任务名称', { exact: true }).fill(`E2E R ${tag}`);
+  await tp.getByRole('button', { name: '从题库选题', exact: true }).click();
+  await tp.getByLabel('搜索题库').fill(content);
+  await tp.locator('.bank-item').getByRole('checkbox').check();
+  await tp.getByRole('button', { name: '完成选题', exact: true }).click();
+  await tp.getByRole('button', { name: '发布任务', exact: true }).click();
   await expect(tp.locator('.task-row').filter({ hasText: `E2E R ${tag}` })).toHaveCount(1);
   const reusedTask = (await (await request.get(url('teacher/events/all'), { headers: teacherHeaders })).json()).data.find((item: any) => item.questionIds.includes(question.id) && item.eventTitle === `E2E R ${tag}`);
   expect(reusedTask.id).not.toEqual(originalTask.id);
@@ -88,8 +97,8 @@ test('publish → answer → archive → reuse → archived practice, and safe A
   await expect(sp.locator('.q-save-feedback')).toContainText('提交成功');
   summary = await request.get(url(`answer-records/teacher/summary?eventId=${originalTask.id}`), { headers: teacherHeaders });
   expect((await summary.json()).data).toMatchObject({ assignmentAnswers: 1, assignmentCorrect: 0, practiceAttempts: 1, masteredQuestions: 1 });
-  await sp.goto(url('student/wrong-book')); await sp.locator('.wb-card-head').first().click();
-  await expect(sp.getByText('题目内容 · 已通过补练')).toBeVisible();
+  await sp.goto(url('student/wrong-book')); await sp.locator('.wb-expand-trigger').first().click();
+  await expect(sp.getByText('题目与答案')).toBeVisible();
   await sp.screenshot({ path: 'test-results/learning-journey.png', fullPage: true });
   await teacher.close(); await student.close();
 });
