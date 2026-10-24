@@ -175,9 +175,10 @@ class AiEnvironmentBindingTest {
                 assertFalse(knowledge.isEnabled(), "知识库默认应关闭");
 
                 AgentProperties agent = context.getBean(AgentProperties.class);
-                assertFalse(agent.isToolCallingEnabled(), "Tool Calling 默认应关闭");
-                assertTrue(agent.getBaseUrl() == null || agent.getBaseUrl().isBlank());
-                assertTrue(agent.getModel() == null || agent.getModel().isBlank());
+                // 默认回退到智谱 OpenAI 兼容端点；无密钥时 agentReady 仍为 false
+                assertEquals("https://open.bigmodel.cn/api/paas/v4", agent.getBaseUrl());
+                assertEquals("glm-4-flash", agent.getModel());
+                assertTrue(agent.getApiKey() == null || agent.getApiKey().isBlank());
 
                 LearningAssistantProperties assistant = context.getBean(LearningAssistantProperties.class);
                 assertEquals(LearningAssistantProperties.Mode.WORKFLOW, assistant.getMode());
@@ -215,14 +216,15 @@ class AiEnvironmentBindingTest {
         }
 
         @Test
-        @DisplayName("Tool Calling 开关打开但缺 base-url/model 时 agentReady 仍为 false")
+        @DisplayName("Tool Calling 开关打开但缺 api-key 时 agentReady 仍为 false")
         void agentSwitchOnButIncomplete() {
             Map<String, Object> caps = capabilities(envRunner(Map.of(
                     "AI_ENABLED", "true",
-                    "AI_AGENT_TOOL_CALLING_ENABLED", "true"
+                    "AI_AGENT_TOOL_CALLING_ENABLED", "true",
+                    "AI_AGENT_API_KEY", ""
             )));
             assertEquals(Boolean.FALSE, caps.get("agentReady"),
-                    "已配置开关不等于可运行，缺少 base-url/model 时不得声称可用");
+                    "已配置开关不等于可运行，缺少 api-key 时不得声称可用");
         }
 
         @Test
@@ -232,7 +234,8 @@ class AiEnvironmentBindingTest {
                     "AI_ENABLED", "true",
                     "AI_AGENT_TOOL_CALLING_ENABLED", "true",
                     "AI_AGENT_BASE_URL", "https://llm.example.com/v1",
-                    "AI_AGENT_MODEL", "test-model"
+                    "AI_AGENT_MODEL", "test-model",
+                    "AI_AGENT_API_KEY", "sk-test"
             )));
             assertEquals(Boolean.TRUE, caps.get("agentReady"));
             assertTrue(String.valueOf(caps.get("notice")).contains("已配置"),

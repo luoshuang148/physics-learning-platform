@@ -121,11 +121,22 @@ def main() -> int:
         failed += 1
         print(f"{fixture_key}: 导入失败 status={status} msg={resp.get('message')}", file=sys.stderr)
 
+    out_path = REPO_ROOT / "scripts/fixtures/platform-rag/fixture-map.json"
+    existing: dict[str, int] = {}
+    if out_path.is_file():
+        try:
+            existing = {k: int(v) for k, v in json.loads(out_path.read_text(encoding="utf-8")).items()}
+        except Exception:
+            existing = {}
+    existing.update({k: int(v) for k, v in mapping.items()})
+    out_path.write_text(json.dumps(existing, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
     print(json.dumps({
         "created": created,
         "reused": reused,
         "failed": failed,
         "fixtureToQuestionId": mapping,
+        "fixtureMapPath": str(out_path),
     }, ensure_ascii=False, indent=2))
     return 0 if failed == 0 else 2
 

@@ -1,0 +1,14 @@
+{
+  "seed": 20261024,
+  "description": "可复现的模拟学生画像。固定随机种子；导入按 fixtureKey 幂等，仅管理自身模拟记录。",
+  "personas": [
+    {"id": "all-correct", "name": "全对画像", "hint": "首次作答大多正确"},
+    {"id": "concept-confusion", "name": "概念混淆", "hint": "作用力/平衡力、位移/路程易混"},
+    {"id": "unit-error", "name": "单位错误", "hint": "计算正确但单位/数量级出错"},
+    {"id": "improving", "name": "改善中", "hint": "前错后对"},
+    {"id": "new-user", "name": "新用户", "hint": "几乎无作答"},
+    {"id": "sparse-data", "name": "数据稀少", "hint": "少量作答，统计不稳"}
+  ],
+  "topics": ["kinematics", "newton", "friction", "energy"],
+  "note": "120 题为建设规模目标，每主题 30 题，覆盖难度 1～3；不靠改数字制造近重复题。"
+}

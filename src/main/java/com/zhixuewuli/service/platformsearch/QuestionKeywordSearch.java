@@ -121,7 +121,25 @@ public class QuestionKeywordSearch {
         flushAscii.run();
         flushCjk.run();
 
-        return tokens.stream().distinct().limit(12).toList();
+        return tokens.stream()
+                .filter(t -> !containsParticle(t))
+                .distinct()
+                .limit(12)
+                .toList();
+    }
+
+    /**
+     * 虚词开头/结尾的 n-gram（如「的基本」「是的」）容易误召回，丢弃。
+     * 中间含虚词的 3-gram 保留（如「功和能」）。
+     */
+    private static boolean containsParticle(String token) {
+        if (token.isEmpty()) return true;
+        return isParticle(token.charAt(0)) || isParticle(token.charAt(token.length() - 1));
+    }
+
+    private static boolean isParticle(char c) {
+        return c == '的' || c == '是' || c == '了' || c == '和' || c == '与'
+                || c == '在' || c == '有' || c == '不' || c == '为' || c == '要';
     }
 
     private List<KeywordHit> toHits(List<QuestionSearchUnit> rows, String mode) {

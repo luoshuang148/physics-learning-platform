@@ -194,10 +194,12 @@ app:
 # AI 业务配置 (对应 AIBusinessProperties)
 ai:
   agent:
-    tool-calling-enabled: ${AI_AGENT_TOOL_CALLING_ENABLED:false}
-    base-url: ${AI_AGENT_BASE_URL:}
-    api-key: ${AI_AGENT_API_KEY:}
-    model: ${AI_AGENT_MODEL:}
+    # Tool Calling 默认走智谱 OpenAI 兼容端点（与 ZHIPU_AI_API_KEY 共用密钥）。
+    # 需要单独供应商时覆盖 AI_AGENT_BASE_URL / AI_AGENT_API_KEY / AI_AGENT_MODEL。
+    tool-calling-enabled: ${AI_AGENT_TOOL_CALLING_ENABLED:true}
+    base-url: ${AI_AGENT_BASE_URL:https://open.bigmodel.cn/api/paas/v4}
+    api-key: ${AI_AGENT_API_KEY:${ZHIPU_AI_API_KEY:${ZHIPU_API_KEY:}}}
+    model: ${AI_AGENT_MODEL:glm-4-flash}
     timeout-seconds: ${AI_AGENT_TIMEOUT_SECONDS:30}
   learning-assistant:
     mode: ${AI_LEARNING_ASSISTANT_MODE:WORKFLOW}
