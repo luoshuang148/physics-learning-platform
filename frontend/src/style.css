@@ -515,34 +515,6 @@ select:focus {
   border: 1px solid rgba(168, 153, 255, 0.35);
 }
 
-.auth-page {
-  min-height: 100vh;
-  display: grid;
-  place-items: center;
-  padding: 24px;
-  position: relative;
-}
-
-.auth-glow {
-  position: absolute;
-  width: min(560px, 88vw);
-  aspect-ratio: 1;
-  background: radial-gradient(circle, rgba(90, 243, 211, 0.3), transparent 66%);
-  filter: blur(22px);
-}
-
-.auth-card {
-  width: min(460px, 92vw);
-  border: 1px solid rgba(155, 177, 255, 0.25);
-  border-radius: 26px;
-  background: linear-gradient(180deg, rgba(15, 20, 38, 0.92), rgba(10, 14, 29, 0.9));
-  box-shadow: var(--shadow);
-  padding: 24px;
-  display: grid;
-  gap: 14px;
-  z-index: 1;
-}
-
 .auth-title {
   font-size: 26px;
 }
@@ -1255,32 +1227,6 @@ section.toolbar,
   }
 }
 /* Auth */
-.auth-page {
-  background:
-    radial-gradient(circle at 50% 0%, rgba(15, 118, 110, 0.06), transparent 42%),
-    #f5f7fa;
-}
-.auth-glow { display: none; }
-.auth-card {
-  background: #ffffff !important;
-  border: 1px solid #e2e8f0 !important;
-  border-radius: 14px !important;
-  box-shadow: 0 12px 36px rgba(15, 23, 42, 0.08) !important;
-  padding: 28px !important;
-  gap: 12px !important;
-}
-.auth-title { color: #172033 !important; font-size: 22px !important; font-weight: 700 !important; }
-.auth-sub { color: #64748b !important; font-size: 13px !important; }
-.auth-card label { color: #334155 !important; font-size: 12px !important; font-weight: 600 !important; }
-.auth-card input {
-  background: #ffffff !important;
-  border: 1px solid #dbe3ec !important;
-  color: #172033 !important;
-  border-radius: 8px !important;
-  padding: 10px 12px !important;
-}
-.auth-card input:focus { border-color: #0f766e !important; box-shadow: 0 0 0 3px rgba(15,118,110,.12) !important; outline: none !important; }
-.auth-link { color: #0f766e !important; font-size: 12px !important; }
 .toast { border-radius: 8px !important; box-shadow: 0 8px 24px rgba(15,23,42,.12) !important; }
 .toast.type-success { background: #ecfdf5 !important; border-color: #a7f3d0 !important; color: #166534 !important; }
 .toast.type-error { background: #fef2f2 !important; border-color: #fecaca !important; color: #991b1b !important; }

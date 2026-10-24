@@ -34,7 +34,7 @@ Java 21 · Spring Boot 3 · Vue 3 · MySQL / Redis / RabbitMQ。<br>
 
 | 登录 | 教师总览 |
 |:----:|:--------:|
-| ![教学管理平台用户名与密码登录表单](docs/images/login.png) | ![教师总览：班级概况指标、待跟进任务与接下来的安排](docs/images/teacher-dashboard.png) |
+| ![教学管理平台登录页：左侧产品介绍与右侧登录表单](docs/images/login.png) | ![教师总览：班级概况指标、待跟进任务与接下来的安排](docs/images/teacher-dashboard.png) |
 
 | 题库管理 | 作业详情 |
 |:--------:|:--------:|
@@ -59,7 +59,7 @@ Java 21 · Spring Boot 3 · Vue 3 · MySQL / Redis / RabbitMQ。<br>
 ## 功能特性
 
 ### 学生端
-- 注册登录（JWT + BCrypt），登录限流，退出/改密即时吊销令牌
+- 注册登录（JWT + BCrypt，注册需确认密码），登录限流，退出/改密即时吊销令牌
 - 作业列表与进度、首次作答与补练分离、幂等提交（`requestId` 重试不重复记分）
 - 错题本按最后一次尝试展示掌握状态（复习清单支持全部/待复习/已通过补练筛选）；历史快照与题库解耦，改题不影响已做记录
 - AI 实时问答与错题分析（SSE 流式，可取消）

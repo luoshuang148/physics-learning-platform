@@ -1,48 +1,63 @@
 <template>
   <AuthLayout>
-    <h2 class="auth-title">创建账号</h2>
+    <header class="auth-heading">
+      <h2 class="auth-title">创建账号</h2>
+    </header>
 
+    <form class="auth-form" novalidate :aria-busy="loading" @submit.prevent="onSubmit" @input="registerError = ''">
+      <div class="auth-field">
+        <label for="register-username">用户名</label>
+        <input id="register-username" v-model="form.username" placeholder="字母、数字或下划线" autocomplete="username" autocapitalize="none" :spellcheck="false" :disabled="loading" required />
+      </div>
+      <div class="auth-field">
+        <label for="register-password">密码</label>
+        <AuthPasswordInput id="register-password" v-model="form.password" placeholder="设置密码，至少 6 位" autocomplete="new-password" :disabled="loading" />
+      </div>
+      <div class="auth-field">
+        <label for="register-confirm-password">确认密码</label>
+        <AuthPasswordInput id="register-confirm-password" v-model="confirmPassword" placeholder="再次输入密码" autocomplete="new-password" :disabled="loading" :invalid="passwordMismatch" :describedby="passwordMismatch ? 'register-password-error' : undefined" />
+      </div>
+      <div class="auth-field-pair">
+        <div class="auth-field">
+          <label for="register-name">真实姓名</label>
+          <input id="register-name" v-model="form.realName" placeholder="你的姓名" autocomplete="name" :disabled="loading" required />
+        </div>
+        <div class="auth-field">
+          <label for="register-class">班级 <span class="auth-optional">选填</span></label>
+          <input id="register-class" v-model="form.className" placeholder="如：高一（1）班" :disabled="loading" />
+        </div>
+      </div>
 
-    <form class="form" @submit.prevent="onSubmit">
-      <label>用户名</label>
-      <input v-model="form.username" placeholder="仅字母/数字/下划线" />
+      <p v-if="passwordMismatch" id="register-password-error" class="auth-inline-error" role="alert">
+        两次输入的密码不一致，请再检查一下。
+      </p>
+      <p v-else-if="registerError" class="auth-inline-error" role="alert">{{ registerError }}</p>
 
-      <label>密码</label>
-      <input v-model="form.password" type="password" placeholder="至少 6 位" />
-
-      <label>真实姓名</label>
-      <input v-model="form.realName"  />
-
-      <label>班级（可选）</label>
-      <input v-model="form.className"  />
-
-
-
-      <button class="neon-btn primary" type="submit" :disabled="loading">
-        {{ loading ? '注册中…' : '注册' }}
+      <button class="auth-submit" type="submit" :disabled="loading">
+        {{ loading ? '正在创建…' : '创建学生账号' }}
       </button>
     </form>
 
-    <RouterLink class="auth-link" to="/auth/login">已有账号？去登录</RouterLink>
-
-    <AppToast :visible="visible" :type="type" :message="message" />
+    <div class="auth-account-switch">
+      <span>已有账号？</span><RouterLink class="auth-link" to="/auth/login">返回登录</RouterLink>
+    </div>
   </AuthLayout>
 </template>
 
 <script setup lang="ts">
-import { reactive, ref } from 'vue';
+import { computed, reactive, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import AuthLayout from '@/layouts/AuthLayout.vue';
-import AppToast from '@/components/AppToast.vue';
+import AuthPasswordInput from '@/components/AuthPasswordInput.vue';
 import { registerApi } from '@/api/auth';
 import { useToast } from '@/composables/useToast';
 
-
-
 const router = useRouter();
-const { visible, type, message, show } = useToast();
+const { show } = useToast();
 
 const loading = ref(false);
+const registerError = ref('');
+const confirmPassword = ref('');
 const form = reactive({
   username: '',
   password: '',
@@ -51,12 +66,21 @@ const form = reactive({
   userType: 'STUDENT' as 'STUDENT' | 'TEACHER',
 });
 
+const passwordMismatch = computed(
+  () => confirmPassword.value.length > 0 && form.password !== confirmPassword.value,
+);
+
 const onSubmit = async () => {
+  if (loading.value) return;
+  registerError.value = '';
   if (!form.username || !form.password || !form.realName) {
-    show('请填写必要信息', 'error');
+    registerError.value = '请填写用户名、密码和真实姓名。';
     return;
   }
-
+  if (form.password !== confirmPassword.value) {
+    registerError.value = '两次输入的密码不一致，请再检查一下。';
+    return;
+  }
 
   loading.value = true;
   try {
@@ -71,17 +95,9 @@ const onSubmit = async () => {
     await router.push('/auth/login');
   } catch (error: any) {
     const hint = error?.response?.data?.message ?? error?.message ?? '注册失败';
-    show(hint, 'error');
+    registerError.value = hint;
   } finally {
     loading.value = false;
   }
 };
 </script>
-
-<style scoped>
-.teacher-code-tip {
-  margin: -4px 0 2px;
-  font-size: var(--font-size-sm);
-  color: #64748b;
-}
-</style>

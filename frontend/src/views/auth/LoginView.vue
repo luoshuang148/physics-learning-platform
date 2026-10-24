@@ -1,23 +1,47 @@
 <template>
   <AuthLayout>
-    <h2 class="auth-title">欢迎回来</h2>
+    <header class="auth-heading auth-login-heading">
+      <h2 class="auth-title">登录</h2>
+    </header>
 
+    <form class="auth-form" novalidate :aria-busy="loading" @submit.prevent="onSubmit" @input="loginError = ''">
+      <div class="auth-field">
+        <label for="login-username">用户名</label>
+        <input
+          id="login-username"
+          v-model="form.username"
+          placeholder="请输入用户名"
+          autocomplete="username"
+          autocapitalize="none"
+          :spellcheck="false"
+          :disabled="loading"
+          :aria-invalid="(attempted && !form.username.trim()) || undefined"
+          :aria-describedby="loginError ? 'login-error' : undefined"
+          required
+        />
+      </div>
 
-    <form class="form" @submit.prevent="onSubmit">
-      <label>用户名</label>
-      <input v-model="form.username" placeholder="请输入用户名" autocomplete="username" />
+      <div class="auth-field">
+        <label for="login-password">密码</label>
+        <AuthPasswordInput
+          id="login-password"
+          v-model="form.password"
+          :disabled="loading"
+          :invalid="attempted && !form.password"
+          :describedby="loginError ? 'login-error' : undefined"
+        />
+      </div>
 
-      <label>密码</label>
-      <input v-model="form.password" type="password" placeholder="请输入密码" />
+      <p v-if="loginError" id="login-error" class="auth-inline-error" role="alert">{{ loginError }}</p>
 
-      <button class="neon-btn primary" type="submit" :disabled="loading">
-        {{ loading ? '登录中…' : '登录' }}
+      <button class="auth-submit" type="submit" :disabled="loading">
+        {{ loading ? '正在登录…' : '登录' }}
       </button>
     </form>
 
-    <RouterLink class="auth-link" to="/auth/register">还没有账号？去注册</RouterLink>
-
-    <AppToast :visible="visible" :type="type" :message="message" />
+    <div class="auth-account-switch">
+      <span>还没有账号？</span><RouterLink class="auth-link" to="/auth/register">注册账号</RouterLink>
+    </div>
   </AuthLayout>
 </template>
 
@@ -25,38 +49,41 @@
 import { reactive, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import AuthLayout from '@/layouts/AuthLayout.vue';
-import AppToast from '@/components/AppToast.vue';
+import AuthPasswordInput from '@/components/AuthPasswordInput.vue';
 import { useAuthStore } from '@/stores/auth';
 import { useToast } from '@/composables/useToast';
 
-
 const auth = useAuthStore();
 const router = useRouter();
-const { visible, type, message, show } = useToast();
+const { show } = useToast();
 
 const loading = ref(false);
+const attempted = ref(false);
+const loginError = ref('');
 const form = reactive({
   username: '',
   password: '',
 });
 
 const onSubmit = async () => {
-  if (!form.username || !form.password) {
-    show('请完整填写登录信息', 'error');
+  if (loading.value) return;
+  attempted.value = true;
+  loginError.value = '';
+  if (!form.username.trim() || !form.password) {
+    loginError.value = '请填写用户名和密码后登录。';
     return;
   }
 
   loading.value = true;
   try {
-    await auth.login(form);
+    await auth.login({ username: form.username.trim(), password: form.password });
     show('登录成功', 'success');
     await router.push(auth.isTeacher ? '/teacher/dashboard' : '/student/home');
   } catch (error: any) {
     const hint = error?.response?.data?.message ?? error?.message ?? '登录失败';
-    show(hint, 'error');
+    loginError.value = hint;
   } finally {
     loading.value = false;
   }
 };
 </script>
-
