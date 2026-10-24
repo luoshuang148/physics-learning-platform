@@ -9,6 +9,7 @@ test('student generates, saves, activates and opens a learning plan using mocked
     sourceAnswerRevision: 'revision-42', practiceAttempts: 0, practiceCorrect: 0, progressStatus: 'NOT_STARTED',
     executionMode: 'WORKFLOW', evidenceSummary: ['W1', 'S1'] });
   await page.route('**/api/v1/**', async route => {
+    if (!['fetch', 'xhr'].includes(route.request().resourceType())) return route.continue();
     const request = route.request();
     const path = new URL(request.url()).pathname.replace('/api/v1', '');
     if (path === '/user/me') return route.fulfill({ json: { code: 200, data: { id: 7, username: 'student', realName: '李同学', userType: 'STUDENT' } } });

@@ -6,6 +6,7 @@ async function fixture(page: Page, options: { fail?: boolean; noTasks?: boolean 
   await page.addInitScript(() => localStorage.setItem('zhixue_token', 'assistant-fixture'));
   const requests: { path: string; body: any; auth: string | undefined }[] = [];
   await page.route('**/api/v1/**', async route => {
+    if (!['fetch', 'xhr'].includes(route.request().resourceType())) return route.continue();
     const req = route.request();
     const path = new URL(req.url()).pathname.replace('/api/v1', '');
     const body = req.postData() ? req.postDataJSON() : null;

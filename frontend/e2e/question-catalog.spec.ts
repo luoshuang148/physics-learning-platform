@@ -33,6 +33,9 @@ async function catalog(page: Page) {
           'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j4JkAAAAASUVORK5CYII=',
       };
     if (path.endsWith('/history')) data = { records: [], total: 0, pages: 0 };
+    if (path === '/questions/knowledge-points') data = [];
+    if (/\/questions\/teacher\/\d+\/index-status$/.test(path))
+      data = { indexed: false, status: 'NONE', lastError: null };
     return route.fulfill({ json: { code: 200, data } });
   });
   return requests;
@@ -52,7 +55,8 @@ test('bank uses bounded pages and fetches full question only when editing', asyn
     .filter({ hasText: '#101' })
     .getByRole('button', { name: '编辑', exact: true })
     .click();
-  await expect(page.locator('.qm-form-panel textarea').first()).toHaveValue('完整题目及公式');
+  await expect(page.locator('.qm-form-panel')).toBeVisible({ timeout: 10000 });
+  await expect(page.locator('.qm-form-panel textarea').first()).toHaveValue('完整题目及公式', { timeout: 10000 });
   await expect(page.locator('.image-preview')).toBeVisible();
 });
 test('assignment selection stays intact across question pages', async ({ page }) => {
