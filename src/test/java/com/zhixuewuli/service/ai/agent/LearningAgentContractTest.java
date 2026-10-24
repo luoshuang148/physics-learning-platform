@@ -24,7 +24,8 @@ class LearningAgentContractTest {
         LearningAssistantProperties limits = new LearningAssistantProperties();
         limits.setMaxModelRounds(1);
         LearningAgentService service = new LearningAgentService(gateway, tools,
-                new LearningPlanValidator(new ObjectMapper()), agent, limits, new ObjectMapper());
+                new LearningPlanValidator(new ObjectMapper()), agent, limits, new ObjectMapper(),
+                new PlanCandidateRegistry());
         when(tools.execute(any(), argThat(toolCall -> toolCall != null && "get_learning_summary".equals(toolCall.name())), anyLong()))
                 .thenReturn(new ToolResult("get_learning_summary", true,
                         "{\"assignmentAttempts\":3,\"correctAttempts\":1,\"wrongQuestionCount\":2,\"sourceAnswerRevision\":\"rev\"}"));
@@ -47,7 +48,8 @@ class LearningAgentContractTest {
         agent.setToolCallingEnabled(true); agent.setBaseUrl("https://example.test/v1"); agent.setModel("test-model");
         LearningAssistantProperties limits = new LearningAssistantProperties(); limits.setMaxModelRounds(3);
         LearningAgentService service = new LearningAgentService(gateway, tools,
-                new LearningPlanValidator(new ObjectMapper()), agent, limits, new ObjectMapper());
+                new LearningPlanValidator(new ObjectMapper()), agent, limits, new ObjectMapper(),
+                new PlanCandidateRegistry());
         when(tools.execute(any(), argThat(toolCall -> toolCall != null && "get_learning_summary".equals(toolCall.name())), anyLong()))
                 .thenReturn(new ToolResult("get_learning_summary", true,
                         "{\"assignmentAttempts\":3,\"correctAttempts\":1,\"wrongQuestionCount\":2,\"sourceAnswerRevision\":\"rev\"}"));

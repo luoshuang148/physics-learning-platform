@@ -21,6 +21,7 @@ public class LearningAgentService {
     private final AgentProperties agentProperties;
     private final LearningAssistantProperties limits;
     private final ObjectMapper json;
+    private final PlanCandidateRegistry candidateRegistry;
 
     public ValidatedPlanPreview preview(LearningToolContext context, String question, int days,
                                         java.util.function.BooleanSupplier cancelled,
@@ -43,6 +44,7 @@ public class LearningAgentService {
         if (!agentProperties.isToolCallingEnabled()) throw new IllegalStateException("动态 Agent 尚未启用");
         if (days < 1 || days > 7 || question == null || question.isBlank() || question.length() > 800)
             throw new IllegalArgumentException("请求参数无效");
+        candidateRegistry.clear();
         long deadline = System.currentTimeMillis() + limits.getTotalDeadlineSeconds() * 1000;
         var step = new java.util.concurrent.atomic.AtomicInteger();
         boolean knowledgeOnly = isKnowledgeOnly(question);
@@ -65,7 +67,13 @@ public class LearningAgentService {
             onModelResponse.accept(response);
             if (response.toolCalls().isEmpty()) {
                 if (response.content() == null || response.content().isBlank()) throw new IllegalStateException("Agent 未返回计划");
-                return validator.validate(response.content(), context.eventId(), revision, evidence,
+                String planJson = extractJson(response.content());
+                if (!candidateRegistry.candidateList().isEmpty()) {
+                    // 使用平台检索候选（本次运行 registry）校验
+                    return validator.validateFromRegistry(planJson, context.eventId(), revision,
+                            candidateRegistry, days, "AGENT");
+                }
+                return validator.validate(planJson, context.eventId(), revision, evidence,
                         candidates, days, "AGENT");
             }
             turns.add(new ChatTurn(ChatTurn.Role.ASSISTANT, response.content(), null, null, response.toolCalls()));
@@ -98,10 +106,26 @@ public class LearningAgentService {
 
     private String systemPrompt(Long eventId, String revision, int days) {
         return "你是物理学习计划助手。只能用工具结果，不得猜测题目ID、证据ID或知识点代码。" +
-                "需要时调用 get_learning_summary、get_wrong_questions、search_knowledge、recommend_practice。" +
-                "最终只输出JSON：days,sourceEventId,sourceAnswerRevision,items，每个item含day,knowledgePointCode,questionIds,reasonSourceIds。" +
-                "days最多" + days + "；sourceEventId固定为" + eventId + "，sourceAnswerRevision固定为" + revision + "。" +
-                "信息不足可返回空items。";
+                "常用工具：get_learning_summary、get_wrong_questions、search_platform_questions、get_question_evidence。" +
+                "search_platform_questions 返回 questionId/revision/sourceIds；get_question_evidence 读取来源原文。" +
+                "最终只输出一个 JSON 对象（不要 markdown 代码块外的任何文字），字段：" +
+                "days(1~" + days + "),sourceEventId(固定" + eventId + "),sourceAnswerRevision(固定\"" + revision + "\")," +
+                "items:数组,每个元素含 day,knowledgePointCode,questionIds(数组,只用工具返回过的 questionId),reasonSourceIds(数组,只用工具返回过的 sourceId)。" +
+                "最多6道题，天数不超过" + days + "。信息不足可返回 items:[]，并说明原因。";
+    }
+
+    /** 从模型输出中提取 JSON 对象（容忍 markdown 代码块）。 */
+    private String extractJson(String content) {
+        String text = content.trim();
+        if (text.startsWith("```")) {
+            int first = text.indexOf('\n');
+            int last = text.lastIndexOf("```");
+            if (first > 0 && last > first) text = text.substring(first + 1, last).trim();
+        }
+        int start = text.indexOf('{');
+        int end = text.lastIndexOf('}');
+        if (start >= 0 && end > start) text = text.substring(start, end + 1);
+        return text;
     }
 
     private PersonalLearningSummary readSummary(LearningToolContext context,
