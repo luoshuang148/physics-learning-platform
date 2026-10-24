@@ -18,7 +18,7 @@ test('lost submission response and same-task practice preserve original results'
  const token=await page.evaluate(()=>localStorage.getItem('zhixue_token'));const sh={Authorization:`Bearer ${token}`};
  // An already completed second question must survive restoration of the first draft.
  expect((await request.post(url('answer-records/student/submit'),{headers:sh,data:{eventId:task.id,requestId:`q2-${tag}`,intent:'ASSIGNMENT',questionId:qs[1].id,userAnswer:'A'}})).ok()).toBeTruthy();
- await page.goto(url('student/task'));await page.locator('.task-item').filter({hasText:'recovery task'}).getByRole('button',{name:'继续作答'}).click();await expect(page).toHaveURL(/student\/question$/);
+ await page.goto(url('student/task'));await page.locator('.assignment-row').filter({hasText:'recovery task'}).getByRole('button',{name:'继续作答'}).click();await expect(page).toHaveURL(/student\/question$/);
  let committedPayload:any;
  await page.route('**/answer-records/student/submit',async route=>{
   committedPayload=route.request().postDataJSON();const response=await route.fetch();expect(response.ok()).toBeTruthy();await route.abort('failed');
@@ -32,12 +32,12 @@ test('lost submission response and same-task practice preserve original results'
  await page.getByRole('button',{name:'重试保存作答',exact:true}).click();
  await expect(page.getByText('✗ 回答错误')).toBeVisible();
  await expect(page.locator('.q-save-feedback')).toContainText('本题答案已提交成功');
- await page.reload();await expect(page.locator('.q-dot.wrong')).toHaveCount(1);await expect(page.locator('.q-dot.correct')).toHaveCount(1);
+ await page.reload();await page.getByRole('button',{name:'答题卡'}).click();await expect(page.locator('.palette-number.wrong')).toHaveCount(1);await expect(page.locator('.palette-number.correct')).toHaveCount(1);
  const before=(await(await request.get(url(`answer-records/student/task/${task.id}`),{headers:sh})).json()).data.records;
  expect(before.filter((r:any)=>!r.practice)).toHaveLength(2);
  await page.goto(url(`student/practice?eventId=${task.id}&questionId=${qs[0].id}`));
  await page.locator('label.option-row').filter({hasText:'correct'}).click();await page.getByRole('button',{name:'提交答案',exact:true}).click();await expect(page.locator('.q-save-feedback')).toBeVisible();
- await page.goto(url('student/question'));await expect(page.locator('.q-dot.wrong')).toHaveCount(1);await expect(page.locator('.q-dot.correct')).toHaveCount(1);
+ await page.goto(url('student/question'));await page.getByRole('button',{name:'答题卡'}).click();await expect(page.locator('.palette-number.wrong')).toHaveCount(1);await expect(page.locator('.palette-number.correct')).toHaveCount(1);await page.getByRole('button',{name:'返回当前题目'}).click();
  await expect(page.locator('.result-box')).toContainText('回答错误');
  const after=(await(await request.get(url(`answer-records/student/task/${task.id}`),{headers:sh})).json()).data.records;
  expect(after.filter((r:any)=>!r.practice)).toHaveLength(2);expect(after.filter((r:any)=>r.practice)).toHaveLength(1);
@@ -57,7 +57,7 @@ test('practice drafts cannot overwrite the original result map for the same task
  const me=(await(await request.get(url('user/me'),{headers:sh})).json()).data;
  await page.evaluate(({userId,eventId})=>sessionStorage.setItem('student_task_entry_event_id_'+userId,String(eventId)),{userId:me.id,eventId:task.id});
  await page.goto(url('student/question'));await expect(page).toHaveURL(/student\/question$/);
- await expect(page.locator('.q-dot.wrong')).toHaveCount(1);await expect(page.locator('.q-dot.correct')).toHaveCount(1);
+ await page.getByRole('button',{name:'答题卡'}).click();await expect(page.locator('.palette-number.wrong')).toHaveCount(1);await expect(page.locator('.palette-number.correct')).toHaveCount(1);await page.getByRole('button',{name:'返回当前题目'}).click();
  await page.goto(url(`student/practice?eventId=${task.id}&questionId=${qs[0].id}`));await page.locator('label.option-row').filter({hasText:'correct'}).click();await page.getByRole('button',{name:'提交答案',exact:true}).click();await expect(page.locator('.q-save-feedback')).toBeVisible();
- await page.goto(url('student/question'));await expect(page.locator('.q-dot.wrong')).toHaveCount(1);await expect(page.locator('.q-dot.correct')).toHaveCount(1);await expect(page.locator('.result-box')).toContainText('回答错误');await context.close();
+ await page.goto(url('student/question'));await page.getByRole('button',{name:'答题卡'}).click();await expect(page.locator('.palette-number.wrong')).toHaveCount(1);await expect(page.locator('.palette-number.correct')).toHaveCount(1);await page.getByRole('button',{name:'返回当前题目'}).click();await expect(page.locator('.result-box')).toContainText('回答错误');await context.close();
 });

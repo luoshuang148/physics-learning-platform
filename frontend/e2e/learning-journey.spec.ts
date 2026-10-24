@@ -41,14 +41,14 @@ test('publish → answer → archive → reuse → archived practice, and safe A
   expect(originalTask.questionIds).toContain(question.id);
 
   await login(sp, studentName, password);
-  await sp.goto(url('student/task')); await sp.locator('.task-item').filter({ hasText: `E2E ${tag}` }).getByRole('button', { name: '开始作答' }).click();
+  await sp.goto(url('student/task')); await sp.locator('.assignment-row').filter({ hasText: `E2E ${tag}` }).getByRole('button', { name: '开始作答' }).click();
   await expect(sp).toHaveURL(/student\/question$/);
   await expect(sp.locator('.question-text')).toContainText(content);
   await sp.locator('label.option-row').filter({ hasText: '12m/s²' }).click();
   await sp.getByRole('button', { name: '提交答案', exact: true }).click();
   await expect(sp.getByText('✗ 回答错误')).toBeVisible();
   await expect(sp.locator('.q-save-feedback')).toContainText('本题答案已提交成功');
-  await sp.reload(); await expect(sp.locator('.q-dot.wrong')).toHaveCount(1);
+  await sp.reload(); await sp.getByRole('button',{name:'答题卡'}).click();await expect(sp.locator('.palette-number.wrong')).toHaveCount(1);await sp.getByRole('button',{name:'返回当前题目'}).click();
   const studentHeaders = await headers(sp);
   let summary = await request.get(url(`answer-records/teacher/summary?eventId=${originalTask.id}`), { headers: teacherHeaders });
   expect((await summary.json()).data).toMatchObject({ assignmentAnswers: 1, assignmentCorrect: 0 });
@@ -67,11 +67,11 @@ test('publish → answer → archive → reuse → archived practice, and safe A
   await expect(tp.locator('.task-row').filter({ hasText: `E2E R ${tag}` })).toHaveCount(1);
   const reusedTask = (await (await request.get(url('teacher/events/all'), { headers: teacherHeaders })).json()).data.find((item: any) => item.questionIds.includes(question.id) && item.eventTitle === `E2E R ${tag}`);
   expect(reusedTask.id).not.toEqual(originalTask.id);
-  await sp.goto(url('student/task')); await sp.locator('.task-item').filter({ hasText: `E2E R ${tag}` }).getByRole('button', { name: '开始作答' }).click();
+  await sp.goto(url('student/task')); await sp.locator('.assignment-row').filter({ hasText: `E2E R ${tag}` }).getByRole('button', { name: '开始作答' }).click();
   await expect(sp).toHaveURL(/student\/question$/);
   await expect(sp.locator('label.option-row')).toHaveCount(4);
-  await expect(sp.locator('.q-dot.wrong')).toHaveCount(0);
-  await expect(sp.locator('.q-dot.correct')).toHaveCount(0);
+  await sp.getByRole('button',{name:'答题卡'}).click();await expect(sp.locator('.palette-number.wrong')).toHaveCount(0);
+  await expect(sp.locator('.palette-number.correct')).toHaveCount(0);await sp.getByRole('button',{name:'返回当前题目'}).click();
   // Reusing a question does not reuse completion or report data.
   const emptyReport = await request.get(url(`ai/student/report?eventId=${reusedTask.id}`), { headers: studentHeaders });
   expect(await emptyReport.text()).toContain('无答题记录');

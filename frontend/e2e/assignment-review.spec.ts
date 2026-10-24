@@ -34,7 +34,7 @@ test('report lives inside assignments, including previously answered archived wo
   await page.goto('student/task');
   const nav = page.getByRole('navigation', { name: '学生主导航', exact: true });
   await expect(nav.getByRole('link')).toHaveText(['首页', '作业', '错题本', '学习助手']);
-  await page.locator('.task-item').filter({ hasText: '运动学作业' }).getByRole('link', { name: '查看结果 / 复盘' }).click();
+  await page.locator('.assignment-row').filter({ hasText: '运动学作业' }).getByRole('link', { name: '查看结果 / 复盘' }).click();
   await expect(page).toHaveURL(/student\/report\?eventId=43$/);
   await expect(page.getByRole('heading', { name: '运动学作业', exact: true })).toBeVisible();
   await expect(nav.getByRole('link', { name: '作业', exact: true })).toHaveAttribute('aria-current', 'page');
@@ -104,7 +104,7 @@ test('cached AI review stays scoped to its task and expires after new answers', 
   await page.getByRole('button', { name: '生成 AI 复盘', exact: true }).click();
   await expect(page.locator('.review-output')).toContainText('作业 42 的练习建议');
   await page.getByRole('navigation', { name: '学生主导航', exact: true }).getByRole('link', { name: '作业', exact: true }).click();
-  await page.locator('.task-item').filter({ hasText: '运动学作业' }).getByRole('link', { name: '查看结果 / 复盘' }).click();
+  await page.locator('.assignment-row').filter({ hasText: '运动学作业' }).getByRole('link', { name: '查看结果 / 复盘' }).click();
   await expect(page.getByRole('button', { name: '生成 AI 复盘', exact: true })).toBeVisible();
   await expect(page.locator('.assignment-review')).not.toContainText('作业 42 的练习建议');
   await page.getByRole('button', { name: '生成 AI 复盘', exact: true }).click();

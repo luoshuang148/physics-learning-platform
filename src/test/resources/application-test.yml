@@ -121,6 +121,9 @@ app:
 # AI服务配置 - 测试环境禁用真实API调用
 ai:
   context:
+    # Integration tests mock AliyunAIClient; keep the business gate open so
+    # the consumer reaches the mock instead of short-circuiting AI_DISABLED.
+    enabled: true
     # 禁用外部API调用
     aliyun-api-key: "test-mock-key"
     zhipu-api-key: "test-mock-key"

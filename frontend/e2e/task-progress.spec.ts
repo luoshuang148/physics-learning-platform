@@ -46,18 +46,18 @@ test('each assignment shows saved progress and distinguishes personal state from
   await studentFixture(page);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('student/task');
-  const card = (title: string) => page.locator('.task-item').filter({ hasText: title });
+  const card = (title: string) => page.locator('.assignment-row').filter({ hasText: title });
   await expect(card('尚未作答')).toContainText('已完成 0 / 3 题');
   await expect(card('尚未作答')).toContainText('未开始');
   await expect(card('继续力学作业')).toContainText('已完成 2 / 3 题');
-  await expect(card('继续力学作业')).toContainText('还剩 1 题');
+  await expect(card('继续力学作业')).toContainText('进行中');
   await expect(card('继续力学作业').getByRole('progressbar')).toHaveAttribute('value', '67');
   await expect(card('全部答完')).toContainText('已完成');
   await expect(card('全部答完').getByRole('button', { name: /作答/ })).toHaveCount(0);
   await expect(card('截止未交')).toContainText('未交');
   await expect(card('截止未完成')).toContainText('未完成');
   await expect(card('等待开放')).toContainText('未开放');
-  await expect(page.locator('.task-item').first()).toContainText('继续力学作业');
+  await expect(page.locator('.assignment-row').first()).toContainText('继续力学作业');
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
   await page.screenshot({ path: 'artifacts/verification/task-progress-mobile.png', fullPage: true });
   await page.setViewportSize({ width: 1440, height: 1000 });
@@ -68,7 +68,7 @@ test('each assignment shows saved progress and distinguishes personal state from
 test('continue opens the first unanswered question and saved completion refreshes the assignment card', async ({ page }) => {
   await studentFixture(page);
   await page.goto('student/task');
-  await page.locator('.task-item').filter({ hasText: '继续力学作业' }).getByRole('button', { name: '继续作答', exact: true }).click();
+  await page.locator('.assignment-row').filter({ hasText: '继续力学作业' }).getByRole('button', { name: '继续作答', exact: true }).click();
   await expect(page.locator('.question-text')).toHaveText('第二题');
   await expect(page).toHaveURL(/student\/question$/);
   await page.reload();
@@ -77,7 +77,7 @@ test('continue opens the first unanswered question and saved completion refreshe
   await page.getByRole('button', { name: '提交答案', exact: true }).click();
   await expect(page.locator('.finish-bar')).toBeVisible();
   await page.getByRole('navigation', { name: '学生主导航', exact: true }).getByRole('link', { name: '作业', exact: true }).click();
-  const card = page.locator('.task-item').filter({ hasText: '继续力学作业' });
+  const card = page.locator('.assignment-row').filter({ hasText: '继续力学作业' });
   await expect(card).toContainText('已完成 3 / 3 题');
   await expect(card.getByRole('button', { name: '继续作答', exact: true })).toHaveCount(0);
   await expect(card.getByRole('link', { name: '查看结果 / 复盘' })).toBeVisible();
@@ -95,7 +95,7 @@ test('home uses the same progress and prioritizes unfinished work', async ({ pag
 test('continuing preserves an answer that still needs saving', async ({ page }) => {
   await studentFixture(page, true);
   await page.goto('student/task');
-  await page.locator('.task-item').filter({ hasText: '继续力学作业' }).getByRole('button', { name: '继续作答', exact: true }).click();
+  await page.locator('.assignment-row').filter({ hasText: '继续力学作业' }).getByRole('button', { name: '继续作答', exact: true }).click();
   await expect(page.locator('.question-text')).toHaveText('第二题');
   await expect(page.getByRole('button', { name: '重试保存作答', exact: true })).toBeVisible();
 });
