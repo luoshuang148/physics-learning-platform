@@ -226,3 +226,7 @@ dev-notes/
 
 # Uploaded knowledge files (not source fixtures)
 data/knowledge/
+
+# AI coding workflow plans/specs (local only)
+docs/superpowers/
+**/.DS_Store
