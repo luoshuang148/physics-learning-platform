@@ -3,6 +3,8 @@ package com.zhixuewuli.controller;
 import com.zhixuewuli.common.result.Result;
 import com.zhixuewuli.common.security.AuthenticatedUser;
 import com.zhixuewuli.dto.request.AssistantMessageRequest;
+import com.zhixuewuli.dto.request.AssistantIntentRequest;
+import com.zhixuewuli.service.ai.assistant.AssistantIntentService;
 import com.zhixuewuli.entity.AssistantConversation;
 import com.zhixuewuli.entity.AssistantMessage;
 import com.zhixuewuli.service.ai.assistant.AssistantConversationService;
@@ -30,6 +32,12 @@ public class StudyAssistantController {
 
     private final PlatformQaService qaService;
     private final AssistantConversationService conversations;
+    private final AssistantIntentService intents;
+
+    @PostMapping("/resolve")
+    public Result<AssistantIntentService.Resolution> resolve(@Valid @RequestBody AssistantIntentRequest request) {
+        return Result.success(intents.resolve(request));
+    }
 
     @PostMapping("/messages")
     public SseEmitter messages(@AuthenticationPrincipal AuthenticatedUser user,

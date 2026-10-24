@@ -24,6 +24,19 @@ class QuestionRepositoryIntegrationTest extends BaseIntegrationTest {
     private QuestionRepository questionRepository;
 
     @Test
+    void sqlInsertWithoutAiFieldsUsesTheMigrationDefaults() {
+        jdbcTemplate.update("INSERT INTO questions " +
+                "(content, content_hash, options, correct_option, created_at, updated_at) " +
+                "VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+                "Legacy SQL question", "f".repeat(64), "{\"A\":\"one\"}", "A");
+
+        Question question = jpaEntityManager.createQuery("select q from Question q where q.content=:content", Question.class)
+                .setParameter("content", "Legacy SQL question").getSingleResult();
+        assertThat(question.isAiPracticeEnabled()).isFalse();
+        assertThat(question.getAiContentRevision()).isEqualTo(1L);
+    }
+
+    @Test
     @Rollback
     void testSaveAndFindQuestion() {
         // Given - 创建题目（不关联视频）

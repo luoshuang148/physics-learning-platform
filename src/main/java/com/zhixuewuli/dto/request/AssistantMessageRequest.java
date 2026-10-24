@@ -2,7 +2,10 @@ package com.zhixuewuli.dto.request;
 
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.Valid;
 import lombok.Data;
+import java.util.List;
 
 /**
  * POST /ai/student/assistant/messages 请求。
@@ -18,6 +21,19 @@ public class AssistantMessageRequest {
     /** GENERAL | PLATFORM */
     @NotNull(message = "模式不能为空")
     private String mode = "GENERAL";
+
+    /** Resolved topic for a short follow-up; remains untrusted question data. */
+    @Size(max = 1600)
+    private String retrievalQuery;
+
+    private boolean excludeAttempted;
+
+    @Valid @Size(max = 8)
+    private List<Turn> history = List.of();
+
+    public record Turn(@NotNull @Pattern(regexp = "USER|ASSISTANT") String role,
+                       @NotNull @Size(max = 4000) String content,
+                       @NotNull @Size(max = 30) List<@Size(max = 120) String> sourceIds) {}
 
     private Long conversationId;
 

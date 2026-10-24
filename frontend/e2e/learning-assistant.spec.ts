@@ -12,6 +12,7 @@ test('student generates, saves, activates and opens a learning plan using mocked
     const request = route.request();
     const path = new URL(request.url()).pathname.replace('/api/v1', '');
     if (path === '/user/me') return route.fulfill({ json: { code: 200, data: { id: 7, username: 'student', realName: '李同学', userType: 'STUDENT' } } });
+    if (path === '/ai/student/assistant/resolve') return route.fulfill({ json: { code: 200, data: { intent: 'PLAN', query: request.postDataJSON().question, days: 3, excludeAttempted: false } } });
     if (path === '/ai/capabilities') return route.fulfill({ json: { code: 200, data: { reports: false, tutoring: false, workflowReady: true, agentReady: false } } });
     if (path === '/teacher/events/available') return route.fulfill({ json: { code: 200, data: [{ id: 42, eventTitle: '牛顿定律作业', questionIds: [31], questionCount: 1 }] } });
     if (path === '/ai/student/learning-plan/preview' && request.method() === 'POST') {
@@ -35,11 +36,10 @@ test('student generates, saves, activates and opens a learning plan using mocked
   });
 
   await page.goto('student/ai');
-  await page.getByRole('button', { name: '复习计划' }).click();
-  await expect(page.getByLabel('选择作业')).toHaveValue('42');
-  await page.getByLabel('你想重点复习什么？').fill('帮我针对这次作业的错题安排三天复习');
-  await page.getByRole('button', { name: '生成建议' }).click();
+  await page.getByRole('textbox', { name: '输入你的物理问题' }).fill('帮我针对这次作业的错题安排三天复习');
+  await page.getByRole('button', { name: '发送消息', exact: true }).click();
   await expect(page.getByText('复习工作流', { exact: true })).toBeVisible();
+  await page.getByText('查看生成依据', { exact: true }).click();
   await expect(page.getByText('已读取本人错题和历史快照')).toBeVisible();
   await expect(page.getByText('使用的证据标识：W1、S1')).toBeVisible();
   await page.getByRole('button', { name: '保存草稿' }).click();
@@ -47,8 +47,8 @@ test('student generates, saves, activates and opens a learning plan using mocked
   await page.getByRole('button', { name: '激活计划' }).click();
   await expect(page.getByText('状态：ACTIVE')).toBeVisible();
   await page.reload();
-  await page.getByRole('button', { name: '复习计划' }).click();
-  await page.getByRole('button', { name: /作业 42 · ACTIVE · 复习工作流/ }).click();
+  await page.getByRole('button', { name: '我的复习计划', exact: true }).click();
+  await page.getByRole('button', { name: /3 天复习 · 进行中/ }).click();
   await expect(page.getByText('状态：ACTIVE')).toBeVisible();
   await page.getByRole('button', { name: '去练习' }).click();
   await expect(page).toHaveURL(/student\/practice\?eventId=42&questionId=31/);

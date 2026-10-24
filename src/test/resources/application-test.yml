@@ -75,6 +75,10 @@ management:
 
 # 应用配置
 app:
+  # 测试数据只由各场景创建，避免本机 .env 的首次教师初始化污染计数和权限测试。
+  # BootstrapTeacherIntegrationTest 会显式覆盖为 true。
+  bootstrap-teacher:
+    enabled: false
   report-batch:
     enabled: false
   video:

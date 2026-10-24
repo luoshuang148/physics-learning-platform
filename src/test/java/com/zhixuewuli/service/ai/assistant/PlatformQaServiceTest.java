@@ -60,7 +60,7 @@ class PlatformQaServiceTest {
                 .thenReturn(new com.zhixuewuli.entity.AssistantMessage());
         when(conversations.startRun(anyString(), anyString(), anyLong(), anyLong(), anyString()))
                 .thenReturn(new AssistantRun());
-        when(modelGateway.complete(anyString(), anyString(), any())).thenReturn("这是回答");
+        when(modelGateway.stream(anyString(), anyString(), any(), any())).thenReturn("这是回答");
     }
 
     private AssistantConversation conversation(long id) {
@@ -94,7 +94,7 @@ class PlatformQaServiceTest {
     void generalModeNoFakeSources() {
         qa.stream(100L, request("GENERAL"), new SseEmitter());
         verify(conversations).appendAssistantMessage(eq(1L), eq("GENERAL"), anyString(), isNull(), eq("COMPLETED"));
-        verify(modelGateway).complete(anyString(), anyString(), any());
+        verify(modelGateway).stream(anyString(), anyString(), any(), any());
     }
 
     @Test
@@ -141,7 +141,41 @@ class PlatformQaServiceTest {
         AssistantMessageRequest request = request("PLATFORM");
         request.setRequestId("fixed-request");
         qa.stream(100L, request, new SseEmitter());
-        verify(modelGateway, never()).complete(anyString(), anyString(), any());
+        verify(modelGateway, never()).stream(anyString(), anyString(), any(), any());
+    }
+
+    @Test
+    void disconnectedResponseKeepsCancelledStatusWithoutSendingACompleteEvent() {
+        java.util.concurrent.atomic.AtomicBoolean disconnected = new java.util.concurrent.atomic.AtomicBoolean();
+        java.util.concurrent.atomic.AtomicReference<Runnable> disconnect = new java.util.concurrent.atomic.AtomicReference<>();
+        SseEmitter emitter = new SseEmitter() {
+            @Override public synchronized void onCompletion(Runnable callback) { disconnect.set(callback); }
+            @Override public void send(SseEventBuilder builder) throws java.io.IOException {
+                if (disconnected.get()) throw new AssertionError("must not write after cancellation");
+            }
+        };
+        when(modelGateway.stream(anyString(), anyString(), any(), any())).thenAnswer(invocation -> {
+            disconnected.set(true);
+            disconnect.get().run();
+            return "已生成的部分回答";
+        });
+        qa.stream(100L, request("GENERAL"), emitter);
+        verify(conversations).appendAssistantMessage(eq(1L), eq("GENERAL"), eq("已生成的部分回答"), isNull(), eq("CANCELLED"));
+        verify(conversations).finishRun(anyString(), eq("CANCELLED"), isNull());
+        verify(conversations, never()).finishRun(anyString(), eq("FAILED"), any());
+    }
+
+    @Test
+    void carriesConversationHistoryButDropsRevokedSourceAnswers() {
+        var request = request("GENERAL");
+        request.setHistory(List.of(
+                new AssistantMessageRequest.Turn("USER", "解释牛顿第二定律", List.of()),
+                new AssistantMessageRequest.Turn("ASSISTANT", "先画受力图，再沿运动方向列式", List.of()),
+                new AssistantMessageRequest.Turn("ASSISTANT", "已失效题库秘密内容", List.of("Q:99:1:QUESTION:0"))));
+        when(sourceService.requireReadable(100L, "Q:99:1:QUESTION:0")).thenThrow(new IllegalArgumentException("revoked"));
+        qa.stream(100L, request, new SseEmitter());
+        verify(modelGateway).stream(anyString(), argThat(value -> value.contains("先画受力图")
+                && !value.contains("已失效题库秘密内容")), any(), any());
     }
 
     @Test

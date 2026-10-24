@@ -35,6 +35,7 @@ class AnswerRecordQueryRegressionTest {
             question.setOptions("{\"A\":\"one\",\"B\":\"two\",\"C\":\"three\",\"D\":\"four\"}");
             question.setCorrectOption("A");
             question.setDifficulty(1);
+            question.setKnowledgePointCodes(java.util.List.of("mechanics.newton"));
             em.persist(question);
             AnswerRecord answer = new AnswerRecord();
             answer.setUserId(student.getId());
@@ -53,6 +54,8 @@ class AnswerRecordQueryRegressionTest {
         long count = statistics.getPrepareStatementCount();
         System.out.println("cold-list: 25 distinct questions, SQL statements=" + count);
         assertThat(result.getRecords()).hasSize(25);
+        assertThat(result.getRecords()).allSatisfy(record ->
+                assertThat(record.getKnowledgePointCodes()).containsExactly("mechanics.newton"));
         assertThat(count).isLessThanOrEqualTo(3);
     }
 

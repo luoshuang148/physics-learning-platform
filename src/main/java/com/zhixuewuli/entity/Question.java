@@ -92,6 +92,7 @@ public class Question extends BaseTimeEntity {
     /** Human-maintained tags. Serialized into task/answer snapshots as stable codes. */
     @JsonIgnore
     @OneToMany(mappedBy = "question", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
+    @org.hibernate.annotations.BatchSize(size = 50)
     private List<QuestionKnowledgePoint> knowledgePoints = new ArrayList<>();
 
     @JsonProperty("knowledgePointCodes")
@@ -122,6 +123,7 @@ public class Question extends BaseTimeEntity {
      * 仅当可用文字内容且解析完整时，教师审核后开启。
      */
     @Column(name = "ai_practice_enabled", nullable = false)
+    @org.hibernate.annotations.ColumnDefault("false")
     private boolean aiPracticeEnabled = false;
 
     /**
@@ -129,6 +131,7 @@ public class Question extends BaseTimeEntity {
      * 纯时间戳变化不递增。
      */
     @Column(name = "ai_content_revision", nullable = false)
+    @org.hibernate.annotations.ColumnDefault("1")
     private long aiContentRevision = 1L;
 
     /**
