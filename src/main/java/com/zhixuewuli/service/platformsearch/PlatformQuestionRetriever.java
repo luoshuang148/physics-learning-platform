@@ -62,8 +62,12 @@ public class PlatformQuestionRetriever {
             if (batch.vectors().isEmpty()) throw new IllegalStateException("NO_QUERY_VECTOR");
             String indexVersion = pickIndexVersion(allowed);
             if (indexVersion != null) {
+                // 关键词无命中时提高向量门槛，避免把无关近邻当结果
+                double minScore = keywordRows.isEmpty()
+                        ? QdrantQuestionVectorIndex.MIN_VECTOR_SCORE_WITHOUT_KEYWORD
+                        : QdrantQuestionVectorIndex.MIN_VECTOR_SCORE;
                 List<QuestionVectorPoint> vectorHits = vectorIndex.search(indexVersion, allowed,
-                        batch.vectors().get(0), perSource);
+                        batch.vectors().get(0), perSource, minScore);
                 for (QuestionVectorPoint point : vectorHits) {
                     var unit = searchUnits.findByQuestionIdAndRevisionOrderByPartAscOrdinalNoAsc(
                                     point.questionId(), point.revision()).stream()

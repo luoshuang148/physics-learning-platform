@@ -144,7 +144,7 @@ class PlatformQuestionRetrievalTest {
                 unit(1L, 1L, "EXPLANATION", 0, "牛顿第三定律解析")));
         when(embeddings.embed(anyList(), eq(true), any())).thenReturn(
                 new EmbeddingBatch("m", 4, List.of(new float[]{1, 0, 0, 0})));
-        when(vectorIndex.search(anyString(), anyList(), any(), anyInt())).thenReturn(List.of());
+        when(vectorIndex.search(anyString(), anyList(), any(), anyInt(), anyDouble())).thenReturn(List.of());
 
         var result = retriever.retrieve(100L, request("作用力与反作用力"), () -> false);
         assertEquals(RetrievalStatus.MATCHED, result.status());
@@ -195,7 +195,7 @@ class PlatformQuestionRetrievalTest {
         when(searchUnits.searchByFullText(anyString(), anyList(), anyInt())).thenReturn(List.of());
         when(embeddings.embed(anyList(), eq(true), any())).thenReturn(
                 new EmbeddingBatch("m", 4, List.of(new float[]{1, 0, 0, 0})));
-        when(vectorIndex.search(anyString(), anyList(), any(), anyInt())).thenReturn(List.of());
+        when(vectorIndex.search(anyString(), anyList(), any(), anyInt(), anyDouble())).thenReturn(List.of());
 
         var result = retriever.retrieve(100L, request("完全无关的查询"), () -> false);
         assertEquals(RetrievalStatus.INSUFFICIENT, result.status());

@@ -142,7 +142,8 @@ public final class PlatformRetrievalTypes {
             long revision,
             Part part,
             int ordinal,
-            float[] vector
+            float[] vector,
+            double score
     ) {
         @Override
         public boolean equals(Object o) {

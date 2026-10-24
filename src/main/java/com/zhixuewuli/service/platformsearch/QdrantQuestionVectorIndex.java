@@ -24,6 +24,13 @@ import java.util.Map;
 public class QdrantQuestionVectorIndex implements QuestionVectorIndex {
 
     private static final int MAX_ATTEMPTS = 3;
+    /**
+     * 向量相关性下限（Qdrant Cosine score，越高越相似）。
+     * 在开发集上调整后冻结；禁止把相似度当作正确概率。
+     */
+    public static final double MIN_VECTOR_SCORE = 0.45d;
+    /** 关键词无命中时，向量需达到更高分才接受（否则视为无相关内容）。 */
+    public static final double MIN_VECTOR_SCORE_WITHOUT_KEYWORD = 0.62d;
 
     private final RestClient client;
     private final KnowledgeProperties properties;
@@ -102,7 +109,7 @@ public class QdrantQuestionVectorIndex implements QuestionVectorIndex {
 
     @Override
     public List<QuestionVectorPoint> search(String indexVersion, List<EligibleQuestion> allowed,
-                                            float[] vector, int limit) {
+                                            float[] vector, int limit, double minScore) {
         if (vector == null || vector.length == 0 || limit < 1
                 || allowed == null || allowed.isEmpty()) {
             return List.of();
@@ -130,8 +137,10 @@ public class QdrantQuestionVectorIndex implements QuestionVectorIndex {
                 int ordinal = payload.path("ordinal").asInt(0);
                 if (questionId <= 0) continue;
                 if (!allowedSet.contains(new EligibleQuestion(questionId, revision))) continue;
+                double score = hit.path("score").asDouble(0d);
+                if (score < minScore) continue;
                 hits.add(new QuestionVectorPoint(hit.path("id").asText(), questionId, revision,
-                        Part.valueOf(part), ordinal, null));
+                        Part.valueOf(part), ordinal, null, score));
             }
         }
         return hits;

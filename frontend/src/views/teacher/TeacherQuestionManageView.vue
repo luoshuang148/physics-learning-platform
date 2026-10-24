@@ -141,6 +141,22 @@
             </div>
           </div>
 
+          <div class="form-section">
+            <div class="form-label">AI 补练</div>
+            <label class="ai-toggle">
+              <input v-model="form.aiPracticeEnabled" type="checkbox" />
+              <span>允许用于 AI 补练检索</span>
+            </label>
+            <p class="ai-hint">仅当题干与解析均为文字且完整时才能开启。开启后题目会进入向量索引。</p>
+            <div v-if="indexStatus" class="index-status">
+              <span>索引状态：<strong :class="'idx-' + indexStatus.status.toLowerCase()">{{ indexStatus.status }}</strong></span>
+              <span v-if="indexStatus.failureCode" class="idx-fail">原因 {{ indexStatus.failureCode }}</span>
+              <button class="ghost-btn" :disabled="indexBusy" @click="reindexNow">
+                {{ indexBusy ? '排队中…' : '重试索引' }}
+              </button>
+            </div>
+          </div>
+
           <div class="form-actions">
             <button class="cancel-btn" @click="closeForm">取消</button>
             <button class="submit-btn" :disabled="submitting || imageReading || !form.content.trim()" @click="submit">
@@ -174,7 +190,7 @@ import LatexText from '@/components/LatexText.vue';
 import { useToast } from '@/composables/useToast';
 import { useAuthStore } from '@/stores/auth';
 import { useQuestionCatalog } from '@/composables/useQuestionCatalog';
-import { createQuestionApi, deleteQuestionApi, getQuestionByIdApi, getKnowledgePointsApi, updateQuestionApi } from '@/api/question';
+import { createQuestionApi, deleteQuestionApi, getQuestionByIdApi, getKnowledgePointsApi, updateQuestionApi, getQuestionIndexStatusApi, reindexQuestionApi } from '@/api/question';
 import type { QuestionResponse, QuestionCatalogRow, KnowledgePoint } from '@/types/question';
 
 const auth = useAuthStore();
@@ -204,7 +220,10 @@ const form = reactive({
   difficulty: 3 as number | null,
   imageBase64: '',
   knowledgePointCodes: [] as string[],
+  aiPracticeEnabled: false,
 });
+const indexStatus = ref<import('@/types/question').QuestionIndexStatus | null>(null);
+const indexBusy = ref(false);
 
 void getKnowledgePointsApi().then(points => { knowledgePointOptions.value = points; }).catch(() => show('知识点目录加载失败', 'error'));
 
@@ -224,6 +243,8 @@ const resetForm = () => {
   form.difficulty = 3;
   form.imageBase64 = '';
   form.knowledgePointCodes = [];
+  form.aiPracticeEnabled = false;
+  indexStatus.value = null;
   optionInputs.A = '';
   optionInputs.B = '';
   optionInputs.C = '';
@@ -249,12 +270,27 @@ const openEdit = async (row: QuestionCatalogRow) => {
   form.difficulty = q.difficulty;
   form.imageBase64 = q.imageBase64 ?? '';
   form.knowledgePointCodes = q.knowledgePointCodes ?? [];
+  form.aiPracticeEnabled = q.aiPracticeEnabled ?? false;
   optionInputs.A = q.options?.A ?? '';
   optionInputs.B = q.options?.B ?? '';
   optionInputs.C = q.options?.C ?? '';
   optionInputs.D = q.options?.D ?? '';
   showForm.value = true;
+  void getQuestionIndexStatusApi(q.id).then(s => { indexStatus.value = s; }).catch(() => { indexStatus.value = null; });
   } catch { if (owner === editSequence) show('题目详情加载失败，请重试', 'error'); }
+};
+
+const reindexNow = async () => {
+  if (!editing.value) return;
+  indexBusy.value = true;
+  try {
+    indexStatus.value = await reindexQuestionApi(editing.value.id);
+    show('已重新排队索引', 'success');
+  } catch {
+    show('重试索引失败', 'error');
+  } finally {
+    indexBusy.value = false;
+  }
 };
 
 const closeForm = () => {
@@ -336,6 +372,7 @@ const submit = async () => {
       difficulty: form.difficulty,
       imageBase64: form.imageBase64 || undefined,
       knowledgePointCodes: form.knowledgePointCodes,
+      aiPracticeEnabled: form.aiPracticeEnabled,
     };
     if (editing.value) {
       await updateQuestionApi({ ...payload, id: editing.value.id });
@@ -550,6 +587,13 @@ const doDelete = async () => {
 .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .half { min-width: 0; }
 .form-label { font-size: 12px; color: var(--text-muted); }
+.ai-toggle { display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; }
+.ai-hint { margin: 0; font-size: 11px; color: var(--text-muted); line-height: 1.5; }
+.index-status { display: flex; align-items: center; gap: 10px; font-size: 12px; flex-wrap: wrap; }
+.idx-ready { color: #3d9a6a; }
+.idx-failed { color: #c45c5c; }
+.idx-pending, .idx-indexing { color: #b08a3e; }
+.idx-fail { color: #c45c5c; }
 .form-required { color: #dc2626; }
 .form-textarea,
 .form-input,

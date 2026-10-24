@@ -21,7 +21,7 @@ public interface QuestionVectorIndex {
      * 必须同时过滤 allowed（questionId+revision），禁止以过滤后不足为理由扩大授权范围。
      */
     List<QuestionVectorPoint> search(String indexVersion, List<EligibleQuestion> allowed,
-                                     float[] vector, int limit);
+                                     float[] vector, int limit, double minScore);
 
     /** 删除某题 <= throughRevision 的向量点。 */
     void deleteQuestion(String indexVersion, long questionId, long throughRevision);

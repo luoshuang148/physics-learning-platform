@@ -6,6 +6,7 @@ export interface QuestionPayload {
   difficulty?: number | null;
   imageBase64?: string;
   knowledgePointCodes?: string[];
+  aiPracticeEnabled?: boolean;
 }
 
 export interface QuestionUpdatePayload extends QuestionPayload {
@@ -24,6 +25,15 @@ export interface QuestionResponse {
   createdAt: string;
   updatedAt: string;
   knowledgePointCodes?: string[];
+  aiPracticeEnabled?: boolean;
+  aiContentRevision?: number;
+}
+
+export interface QuestionIndexStatus {
+  questionId: number;
+  revision: number;
+  status: 'PENDING' | 'INDEXING' | 'READY' | 'FAILED' | 'OBSOLETE' | 'DELETED' | 'DISABLED';
+  failureCode: string | null;
 }
 
 export interface KnowledgePoint {

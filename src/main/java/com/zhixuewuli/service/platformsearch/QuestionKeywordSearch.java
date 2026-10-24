@@ -8,6 +8,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 
 /**
@@ -39,36 +40,88 @@ public class QuestionKeywordSearch {
         if (preferFullText) {
             try {
                 List<QuestionSearchUnit> rows = searchUnits.searchByFullText(cleaned, candidateIds, limit);
-                return toHits(rows, "fulltext");
+                if (!rows.isEmpty()) {
+                    return toHits(rows, "fulltext");
+                }
+                // FULLTEXT 可执行但 0 命中 → 继续走 LIKE 适配器补召回
             } catch (Exception error) {
                 log.warn("FULLTEXT 检索不可用，降级 LIKE 适配器: {}", error.getMessage());
             }
         }
         // 显式 LIKE 适配器（actualMode 记录 lexical_only）
         List<QuestionSearchUnit> rows = new ArrayList<>();
-        for (String token : tokenize(cleaned)) {
+        List<String> tokens = tokenize(cleaned);
+        if (tokens.isEmpty()) return List.of();
+        for (String token : tokens) {
             rows.addAll(searchUnits.searchByTokenLike(token, candidateIds, limit));
             if (rows.size() >= limit * 2) break;
         }
-        return toHits(rows.stream().distinct().limit(limit).toList(), "lexical_only");
+        // 要求至少命中两个不同 token，或命中最长 token（降低「物理」等通用词误召回）
+        String longest = tokens.stream().max(Comparator.comparingInt(String::length)).orElse("");
+        List<QuestionSearchUnit> filtered = rows.stream()
+                .distinct()
+                .filter(row -> {
+                    String text = row.getUnitText() == null ? "" : row.getUnitText();
+                    long matched = tokens.stream().filter(text::contains).count();
+                    return matched >= 2 || (longest.length() >= 3 && text.contains(longest));
+                })
+                .limit(limit)
+                .toList();
+        return toHits(filtered, "lexical_only");
     }
 
-    /** 简易中文分词：连续 CJK/字母数字作为 token。 */
+    /**
+     * 简易中文分词：CJK 走 2/3 字 n-gram，字母数字按连续串。
+     * 单字 CJK 不检索（避免全表噪声）；无真实分词器时这是可测试的降级适配器。
+     */
     static List<String> tokenize(String query) {
         List<String> tokens = new ArrayList<>();
-        StringBuilder buffer = new StringBuilder();
+        StringBuilder ascii = new StringBuilder();
+        StringBuilder cjk = new StringBuilder();
+
+        Runnable flushAscii = () -> {
+            if (ascii.length() > 0) {
+                tokens.add(ascii.toString());
+                ascii.setLength(0);
+            }
+        };
+        Runnable flushCjk = () -> {
+            if (cjk.length() > 0) {
+                String run = cjk.toString();
+                if (run.length() == 1) {
+                    // 单字跳过
+                } else if (run.length() == 2) {
+                    tokens.add(run);
+                } else {
+                    for (int i = 0; i + 1 < run.length(); i++) {
+                        tokens.add(run.substring(i, i + 2));
+                        if (i + 3 <= run.length() && i + 2 < run.length()) {
+                            tokens.add(run.substring(i, i + 3));
+                        }
+                    }
+                }
+                cjk.setLength(0);
+            }
+        };
+
         for (int i = 0; i < query.length(); i++) {
             char c = query.charAt(i);
-            if (Character.isLetterOrDigit(c) || (c >= 0x4E00 && c <= 0x9FFF)) {
-                buffer.append(c);
-            } else if (buffer.length() > 0) {
-                tokens.add(buffer.toString());
-                buffer.setLength(0);
+            boolean isCjkChar = c >= 0x4E00 && c <= 0x9FFF;
+            if (isCjkChar) {
+                flushAscii.run();
+                cjk.append(c);
+            } else if (Character.isLetterOrDigit(c)) {
+                flushCjk.run();
+                ascii.append(c);
+            } else {
+                flushAscii.run();
+                flushCjk.run();
             }
         }
-        if (buffer.length() > 0) tokens.add(buffer.toString());
-        // 过短 token 不检索（避免全表噪声）
-        return tokens.stream().filter(t -> t.length() >= 1).distinct().limit(8).toList();
+        flushAscii.run();
+        flushCjk.run();
+
+        return tokens.stream().distinct().limit(12).toList();
     }
 
     private List<KeywordHit> toHits(List<QuestionSearchUnit> rows, String mode) {

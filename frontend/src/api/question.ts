@@ -58,3 +58,17 @@ export const deleteQuestionApi = async (id: number): Promise<void> => {
   await request.delete<ApiResponse<void>>(`/questions/teacher/delete/${id}`);
 };
 
+
+export const getQuestionIndexStatusApi = async (id: number): Promise<import('@/types/question').QuestionIndexStatus> => {
+  const { data } = await request.get<ApiResponse<import('@/types/question').QuestionIndexStatus>>(
+    `/questions/teacher/${id}/index-status`,
+  );
+  return data.data;
+};
+
+export const reindexQuestionApi = async (id: number): Promise<import('@/types/question').QuestionIndexStatus> => {
+  const { data } = await request.post<ApiResponse<import('@/types/question').QuestionIndexStatus>>(
+    `/questions/teacher/${id}/reindex`,
+  );
+  return data.data;
+};

@@ -1,0 +1,20 @@
+{
+  "corpusVersion": "platform-rag-v2",
+  "createdAt": "2026-10-24",
+  "reviewStatus": "developer_checked",
+  "initialCheck": "ai_assisted",
+  "description": "平台题库检索与计划任务评测语料。语料可包含目标题；检索问题与标签不进入模型提示词。",
+  "topics": ["kinematics", "newton", "friction", "energy"],
+  "fixtureSource": "scripts/fixtures/platform-rag/questions.jsonl",
+  "splits": {
+    "development": 60,
+    "holdout": 40
+  },
+  "agentTasks": 20,
+  "metrics": {
+    "hitAt5": "目标 ≥85%（相关题存在时题目级去重）",
+    "noResultHandling": "目标 ≥90% 不编造题号",
+    "citationValidity": "来源 ID 必须来自本次授权结果，结构校验 100%"
+  },
+  "notes": "留出集只用于冻结后的最终评测；阈值在开发集调整后冻结。人工复核范围标注为开发者核对，非物理专业复核。"
+}
